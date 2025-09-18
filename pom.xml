@@ -10,7 +10,7 @@
 
 		<!-- PR-labelled release -->
 		<!-- FIXME: Decide on version -->
-		<version>2025.0-PR3332</version>
+		<version>2026.0-PR4244</version>
 
 		<!-- snapshot == not recommended: rather use PR-labelled release!-->
 <!--		<version>2025.0-SNAPSHOT</version>-->
@@ -18,15 +18,15 @@
 
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>com.github.matsim-scenarios</groupId>
-	<artifactId>matsim-template</artifactId>
-	<version>1.x-SNAPSHOT</version>
+	<artifactId>matsim-dresden</artifactId>
+	<version>1.0</version>
 
-	<name>MATSim Template Model</name>
-	<description>A transport model of template</description>
+	<name>MATSim Dresden Model</name>
+	<description>A transport model of Dresden</description>
 
 	<properties>
 		<!-- FIXME: change main class -->
-		<main.class>org.matsim.run.RunTemplateScenario</main.class>
+		<main.class>org.matsim.run.RunDresdenScenario</main.class>
 
 		<!-- Don't modify, will use the same version as parent -->
 		<matsim.version>${project.parent.version}</matsim.version>
@@ -41,7 +41,7 @@
 			<id>github</id>
 			<name>GitHub Packages</name>
 			<!-- FIXME: Update Repo -->
-			<url>https://maven.pkg.github.com/matsim-scenarios/matsim-template-scenario</url>
+			<url>https://maven.pkg.github.com/matsim-scenarios/matsim-dresden</url>
 		</repository>
 	</distributionManagement>
 
