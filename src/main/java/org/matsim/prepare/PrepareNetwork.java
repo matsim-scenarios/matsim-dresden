@@ -10,12 +10,11 @@ import org.matsim.application.MATSimAppCommand;
 import org.matsim.contrib.emissions.HbefaRoadTypeMapping;
 import org.matsim.contrib.emissions.OsmHbefaMapping;
 import org.matsim.core.network.NetworkUtils;
-import org.matsim.core.network.algorithms.MultimodalNetworkCleaner;
 import picocli.CommandLine;
 
 import java.util.Set;
 
-import static org.matsim.run.scenarios.DresdenScenario.FREIGHT_MODES;
+import static org.matsim.utils.DresdenUtils.FREIGHT_MODES;
 
 @CommandLine.Command(
 		name = "network",
@@ -67,8 +66,7 @@ public class PrepareNetwork implements MATSimAppCommand {
 		}
 
 		log.info("For {} links the freight modes {} have been added as allowed modes.", linkCount, FREIGHT_MODES);
-
-		new MultimodalNetworkCleaner(network).run(FREIGHT_MODES);
+		NetworkUtils.cleanNetwork(network, FREIGHT_MODES);
 	}
 
 	/**
