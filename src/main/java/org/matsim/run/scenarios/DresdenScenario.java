@@ -15,17 +15,21 @@ import org.matsim.application.prepare.population.*;
 import org.matsim.application.prepare.pt.CreateTransitScheduleFromGtfs;
 import org.matsim.core.config.Config;
 import org.matsim.core.controler.Controler;
+import org.matsim.prepare.CutOutDresdenPopulation;
 import org.matsim.prepare.PrepareNetwork;
+import org.matsim.prepare.PreparePopulation;
+import org.matsim.smallScaleCommercialTrafficGeneration.GenerateSmallScaleCommercialTrafficDemand;
+import org.matsim.smallScaleCommercialTrafficGeneration.prepare.CreateDataDistributionOfStructureData;
 import picocli.CommandLine;
-
-import java.util.Set;
 
 @CommandLine.Command(header = ":: Dresden Scenario ::", version = DresdenScenario.VERSION, mixinStandardHelpOptions = true)
 @MATSimApplication.Prepare({
 		CreateNetworkFromSumo.class, CreateTransitScheduleFromGtfs.class, TrajectoryToPlans.class, GenerateShortDistanceTrips.class,
 		MergePopulations.class, ExtractRelevantFreightTrips.class, DownSamplePopulation.class, ExtractHomeCoordinates.class,
 		CreateLandUseShp.class, ResolveGridCoordinates.class, FixSubtourModes.class, AdjustActivityToLinkDistances.class, XYToLinks.class,
-		CleanNetwork.class, PrepareNetwork.class, SplitActivityTypesDuration.class, CreateCountsFromBAStData.class
+		CleanNetwork.class, PrepareNetwork.class, SplitActivityTypesDuration.class, CreateCountsFromBAStData.class,
+		CutOutDresdenPopulation.class, CreateDataDistributionOfStructureData.class, GenerateSmallScaleCommercialTrafficDemand.class,
+		PreparePopulation.class
 })
 @MATSimApplication.Analysis({
 		LinkStats.class, CheckPopulation.class
@@ -33,11 +37,6 @@ import java.util.Set;
 public class DresdenScenario extends MATSimApplication {
 
 	static final String VERSION = "v1.0";
-
-	public static final String HEAVY_MODE = "truck40t";
-	public static final String MEDIUM_MODE = "truck18t";
-	public static final String LIGHT_MODE = "truck8t";
-	public static final Set<String> FREIGHT_MODES = Set.of(HEAVY_MODE, MEDIUM_MODE, LIGHT_MODE);
 
 	@CommandLine.Mixin
 	private final SampleOptions sample = new SampleOptions(100, 25, 10, 1);

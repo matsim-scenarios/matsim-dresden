@@ -3,7 +3,10 @@ package org.matsim.run;
 import org.matsim.application.MATSimApplication;
 import org.matsim.run.scenarios.DresdenScenario;
 
-public class RunDresdenScenario {
+/**
+ * Run the Dresden scenario with default configuration.
+ */
+public final class RunDresdenScenario {
 	private RunDresdenScenario() {
 
 	}
