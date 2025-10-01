@@ -12,28 +12,28 @@ import org.matsim.application.MATSimAppCommand;
 import org.matsim.application.options.CrsOptions;
 import org.matsim.application.options.ShpOptions;
 import org.matsim.application.prepare.population.CleanPopulation;
-import org.matsim.application.prepare.scenario.CreateScenarioCutOut;
 import org.matsim.core.config.Config;
 import org.matsim.core.config.ConfigUtils;
 import org.matsim.core.controler.Controler;
 import org.matsim.core.population.PopulationUtils;
-import org.matsim.core.population.algorithms.ParallelPersonAlgorithmUtils;
 import org.matsim.core.population.algorithms.TripsToLegsAlgorithm;
 import org.matsim.core.population.routes.NetworkRoute;
 import org.matsim.core.router.*;
 import org.matsim.core.scenario.ScenarioUtils;
 import org.matsim.core.utils.geometry.geotools.MGC;
-import org.matsim.utils.DresdenUtils;
 import picocli.CommandLine;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 
 import static org.matsim.application.ApplicationUtils.globFile;
 
+@CommandLine.Command(
+	name = "cutout",
+	description = "Cut out a population from a bigger population based on network routing and a shp file."
+)
 public class CutOutDresdenPopulation implements MATSimAppCommand {
 	Logger log = LogManager.getLogger(CutOutDresdenPopulation.class);
 
@@ -41,15 +41,12 @@ public class CutOutDresdenPopulation implements MATSimAppCommand {
 	private String populationPath;
 	@CommandLine.Option(names = "--network", description = "Path to network", required = true)
 	private String networkPath;
-	@CommandLine.Option(names = "--buffer", description = "Buffer around zones in meter", defaultValue = "5000")
+	@CommandLine.Option(names = "--buffer", description = "Buffer around zones in meter", defaultValue = "0")
 	private double buffer;
 	@CommandLine.Option(names = "--output-population", description = "Path to output population", required = true)
 	private String outputPopulation;
 	@CommandLine.Option(names = "--network-mode", description = "Mode to be used for network routing", defaultValue = TransportMode.car)
 	private String mode;
-	@CommandLine.Option(names = "--beeline", description = "If activated, it is checked if agents' routes go through the defined area by beeline -- connecting start and end of a trip --" +
-		"rather than network routes.", defaultValue = "DISABLED")
-	private DresdenUtils.FunctionalityHandling beeline;
 	@CommandLine.Mixin
 	private CrsOptions crs;
 	@CommandLine.Mixin
@@ -74,71 +71,75 @@ public class CutOutDresdenPopulation implements MATSimAppCommand {
 		Scenario scenario = ScenarioUtils.loadScenario(config);
 
 		Geometry geom = shp.getGeometry(crs.getInputCRS());
-		Geometry geomBuffer = geom.buffer(buffer);
+
+		if (buffer != 0.) {
+			geom = geom.buffer(buffer);
+		}
 
 		Population population;
 
-		if (beeline == DresdenUtils.FunctionalityHandling.ENABLED) {
-//			use CR logic from Cutout. It is checked if either activities or the beeline of a leg's route touches the shp
-			ParallelPersonAlgorithmUtils.run(scenario.getPopulation(), Runtime.getRuntime().availableProcessors(), new CreateScenarioCutOut());
-			population = scenario.getPopulation();
-		} else {
-			final TripsToLegsAlgorithm trips2Legs = new TripsToLegsAlgorithm(new RoutingModeMainModeIdentifier());
+		final TripsToLegsAlgorithm trips2Legs = new TripsToLegsAlgorithm(new RoutingModeMainModeIdentifier());
 
-			for (Person person : scenario.getPopulation().getPersons().values()) {
-				for (Plan plan : person.getPlans()) {
+		for (Person person : scenario.getPopulation().getPersons().values()) {
+			for (Plan plan : person.getPlans()) {
 //					make trips = legs
-					trips2Legs.run(plan);
+				trips2Legs.run(plan);
 
-					for (PlanElement el : plan.getPlanElements()) {
-						if (el instanceof Leg leg) {
+				for (PlanElement el : plan.getPlanElements()) {
+					if (el instanceof Leg leg) {
 //							remove routes from legs
-							CleanPopulation.removeRouteFromLeg(leg);
-							leg.setRoutingMode(mode);
-							leg.setMode(mode);
-						}
+						CleanPopulation.removeRouteFromLeg(leg);
+						leg.setRoutingMode(mode);
+						leg.setMode(mode);
 					}
 				}
 			}
+		}
 
-			Controler controler = new Controler(scenario);
-			controler.run();
+		Controler controler = new Controler(scenario);
+		controler.run();
 
-			String popPath = globFile(tempDir, "*output_population.xml.gz").toString();
+		String popPath = globFile(tempDir, "*output_population.xml.gz").toString();
 
-			population = PopulationUtils.readPopulation(popPath);
-			Set<Id<Person>> relevantPersons = new HashSet<>();
+		population = PopulationUtils.readPopulation(popPath);
+		Set<Id<Person>> relevantPersons = new HashSet<>();
 
-			personLoop:
-			for (Person person : population.getPersons().values()) {
-				for (Plan plan : person.getPlans()) {
-					for (PlanElement el : plan.getPlanElements()) {
-						if (el instanceof Leg leg) {
-							if (leg.getRoute() instanceof NetworkRoute networkRoute) {
-								for (Id<Link> linkId : networkRoute.getLinkIds()) {
-									Link link = scenario.getNetwork().getLinks().get(linkId);
+		personLoop:
+		for (Person person : population.getPersons().values()) {
+			for (Plan plan : person.getPlans()) {
+				for (PlanElement el : plan.getPlanElements()) {
+					if (el instanceof Leg leg) {
+						if (leg.getRoute() instanceof NetworkRoute networkRoute) {
+							for (Id<Link> linkId : networkRoute.getLinkIds()) {
+								Link link = scenario.getNetwork().getLinks().get(linkId);
 
-									if (MGC.coord2Point(link.getFromNode().getCoord()).within(geomBuffer) ||
-										MGC.coord2Point(link.getToNode().getCoord()).within(geomBuffer)) {
-										relevantPersons.add(person.getId());
-										// break out of planElement + plan loop, continue with next person
-										continue personLoop;
-									}
+								if (MGC.coord2Point(link.getFromNode().getCoord()).within(geom) ||
+									MGC.coord2Point(link.getToNode().getCoord()).within(geom)) {
+									relevantPersons.add(person.getId());
+									// break out of planElement + plan loop, continue with next person
+									continue personLoop;
 								}
 							}
+						} else {
+							log.fatal("All routes should be network routes, but route of leg with routing mode {} of agent {} is not. Please check your population!",
+								leg.getRoutingMode(), person.getId());
+							throw new IllegalStateException();
 						}
 					}
 				}
 			}
-
-			for (Id<Person> personId : relevantPersons) {
-				population.removePerson(personId);
-			}
-
-			log.info("{} persons of {} have been removed from the population because they do not touch the study area defined in --shp.",
-				relevantPersons.size(), scenario.getPopulation().getPersons().size());
 		}
-		PopulationUtils.writePopulation(population, outputPopulation);
+
+		Population cutoutPopulation = PopulationUtils.createPopulation(new Config());
+
+		for (Id<Person> personId : relevantPersons) {
+			cutoutPopulation.addPerson(population.getPersons().get(personId));
+		}
+
+		log.info("{} persons of {} have been removed from the population because they do not touch the study area defined in --shp.",
+			relevantPersons.size(), scenario.getPopulation().getPersons().size());
+
+		PopulationUtils.writePopulation(cutoutPopulation, outputPopulation);
 
 		return 0;
 	}
