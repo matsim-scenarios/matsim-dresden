@@ -18,7 +18,7 @@ dresden := $(CURDIR)/../../public-svn/matsim/scenarios/countries/de/dresden/dres
 
 MEMORY ?= 30G
 #JAR := matsim-$(N)-*.jar
-JAR := matsim-dresden-1.0-f0f33cf-dirty.jar
+JAR := matsim-dresden-1.0-859b7ea-dirty.jar
 NETWORK := $(germany)/maps/germany-250127.osm.pbf
 
 # Scenario creation tool
@@ -216,30 +216,34 @@ input/v1.0/prepare-100pct.plans.xml.gz:
 	 --output $@
 
 # the population from snz was delivered for oberlausitz-dresden, so we have to cut out the dresden population.
-input/v1.0/prepare-cutout-100pct.plans.xml.gz: input/v1.0/prepare-100pct.plans.xml.gz input/$V/$N-$V-network-with-pt.xml.gz
+input/v1.0/prepare-cutout-100pct.plans.xml.gz: input/v1.0/prepare-100pct.plans.xml.gz input/$V/$N-$V-network.xml.gz
 	$(sc) prepare cutout\
 	 --population $<\
 	 --network $(word 2,$^)\
 	 --output-population $@\
 	 --input-crs $(CRS)\
 	 --shp $(shared)/data/dresden-model/shp/dresden-pt-area-utm32n.shp\
+	 --shp-crs $(CRS)
 
 # same goes for small scale commercial traffic.
-input/v1.0/dresden-small-scale-commercialTraffic-v1.0-100pct.xml.gz: input/$V/oberlausitz-dresden-small-scale-commercialTraffic-$V-100pct.xml.gz input/$V/$N-$V-network-with-pt.xml.gz
+input/v1.0/dresden-small-scale-commercialTraffic-v1.0-100pct.xml.gz: input/$V/oberlausitz-dresden-small-scale-commercialTraffic-$V-100pct.xml.gz input/$V/$N-$V-network.xml.gz
 	$(sc) prepare cutout\
 	 --population $<\
 	 --network $(word 2,$^)\
 	 --output-population $@\
 	 --input-crs $(CRS)\
 	 --shp $(shared)/data/dresden-model/shp/dresden-pt-area-utm32n.shp\
+	 --shp-crs $(CRS)
 
 input/v1.0/prepare-cutout-fixed-subtours-100pct.plans.xml.gz: input/$V/prepare-cutout-100pct.plans.xml.gz
 # change modes in subtours with chain based AND non-chain based by choosing mode for subtour randomly
-	$(sc) prepare fix-subtour-modes --coord-dist 100 --input $@ --output $@
+	$(sc) prepare fix-subtour-modes --coord-dist 100 --input $< --output $@
 # set car availability for agents below 18 to false, standardize some person attrs, set home coords, set person income
 	$(sc) prepare population $@ --output $@
 
-input/v1.0/prepare-100pct-with.trips-split-merged.plans.xml.gz: input/plans-longHaulFreight.xml.gz input/$V/prepare-cutout-100pct.plans.xml.gz input/$V/$N-small-scale-commercialTraffic-$V-100pct.xml.gz
+#TODO: continue here. We need the srv data for the next step.
+
+input/v1.0/prepare-100pct-with-trips-split-merged.plans.xml.gz: input/plans-longHaulFreight.xml.gz input/$V/prepare-cutout-100pct.plans.xml.gz input/$V/$N-small-scale-commercialTraffic-$V-100pct.xml.gz
 # generate some short distance trips, which in senozon data generally are missing
 # 1) we have to calculate the number of trips to add with python script create_ref.py
 # for that it might be necessary to run split-activity-types-duration (see below) separately.

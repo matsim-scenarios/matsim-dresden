@@ -127,10 +127,9 @@ public class CutOutDresdenPopulation implements MATSimAppCommand {
 			cutoutPopulation.addPerson(population.getPersons().get(personId));
 		}
 
+		PopulationUtils.writePopulation(cutoutPopulation, outputPopulation);
 		log.info("{} persons of {} have been removed from the population because they do not touch the study area defined in --shp.",
 			population.getPersons().size() - relevantPersons.size(), population.getPersons().size());
-
-		PopulationUtils.writePopulation(cutoutPopulation, outputPopulation);
 
 		return 0;
 	}
