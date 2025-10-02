@@ -4,9 +4,9 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.locationtech.jts.geom.Geometry;
 import org.matsim.api.core.v01.Id;
-import org.matsim.api.core.v01.Scenario;
 import org.matsim.api.core.v01.TransportMode;
 import org.matsim.api.core.v01.network.Link;
+import org.matsim.api.core.v01.network.Network;
 import org.matsim.api.core.v01.population.*;
 import org.matsim.application.MATSimAppCommand;
 import org.matsim.application.options.CrsOptions;
@@ -14,21 +14,21 @@ import org.matsim.application.options.ShpOptions;
 import org.matsim.application.prepare.population.CleanPopulation;
 import org.matsim.core.config.Config;
 import org.matsim.core.config.ConfigUtils;
-import org.matsim.core.controler.Controler;
+import org.matsim.core.network.NetworkUtils;
 import org.matsim.core.population.PopulationUtils;
 import org.matsim.core.population.algorithms.TripsToLegsAlgorithm;
-import org.matsim.core.population.routes.NetworkRoute;
 import org.matsim.core.router.*;
-import org.matsim.core.scenario.ScenarioUtils;
+import org.matsim.core.router.costcalculators.RandomizingTimeDistanceTravelDisutilityFactory;
+import org.matsim.core.router.speedy.SpeedyALTFactory;
+import org.matsim.core.router.util.LeastCostPathCalculator;
+import org.matsim.core.router.util.LeastCostPathCalculatorFactory;
+import org.matsim.core.router.util.TravelDisutility;
+import org.matsim.core.trafficmonitoring.FreeSpeedTravelTime;
 import org.matsim.core.utils.geometry.geotools.MGC;
 import picocli.CommandLine;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.Set;
-
-import static org.matsim.application.ApplicationUtils.globFile;
 
 @CommandLine.Command(
 	name = "cutout",
@@ -60,15 +60,10 @@ public class CutOutDresdenPopulation implements MATSimAppCommand {
 	public Integer call() throws Exception {
 		Config config = ConfigUtils.createConfig();
 		config.global().setCoordinateSystem(crs.getInputCRS());
-		config.plans().setInputFile(populationPath);
-		config.network().setInputFile(networkPath);
 		config.network().setTimeVariantNetwork(true);
 
-		Path tempDir = Files.createTempDirectory("temp");
-		config.controller().setOutputDirectory(tempDir.toString());
-		config.controller().setLastIteration(0);
-
-		Scenario scenario = ScenarioUtils.loadScenario(config);
+		Population population = PopulationUtils.readPopulation(populationPath);
+		Network network = NetworkUtils.readNetwork(networkPath);
 
 		Geometry geom = shp.getGeometry(crs.getInputCRS());
 
@@ -76,11 +71,9 @@ public class CutOutDresdenPopulation implements MATSimAppCommand {
 			geom = geom.buffer(buffer);
 		}
 
-		Population population;
-
 		final TripsToLegsAlgorithm trips2Legs = new TripsToLegsAlgorithm(new RoutingModeMainModeIdentifier());
 
-		for (Person person : scenario.getPopulation().getPersons().values()) {
+		for (Person person : population.getPersons().values()) {
 			for (Plan plan : person.getPlans()) {
 //					make trips = legs
 				trips2Legs.run(plan);
@@ -96,51 +89,57 @@ public class CutOutDresdenPopulation implements MATSimAppCommand {
 			}
 		}
 
-		Controler controler = new Controler(scenario);
-		controler.run();
+		// Create router
+		FreeSpeedTravelTime travelTime = new FreeSpeedTravelTime();
+		LeastCostPathCalculatorFactory fastAStarLandmarksFactory = new SpeedyALTFactory();
+		RandomizingTimeDistanceTravelDisutilityFactory disutilityFactory = new RandomizingTimeDistanceTravelDisutilityFactory(
+			mode, config);
+		TravelDisutility travelDisutility = disutilityFactory.createTravelDisutility(travelTime);
+		LeastCostPathCalculator router = fastAStarLandmarksFactory.createPathCalculator(network, travelDisutility,
+			travelTime);
 
-		String popPath = globFile(tempDir, "*output_population.xml.gz").toString();
-
-		population = PopulationUtils.readPopulation(popPath);
 		Set<Id<Person>> relevantPersons = new HashSet<>();
-
 		personLoop:
 		for (Person person : population.getPersons().values()) {
 			for (Plan plan : person.getPlans()) {
-				for (PlanElement el : plan.getPlanElements()) {
-					if (el instanceof Leg leg) {
-						if (leg.getRoute() instanceof NetworkRoute networkRoute) {
-							for (Id<Link> linkId : networkRoute.getLinkIds()) {
-								Link link = scenario.getNetwork().getLinks().get(linkId);
+				for (TripStructureUtils.Trip trip : TripStructureUtils.getTrips(plan)) {
+					Link startLink = getLinkOfAct(trip.getOriginActivity(), network);
+					Link endLink = getLinkOfAct(trip.getDestinationActivity(), network);
 
-								if (MGC.coord2Point(link.getFromNode().getCoord()).within(geom) ||
-									MGC.coord2Point(link.getToNode().getCoord()).within(geom)) {
-									relevantPersons.add(person.getId());
-									// break out of planElement + plan loop, continue with next person
-									continue personLoop;
-								}
-							}
-						} else {
-							log.fatal("All routes should be network routes, but route of leg with routing mode {} of agent {} is not. Please check your population!",
-								leg.getRoutingMode(), person.getId());
-							throw new IllegalStateException();
+					LeastCostPathCalculator.Path route = router.calcLeastCostPath(startLink, endLink,
+						0, person, null);
+
+					for (Link link : route.links) {
+						if (MGC.coord2Point(link.getFromNode().getCoord()).within(geom) ||
+							MGC.coord2Point(link.getToNode().getCoord()).within(geom)) {
+							relevantPersons.add(person.getId());
+							// break out of planElement + plan loop, continue with next person
+							continue personLoop;
 						}
 					}
 				}
 			}
 		}
 
-		Population cutoutPopulation = PopulationUtils.createPopulation(new Config());
+		Population cutoutPopulation = PopulationUtils.createPopulation(ConfigUtils.createConfig());
 
 		for (Id<Person> personId : relevantPersons) {
 			cutoutPopulation.addPerson(population.getPersons().get(personId));
 		}
 
 		log.info("{} persons of {} have been removed from the population because they do not touch the study area defined in --shp.",
-			relevantPersons.size(), scenario.getPopulation().getPersons().size());
+			population.getPersons().size() - relevantPersons.size(), population.getPersons().size());
 
 		PopulationUtils.writePopulation(cutoutPopulation, outputPopulation);
 
 		return 0;
+	}
+
+	private static Link getLinkOfAct(Activity act, Network network) {
+		if (act.getLinkId() == null) {
+			return NetworkUtils.getNearestLink(network, act.getCoord());
+		} else {
+			return network.getLinks().get(act.getLinkId());
+		}
 	}
 }
