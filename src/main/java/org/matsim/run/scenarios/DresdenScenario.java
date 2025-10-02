@@ -1,8 +1,13 @@
 package org.matsim.run.scenarios;
 
+import ch.sbb.matsim.config.SwissRailRaptorConfigGroup;
+import com.google.common.collect.Sets;
 import jakarta.annotation.Nullable;
 import org.matsim.analysis.CheckAndSummarizeLongDistanceFreightPopulation;
+import org.matsim.analysis.personMoney.PersonMoneyEventsAnalysisModule;
 import org.matsim.api.core.v01.Scenario;
+import org.matsim.api.core.v01.TransportMode;
+import org.matsim.api.core.v01.network.Link;
 import org.matsim.application.MATSimApplication;
 import org.matsim.application.analysis.CheckPopulation;
 import org.matsim.application.analysis.traffic.LinkStats;
@@ -17,23 +22,38 @@ import org.matsim.application.prepare.pt.CreateTransitScheduleFromGtfs;
 import org.matsim.contrib.vsp.pt.fare.DistanceBasedPtFareParams;
 import org.matsim.contrib.vsp.pt.fare.FareZoneBasedPtFareParams;
 import org.matsim.contrib.vsp.pt.fare.PtFareConfigGroup;
+import org.matsim.contrib.vsp.pt.fare.PtFareModule;
 import org.matsim.contrib.vsp.scenario.SnzActivities;
 import org.matsim.contrib.vsp.scoring.RideScoringParamsFromCarParams;
 import org.matsim.core.config.Config;
 import org.matsim.core.config.ConfigUtils;
+import org.matsim.core.config.groups.ReplanningConfigGroup;
 import org.matsim.core.config.groups.RoutingConfigGroup;
 import org.matsim.core.config.groups.ScoringConfigGroup;
 import org.matsim.core.config.groups.VspExperimentalConfigGroup;
+import org.matsim.core.controler.AbstractModule;
 import org.matsim.core.controler.Controler;
+import org.matsim.core.network.NetworkUtils;
+import org.matsim.core.network.turnRestrictions.DisallowedNextLinks;
 import org.matsim.core.replanning.annealing.ReplanningAnnealerConfigGroup;
+import org.matsim.core.replanning.strategies.DefaultPlanStrategiesModule;
+import org.matsim.core.scoring.functions.ScoringParametersForPerson;
 import org.matsim.prepare.CutOutDresdenPopulation;
 import org.matsim.prepare.PrepareNetwork;
 import org.matsim.prepare.PreparePopulation;
 import org.matsim.simwrapper.SimWrapperConfigGroup;
+import org.matsim.simwrapper.SimWrapperModule;
 import org.matsim.smallScaleCommercialTrafficGeneration.GenerateSmallScaleCommercialTrafficDemand;
 import org.matsim.smallScaleCommercialTrafficGeneration.prepare.CreateDataDistributionOfStructureData;
 import org.matsim.utils.DresdenUtils;
 import picocli.CommandLine;
+import playground.vsp.scoring.IncomeDependentUtilityOfMoneyPersonScoringParameters;
+
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
+import static org.matsim.utils.DresdenUtils.*;
 
 @CommandLine.Command(header = ":: Dresden Scenario ::", version = DresdenScenario.VERSION, mixinStandardHelpOptions = true)
 @MATSimApplication.Prepare({
@@ -53,9 +73,10 @@ public class DresdenScenario extends MATSimApplication {
 
 	@CommandLine.Mixin
 	private final SampleOptions sample = new SampleOptions(100, 25, 10, 1);
-
 	@CommandLine.Option(names = "--emissions", defaultValue = "ENABLED", description = "Define if emission analysis should be performed or not.")
 	DresdenUtils.FunctionalityHandling emissions;
+	@CommandLine.Option(names = "--explicit-walk-intermodality", defaultValue = "ENABLED", description = "Define if explicit walk intermodality parameter to/from pt should be set or not (use default).")
+	static DresdenUtils.FunctionalityHandling explicitWalkIntermodality;
 
 
 	public DresdenScenario(@Nullable Config config) {
@@ -104,9 +125,9 @@ public class DresdenScenario extends MATSimApplication {
 		scoringConfigGroup.setPerforming_utils_hr(performing);
 		scoringConfigGroup.setWriteExperiencedPlans(true);
 		scoringConfigGroup.setPathSizeLogitBeta(0.);
-//		TODO: check if the following 2 are needed.
-//		scoringConfigGroup.addActivityParams(new ScoringConfigGroup.ActivityParams("freight_start").setTypicalDuration(30 * 60.));
-//		scoringConfigGroup.addActivityParams(new ScoringConfigGroup.ActivityParams("freight_end").setTypicalDuration(30 * 60.));
+
+//		prepare config for usage of longDistanceFreight and small scale commercial traffic
+		prepareCommercialTrafficConfig(config);
 
 //		set ride scoring params dependent from car params
 //		2.0 + 1.0 = alpha + 1
@@ -135,8 +156,6 @@ public class DresdenScenario extends MATSimApplication {
 //		for more info see PTFareModule / ChainedPtFareCalculator classes in vsp contrib
 		PtFareConfigGroup ptFareConfigGroup = ConfigUtils.addOrGetModule(config, PtFareConfigGroup.class);
 
-//		TODO: project pt prices to ref year?
-
 		FareZoneBasedPtFareParams vvo = new FareZoneBasedPtFareParams();
 		vvo.setTransactionPartner("VVO Tarifzone 10 Dresden");
 		vvo.setDescription("VVO Tarifzone 10 Dresden");
@@ -151,48 +170,123 @@ public class DresdenScenario extends MATSimApplication {
 		ptFareConfigGroup.addParameterSet(vvo);
 		ptFareConfigGroup.addParameterSet(germany);
 
-//		TODO: continue run class cfg here
-//		TODO: prepare small scale commercial cfg?
+		//		TODO: project pt prices to ref year? what is the ref year here?
+//		TODO: also: project all other prices to ref year
 
-//		TODO: emissions config
+		if (explicitWalkIntermodality == DresdenUtils.FunctionalityHandling.ENABLED) {
+			setExplicitIntermodalityParamsForWalkToPt(ConfigUtils.addOrGetModule(config, SwissRailRaptorConfigGroup.class));
+		}
 
+		if (emissions == DresdenUtils.FunctionalityHandling.ENABLED) {
+//		set hbefa input files for emission analysis
+			setEmissionsConfigs(config);
+		}
 		return config;
 	}
 
 	@Override
 	protected void prepareScenario(Scenario scenario) {
 
-		//		add longDistanceFreight as allowed modes together with car
-//		PrepareNetwork.prepareFreightNetwork(scenario.getNetwork());
-//
-//		for (Link link : scenario.getNetwork().getLinks().values()) {
-//			DisallowedNextLinks disallowed = NetworkUtils.getDisallowedNextLinks(link);
-//			if (disallowed != null) {
-//				link.getAllowedModes().forEach(disallowed::removeDisallowedLinkSequences);
-//				if (disallowed.isEmpty()) {
-//					NetworkUtils.removeDisallowedNextLinks(link);
-//				}
-//			}
-//		}
-////		TODO: emissions
+		//		add freight modes of DresdenUtils to network.
+//		this happens in the makefile pipeline already, but we do it here anyways, in case somebody uses a preliminary network.
+		PrepareNetwork.prepareFreightNetwork(scenario.getNetwork());
+
+//		remove disallowed links. The disallowed links cause many problems and (usually) are not useful in our rather macroscopic view on transport systems.
+		for (Link link : scenario.getNetwork().getLinks().values()) {
+			DisallowedNextLinks disallowed = NetworkUtils.getDisallowedNextLinks(link);
+			if (disallowed != null) {
+				link.getAllowedModes().forEach(disallowed::removeDisallowedLinkSequences);
+				if (disallowed.isEmpty()) {
+					NetworkUtils.removeDisallowedNextLinks(link);
+				}
+			}
+		}
+
+		if (emissions == FunctionalityHandling.ENABLED) {
+//			prepare hbefa link attributes + make link.getType() handable for OsmHbefaMapping
+//			this also happens in makefile pipeline. integrating it here for same reason as above.
+			PrepareNetwork.prepareEmissionsAttributes(scenario.getNetwork());
+//			prepare vehicle types for emission analysis
+			prepareVehicleTypesForEmissionAnalysis(scenario);
+		}
 	}
 
 	@Override
 	protected void prepareControler(Controler controler) {
 		//analyse PersonMoneyEvents
-//		controler.addOverridingModule(new PersonMoneyEventsAnalysisModule());
-//
-//		controler.addOverridingModule(new SimWrapperModule());
-//
-//		controler.addOverridingModule(new AbstractModule() {
-//			@Override
-//			public void install() {
-//				install(new PtFareModule());
-//				bind(ScoringParametersForPerson.class).to(IncomeDependentUtilityOfMoneyPersonScoringParameters.class).asEagerSingleton();
-//
-//				addTravelTimeBinding(TransportMode.ride).to(carTravelTime());
-//				addTravelDisutilityFactoryBinding(TransportMode.ride).to(carTravelDisutilityFactoryKey());
-//			}
-//		});
+		controler.addOverridingModule(new PersonMoneyEventsAnalysisModule());
+
+		controler.addOverridingModule(new SimWrapperModule());
+
+		controler.addOverridingModule(new AbstractModule() {
+			@Override
+			public void install() {
+				install(new PtFareModule());
+				bind(ScoringParametersForPerson.class).to(IncomeDependentUtilityOfMoneyPersonScoringParameters.class).asEagerSingleton();
+
+				addTravelTimeBinding(TransportMode.ride).to(carTravelTime());
+				addTravelDisutilityFactoryBinding(TransportMode.ride).to(carTravelDisutilityFactoryKey());
+			}
+		});
+	}
+
+	/**
+	 * Prepare the config for commercial traffic.
+	 */
+	private static void prepareCommercialTrafficConfig(Config config) {
+
+		FREIGHT_MODES.forEach(mode -> {
+			ScoringConfigGroup.ModeParams thisModeParams = new ScoringConfigGroup.ModeParams(mode);
+			config.scoring().addModeParams(thisModeParams);
+		});
+
+		Set<String> qsimModes = new HashSet<>(config.qsim().getMainModes());
+		config.qsim().setMainModes(Sets.union(qsimModes, FREIGHT_MODES));
+
+		Set<String> networkModes = new HashSet<>(config.routing().getNetworkModes());
+		config.routing().setNetworkModes(Sets.union(networkModes, FREIGHT_MODES));
+
+		config.scoring().addActivityParams(new ScoringConfigGroup.ActivityParams("commercial_start").setTypicalDuration(30 * 60.));
+		config.scoring().addActivityParams(new ScoringConfigGroup.ActivityParams("commercial_end").setTypicalDuration(30 * 60.));
+		config.scoring().addActivityParams(new ScoringConfigGroup.ActivityParams("service").setTypicalDuration(30 * 60.));
+		config.scoring().addActivityParams(new ScoringConfigGroup.ActivityParams("start").setTypicalDuration(30 * 60.));
+		config.scoring().addActivityParams(new ScoringConfigGroup.ActivityParams("end").setTypicalDuration(30 * 60.));
+		config.scoring().addActivityParams(new ScoringConfigGroup.ActivityParams("freight_start").setTypicalDuration(30 * 60.));
+		config.scoring().addActivityParams(new ScoringConfigGroup.ActivityParams("freight_end").setTypicalDuration(30 * 60.));
+
+//		replanning strategies for small scale commercial traffic
+		for (String subpopulation : List.of("commercialPersonTraffic", "commercialPersonTraffic_service", "goodsTraffic")) {
+			config.replanning().addStrategySettings(
+				new ReplanningConfigGroup.StrategySettings()
+					.setStrategyName(DefaultPlanStrategiesModule.DefaultSelector.ChangeExpBeta)
+					.setWeight(0.85)
+					.setSubpopulation(subpopulation)
+			);
+
+			config.replanning().addStrategySettings(
+				new ReplanningConfigGroup.StrategySettings()
+					.setStrategyName(DefaultPlanStrategiesModule.DefaultStrategy.ReRoute)
+					.setWeight(0.1)
+					.setSubpopulation(subpopulation)
+			);
+		}
+
+//		replanning strategies for longDistanceFreight
+		config.replanning().addStrategySettings(
+			new ReplanningConfigGroup.StrategySettings()
+				.setStrategyName(DefaultPlanStrategiesModule.DefaultSelector.ChangeExpBeta)
+				.setWeight(0.95)
+				.setSubpopulation("longDistanceFreight")
+		);
+		config.replanning().addStrategySettings(
+			new ReplanningConfigGroup.StrategySettings()
+				.setStrategyName(DefaultPlanStrategiesModule.DefaultStrategy.ReRoute)
+				.setWeight(0.05)
+				.setSubpopulation("longDistanceFreight")
+		);
+
+//		analyze travel times for all qsim main modes
+		config.travelTimeCalculator().setAnalyzedModes(Sets.union(qsimModes, FREIGHT_MODES));
+
 	}
 }

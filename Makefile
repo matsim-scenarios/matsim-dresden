@@ -241,6 +241,12 @@ input/v1.0/prepare-cutout-fixed-subtours-100pct.plans.xml.gz: input/$V/prepare-c
 # set car availability for agents below 18 to false, standardize some person attrs, set home coords, set person income
 	$(sc) prepare population $@ --output $@
 
+input/v1.0/prepare-100pct-with-trips-split-merged.plans_FOR_0IT_TEST.xml.gz: input/$V/prepare-cutout-100pct.plans.xml.gz
+	$(sc) prepare split-activity-types-duration\
+		--input $<\
+		--exclude commercial_start,commercial_end,freight_start,freight_end,service\
+		--output $@
+
 #TODO: continue here. We need the srv data for the next step.
 
 input/v1.0/prepare-100pct-with-trips-split-merged.plans.xml.gz: input/plans-longHaulFreight.xml.gz input/$V/prepare-cutout-100pct.plans.xml.gz input/$V/$N-small-scale-commercialTraffic-$V-100pct.xml.gz
