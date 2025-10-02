@@ -140,6 +140,13 @@ input/plans-longHaulFreight.xml.gz:
 	 --subpopulation "longDistanceFreight"\
 	 --output $@
 
+# this step is needed because some transit trips of long distance freight traffic have acts without coords.
+# RE is fixing this in core. Until then: Manually find affected agents in above pop and comment them out if not too many.
+# Currently, 12 agents are affected. With the following we can check the pop for more malfunctions and create the summary tsv
+# which cannot be created with malfunctioned agents. -sm1025
+input/plans-longHaulFreight-locations-summary.tsv: input/plans-longHaulFreight.xml.gz
+	$(sc) analysis check-summarize-freight $<
+
 # create facilities for commercial traffic
 # the following 2 steps are typically run on the math cluster by Ricardo Ewert. the steps are here for documentation.
 # the necessary small scale commercial traffic plans file is copied from the cluster into the local directory for further use.
