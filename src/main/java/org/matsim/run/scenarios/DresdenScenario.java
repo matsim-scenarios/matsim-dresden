@@ -172,7 +172,7 @@ public class DresdenScenario extends MATSimApplication {
 		ptFareConfigGroup.addParameterSet(germany);
 
 		//		TODO: project pt prices to ref year? what is the ref year here?
-//		TODO: also: project all other prices to ref year
+//		TODO: also: project all other prices to ref year, also in cfg file
 
 		if (explicitWalkIntermodality == DresdenUtils.FunctionalityHandling.ENABLED) {
 			setExplicitIntermodalityParamsForWalkToPt(ConfigUtils.addOrGetModule(config, SwissRailRaptorConfigGroup.class));
