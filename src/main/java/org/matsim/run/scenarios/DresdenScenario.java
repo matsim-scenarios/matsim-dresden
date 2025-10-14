@@ -38,6 +38,7 @@ import org.matsim.core.network.turnRestrictions.DisallowedNextLinks;
 import org.matsim.core.replanning.annealing.ReplanningAnnealerConfigGroup;
 import org.matsim.core.replanning.strategies.DefaultPlanStrategiesModule;
 import org.matsim.core.scoring.functions.ScoringParametersForPerson;
+import org.matsim.prepare.CreateFacilitiesFromPopulation;
 import org.matsim.prepare.CutOutDresdenPopulation;
 import org.matsim.prepare.PrepareNetwork;
 import org.matsim.prepare.PreparePopulation;
@@ -62,7 +63,7 @@ import static org.matsim.utils.DresdenUtils.*;
 		CreateLandUseShp.class, ResolveGridCoordinates.class, FixSubtourModes.class, AdjustActivityToLinkDistances.class, XYToLinks.class,
 		CleanNetwork.class, PrepareNetwork.class, SplitActivityTypesDuration.class, CreateCountsFromBAStData.class,
 		CutOutDresdenPopulation.class, CreateDataDistributionOfStructureData.class, GenerateSmallScaleCommercialTrafficDemand.class,
-		PreparePopulation.class
+		PreparePopulation.class, CreateFacilitiesFromPopulation.class
 })
 @MATSimApplication.Analysis({
 		LinkStats.class, CheckPopulation.class, CheckAndSummarizeLongDistanceFreightPopulation.class

@@ -18,7 +18,7 @@ dresden := $(CURDIR)/../../public-svn/matsim/scenarios/countries/de/dresden/dres
 
 MEMORY ?= 30G
 #JAR := matsim-$(N)-*.jar
-JAR := matsim-dresden-1.0-859b7ea-dirty.jar
+JAR := matsim-dresden-1.0-00c6d14-dirty.jar
 NETWORK := $(germany)/maps/germany-250127.osm.pbf
 
 # Scenario creation tool
@@ -89,7 +89,6 @@ $(JAR):
 # free-speed-factor 0.7 (standard is 0.9): see VSP WP 24-08 Figure 2. Dresden is most similar to metropolitan.
 #--remove-turn-restrictions used instead of new TurnRestrictionCleaner,
 # the cleaner needs more testing, as it destroys the bike network e.g.
-# TODO: talk to GR about freespeed factor/solutions to counts problem in RVR scenario.
 input/v1.0/dresden-v1.0-network.xml.gz: input/sumo.net.xml
 	echo input/$V/$N-$V-network.xml.gz
 	$(sc) prepare network-from-sumo $< --output $@ --free-speed-factor 0.7 --turn-restrictions IGNORE_TURN_RESTRICTIONS
@@ -114,7 +113,7 @@ input/v1.0/dresden-v1.0-network-with-pt.xml.gz: input/$V/$N-$V-network.xml.gz
 	 --shp $(germany)/shp/germany-area.shp\
 
 # create matsim counts file
-#TODO: manually validate count locations
+# count to link assignments have been checked manually, they look correct.
 input/v1.0/dresden-v1.0-counts-bast.xml.gz: input/$V/$N-$V-network-with-pt.xml.gz
 	$(sc) prepare counts-from-bast\
 		--network $<\
@@ -151,44 +150,44 @@ input/plans-longHaulFreight-locations-summary.tsv: input/plans-longHaulFreight.x
 # the following 2 steps are typically run on the math cluster by Ricardo Ewert. the steps are here for documentation.
 # the necessary small scale commercial traffic plans file is copied from the cluster into the local directory for further use.
 # on the cluster, the plans are located at:
-input/v1.0/commercialFacilities.xml.gz:
-	$(sc) prepare create-data-distribution-of-structure-data\
-	 --outputFacilityFile $@\
-	 --outputDataDistributionFile $(sharedOberlausitzDresden)/data/commercial_traffic/output/dataDistributionPerZone.csv\
-	 --landuseConfiguration useOSMBuildingsAndLanduse\
- 	 --regionsShapeFileName $(sharedOberlausitzDresden)/data/commercial_traffic/input/oberlausitz_dresden_regions_25832.shp\
-	 --regionsShapeRegionColumn "gen"\
-	 --zoneShapeFileName $(sharedOberlausitzDresden)/data/commercial_traffic/input/oberlausitz_dresden_zones_25832.shp\
-	 --zoneShapeFileNameColumn "zone"\
-	 --buildingsShapeFileName $(sharedOberlausitzDresden)/data/commercial_traffic/input/oberlausitz_dresden_buildings_25832.shp\
-	 --shapeFileBuildingTypeColumn "building"\
-	 --landuseShapeFileName $(sharedOberlausitzDresden)/data/commercial_traffic/input/oberlausitz_dresden_landuse_25832.shp\
-	 --shapeFileLanduseTypeColumn "landuse"\
-	 --shapeCRS "EPSG:25832"\
-	 --pathToInvestigationAreaData $(sharedOberlausitzDresden)/data/commercial_traffic/input/investigationAreaData.csv
+#input/v1.0/commercialFacilities.xml.gz:
+#	$(sc) prepare create-data-distribution-of-structure-data\
+#	 --outputFacilityFile $@\
+#	 --outputDataDistributionFile $(sharedOberlausitzDresden)/data/commercial_traffic/output/dataDistributionPerZone.csv\
+#	 --landuseConfiguration useOSMBuildingsAndLanduse\
+# 	 --regionsShapeFileName $(sharedOberlausitzDresden)/data/commercial_traffic/input/oberlausitz_dresden_regions_25832.shp\
+#	 --regionsShapeRegionColumn "gen"\
+#	 --zoneShapeFileName $(sharedOberlausitzDresden)/data/commercial_traffic/input/oberlausitz_dresden_zones_25832.shp\
+#	 --zoneShapeFileNameColumn "zone"\
+#	 --buildingsShapeFileName $(sharedOberlausitzDresden)/data/commercial_traffic/input/oberlausitz_dresden_buildings_25832.shp\
+#	 --shapeFileBuildingTypeColumn "building"\
+#	 --landuseShapeFileName $(sharedOberlausitzDresden)/data/commercial_traffic/input/oberlausitz_dresden_landuse_25832.shp\
+#	 --shapeFileLanduseTypeColumn "landuse"\
+#	 --shapeCRS "EPSG:25832"\
+#	 --pathToInvestigationAreaData $(sharedOberlausitzDresden)/data/commercial_traffic/input/investigationAreaData.csv
 
 # generate small scale commercial traffic
-input/v1.0/oberlausitz-dresden-small-scale-commercialTraffic-v1.0-100pct.xml.gz: input/$V/$N-$V-network.xml.gz input/$V/commercialFacilities.xml.gz
-	$(sc) prepare generate-small-scale-commercial-traffic\
-	  input/$V/$N-$V-100pct.config.xml\
-	 --pathToDataDistributionToZones $(sharedOberlausitzDresden)/data/commercial_traffic/output/dataDistributionPerZone.csv\
-	 --pathToCommercialFacilities $(word 2,$^)\
-	 --sample 1.0\
-	 --jspritIterations 100\
-	 --additionalTravelBufferPerIterationInMinutes 60\
-	 --creationOption "createNewCarrierFile"\
-	 --network $<\
-	 --smallScaleCommercialTrafficType "completeSmallScaleCommercialTraffic"\
-	 --zoneShapeFileName $(sharedOberlausitzDresden)/data/commercial_traffic/input/oberlausitz_dresden_zones_25832.shp\
-	 --zoneShapeFileNameColumn "zone"\
-	 --shapeCRS "EPSG:25832"\
-	 --resistanceFactor_commercialPersonTraffic 0.2\
-	 --resistanceFactor_goodsTraffic 0.1\
-	 --numberOfPlanVariantsPerAgent 5\
-	 --nameOutputPopulation $@\
-	 --pathOutput output/commercialPersonTraffic
-
-	mv output/commercialPersonTraffic/$@ $@
+#input/v1.0/oberlausitz-dresden-small-scale-commercialTraffic-v1.0-100pct.xml.gz: input/$V/$N-$V-network.xml.gz input/$V/commercialFacilities.xml.gz
+#	$(sc) prepare generate-small-scale-commercial-traffic\
+#	  input/$V/$N-$V-100pct.config.xml\
+#	 --pathToDataDistributionToZones $(sharedOberlausitzDresden)/data/commercial_traffic/output/dataDistributionPerZone.csv\
+#	 --pathToCommercialFacilities $(word 2,$^)\
+#	 --sample 1.0\
+#	 --jspritIterations 100\
+#	 --additionalTravelBufferPerIterationInMinutes 60\
+#	 --creationOption "createNewCarrierFile"\
+#	 --network $<\
+#	 --smallScaleCommercialTrafficType "completeSmallScaleCommercialTraffic"\
+#	 --zoneShapeFileName $(sharedOberlausitzDresden)/data/commercial_traffic/input/oberlausitz_dresden_zones_25832.shp\
+#	 --zoneShapeFileNameColumn "zone"\
+#	 --shapeCRS "EPSG:25832"\
+#	 --resistanceFactor_commercialPersonTraffic 0.2\
+#	 --resistanceFactor_goodsTraffic 0.1\
+#	 --numberOfPlanVariantsPerAgent 5\
+#	 --nameOutputPopulation $@\
+#	 --pathOutput output/commercialPersonTraffic
+#
+#	mv output/commercialPersonTraffic/$@ $@
 
 # trajectory-to-plans formerly was a collection of methods to prepare a given population
 # now, most of the functions of this class do have their own class (downsample, splitduration types...)
@@ -241,13 +240,11 @@ input/v1.0/prepare-cutout-fixed-subtours-100pct.plans.xml.gz: input/$V/prepare-c
 # set car availability for agents below 18 to false, standardize some person attrs, set home coords, set person income
 	$(sc) prepare population $@ --output $@
 
-input/v1.0/prepare-100pct-with-trips-split-merged.plans_FOR_0IT_TEST.xml.gz: input/$V/prepare-cutout-100pct.plans.xml.gz
+input/v1.0/prepare-100pct-with-trips-split-merged.plans_FOR_0IT_TEST.xml.gz: input/v1.0/prepare-cutout-fixed-subtours-100pct.plans.xml.gz
 	$(sc) prepare split-activity-types-duration\
 		--input $<\
 		--exclude commercial_start,commercial_end,freight_start,freight_end,service\
 		--output $@
-
-#TODO: continue here. We need the srv data for the next step.
 
 input/v1.0/prepare-100pct-with-trips-split-merged.plans.xml.gz: input/plans-longHaulFreight.xml.gz input/$V/prepare-cutout-100pct.plans.xml.gz input/$V/$N-small-scale-commercialTraffic-$V-100pct.xml.gz
 # generate some short distance trips, which in senozon data generally are missing
@@ -256,14 +253,16 @@ input/v1.0/prepare-100pct-with-trips-split-merged.plans.xml.gz: input/plans-long
 # 2) trip range 700m because:
 # when adding 1km trips (default value), too many trips of bin 1km-2km were also added.
 # the range value is beeline, so the trip distance (routed) often is higher than 1km
-# 3) for dresden we have SrV data. probably from 2023. tbd.
+# 3) for dresden we have SrV data. currently using 2018 data.
+# 43524 additional short trips seems to few here. Usually we are around 250k..
+# I checked the script (extract_ref_data.py) which calculates --num-trips and it seems to be correct. Continuing with 43.5k trips here.
 	$(sc) prepare generate-short-distance-trips\
    	 --population $(word 2,$^)\
    	 --input-crs $(CRS)\
-#   	 TODO: use dd shp, run python script for retrieving --num-trips
-  	 --shp $(sharedOberlausitzDresden)/data/dresden-model/shp/vvo_tarifzone_10_dresden_utm32n.shp --shp-crs $(CRS)\
+  	 --shp $(shared)/data/dresden-model/shp/vvo_tarifzone_10_dresden_utm32n.shp --shp-crs $(CRS)\
   	 --range 700\
-    --num-trips TODO
+    --num-trips 43524\
+    --output $@
 #   this step *has to* be done after the generation of short distance trips.
 #	split activity types to type_duration for the scoring to take into account the typical duration
 	$(sc) prepare split-activity-types-duration\
@@ -273,15 +272,20 @@ input/v1.0/prepare-100pct-with-trips-split-merged.plans.xml.gz: input/plans-long
 #	merge person and freight pops
 	$(sc) prepare merge-populations $@ $< $(word 3,$^) --output $@
 
-input/v1.0/dresden-v1.0-100pct.plans-initial.xml.gz: input/$V/prepare-100pct-with.trips-split-merged.plans.xml.gz
+# there should be more detailed algorithms to create activity facilities than the below class. it creates one facility per activity coord.
+# see https://github.com/matsim-scenarios/matsim-hannover/issues/1
+input/v1.0/dresden-v1.0-100pct.plans-initial.xml.gz: input/$V/prepare-100pct-with-trips-split-merged.plans.xml.gz input/$V/$N-$V-network-with-pt.xml.gz
+	$(sc) prepare facilities\
+    		--input-population $<\
+            --network $(word 2,$^)\
+            --output-population $@\
+            --output-facilities input/$V/$N-$V-activity-facilities.xml.gz
 	$(sc) prepare downsample-population $<\
     	 --sample-size 1\
     	 --samples 0.25 0.1 0.01 0.001\
 
-#TODO: create facilities from plans and use as input. if so, do it in above step.
-# if not, the above step can be merged into the 2nd to last step.
-
 # output of check-population was compared to initial output in matsim-oberlausitz-dresden scenario documentation, they align -sm0225
+# TODO: compare new dresden only output to senozon data
 check: input/$V/$N-$V-100pct.plans-initial.xml.gz
 	$(sc) analysis check-population $<\
  	 --input-crs $(CRS)\
