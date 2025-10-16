@@ -58,6 +58,8 @@ if __name__ == "__main__":
     # use srv 2018 data for now. There is no infrastructure for srv2023 yet in matsim python tools. TODO
     d = os.path.expanduser("../../../../../shared-svn/projects/agimo/data/dresden-model/SrV/2018")
 
+    # TODO: prüfen ob in run_create_ref_data.create auch geprüft wird, ob der Weg überhaupt gültig ist
+    #  SrV column E_WEG_GUELTIG: Gültiger Weg (Angaben zu Dauer und Länge vorhanden, Länge <100km)
     result = run_create_ref_data.create(
         d,
         person_filter, trip_filter,
