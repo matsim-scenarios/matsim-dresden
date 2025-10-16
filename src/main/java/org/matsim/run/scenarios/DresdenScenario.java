@@ -4,6 +4,7 @@ import ch.sbb.matsim.config.SwissRailRaptorConfigGroup;
 import com.google.common.collect.Sets;
 import jakarta.annotation.Nullable;
 import org.matsim.analysis.CheckAndSummarizeLongDistanceFreightPopulation;
+import org.matsim.analysis.CheckStayHomeAgents;
 import org.matsim.analysis.personMoney.PersonMoneyEventsAnalysisModule;
 import org.matsim.api.core.v01.Scenario;
 import org.matsim.api.core.v01.TransportMode;
@@ -38,10 +39,7 @@ import org.matsim.core.network.turnRestrictions.DisallowedNextLinks;
 import org.matsim.core.replanning.annealing.ReplanningAnnealerConfigGroup;
 import org.matsim.core.replanning.strategies.DefaultPlanStrategiesModule;
 import org.matsim.core.scoring.functions.ScoringParametersForPerson;
-import org.matsim.prepare.CreateFacilitiesFromPopulation;
-import org.matsim.prepare.CutOutDresdenPopulation;
-import org.matsim.prepare.PrepareNetwork;
-import org.matsim.prepare.PreparePopulation;
+import org.matsim.prepare.*;
 import org.matsim.simwrapper.SimWrapperConfigGroup;
 import org.matsim.simwrapper.SimWrapperModule;
 import org.matsim.smallScaleCommercialTrafficGeneration.GenerateSmallScaleCommercialTrafficDemand;
@@ -63,10 +61,10 @@ import static org.matsim.utils.DresdenUtils.*;
 		CreateLandUseShp.class, ResolveGridCoordinates.class, FixSubtourModes.class, AdjustActivityToLinkDistances.class, XYToLinks.class,
 		CleanNetwork.class, PrepareNetwork.class, SplitActivityTypesDuration.class, CreateCountsFromBAStData.class,
 		CutOutDresdenPopulation.class, CreateDataDistributionOfStructureData.class, GenerateSmallScaleCommercialTrafficDemand.class,
-		PreparePopulation.class, CreateFacilitiesFromPopulation.class
+		PreparePopulation.class, CreateFacilitiesFromPopulation.class, CreateSingleTransportModePopulation.class
 })
 @MATSimApplication.Analysis({
-		LinkStats.class, CheckPopulation.class, CheckAndSummarizeLongDistanceFreightPopulation.class
+		LinkStats.class, CheckPopulation.class, CheckAndSummarizeLongDistanceFreightPopulation.class, CheckStayHomeAgents.class
 })
 public class DresdenScenario extends MATSimApplication {
 
