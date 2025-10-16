@@ -105,7 +105,8 @@ public class DresdenScenario extends MATSimApplication {
 		simWrapper.defaultParams().setContext("");
 		simWrapper.defaultParams().setMapCenter("14.5,51.53");
 		simWrapper.defaultParams().setMapZoomLevel(6.8);
-		simWrapper.defaultParams().setShp("../shp/dresden-utm32n.shp");
+//		the tarifzone shp file basically is a dresden shp file with fare prices as additional information
+		simWrapper.defaultParams().setShp("./vvo_tarifzone10_dresden/v%s_vvo_tarifzone_10_dresden_utm32n.shp");
 
 		if (sample.isSet()){
 			config.controller().setOutputDirectory(sample.adjustName(config.controller().getOutputDirectory()));
@@ -157,22 +158,40 @@ public class DresdenScenario extends MATSimApplication {
 //		for more info see PTFareModule / ChainedPtFareCalculator classes in vsp contrib
 		PtFareConfigGroup ptFareConfigGroup = ConfigUtils.addOrGetModule(config, PtFareConfigGroup.class);
 
-		FareZoneBasedPtFareParams vvo = new FareZoneBasedPtFareParams();
-		vvo.setTransactionPartner("VVO Tarifzone 10 Dresden");
-		vvo.setDescription("VVO Tarifzone 10 Dresden");
-		vvo.setOrder(1);
-		vvo.setFareZoneShp("../shp/vvo_tarifzone_10_dresden_utm32n.shp");
+
+//		pt fare for single ticket in tarifzone 10 dresden was 3 eu in 2023.
+//		see: https://dawo-dresden.de/2024/03/20/bus-und-bahnfahren-ab-1-april-teurer/?utm_source=chatgpt.com
+//		pt single ticket fare 2021 = fare 2023 / inflationFactor (see below) = 3eu / 1.16 ~ 2.6 eu
+//		fare prices for vvo tarifzone 10 aka Dresden have to be set in shp file.
+		FareZoneBasedPtFareParams vvo10 = new FareZoneBasedPtFareParams();
+		vvo10.setTransactionPartner("VVO Tarifzone 10 Dresden");
+		vvo10.setDescription("VVO Tarifzone 10 Dresden");
+		vvo10.setOrder(1);
+		vvo10.setFareZoneShp(String.format("./vvo_tarifzone10_dresden/v%s_vvo_tarifzone_10_dresden_utm32n.shp", VERSION));
 
 		DistanceBasedPtFareParams germany = DistanceBasedPtFareParams.GERMAN_WIDE_FARE_2024;
 		germany.setTransactionPartner("Deutschlandtarif");
 		germany.setDescription("Deutschlandtarif");
 		germany.setOrder(2);
 
-		ptFareConfigGroup.addParameterSet(vvo);
-		ptFareConfigGroup.addParameterSet(germany);
+//		apply inflation factor to distance based fare. fare values are from 10.12.23 / for the whole of 2024.
+//		car cost in this scenario is projected to 2021. Hence, we deflate the pt cost to 2021
+//		according to https://www-genesis.destatis.de/genesis/online?sequenz=tabelleErgebnis&selectionname=61111-0001&startjahr=1991#abreadcrumb (same source as for car cost inflation in google drive)
+//		Verbraucherpreisindex 2021 to 2024: 103.1 to 119.3 = 16.2 = inflationFactor of 1.16
+//		pt distance cost 2021: cost = (m*distance + b) / inflationFactor = m * inflationFactor * distance + b * inflationFactor
+//		ergo: slope2021 = slope2024/inflationFactor and intercept2021 = intercept2024/inflationFactor
+//		TODO: think about moving car cost values to 2023? 2022-2023 is the reference year of mobile phone data in snz model
+		double inflationFactor = 1.16;
+		DistanceBasedPtFareParams.DistanceClassLinearFareFunctionParams below100km = germany.getOrCreateDistanceClassFareParams(100_000.);
+		below100km.setFareSlope(below100km.getFareSlope() / inflationFactor);
+		below100km.setFareIntercept(below100km.getFareIntercept() / inflationFactor);
 
-		//		TODO: project pt prices to ref year? what is the ref year here?
-//		TODO: also: project all other prices to ref year, also in cfg file
+		DistanceBasedPtFareParams.DistanceClassLinearFareFunctionParams greaterThan100km = germany.getOrCreateDistanceClassFareParams(Double.POSITIVE_INFINITY);
+		greaterThan100km.setFareSlope(greaterThan100km.getFareSlope() / inflationFactor);
+		greaterThan100km.setFareIntercept(greaterThan100km.getFareIntercept() / inflationFactor);
+
+		ptFareConfigGroup.addParameterSet(vvo10);
+		ptFareConfigGroup.addParameterSet(germany);
 
 		if (explicitWalkIntermodality == DresdenUtils.FunctionalityHandling.ENABLED) {
 			setExplicitIntermodalityParamsForWalkToPt(ConfigUtils.addOrGetModule(config, SwissRailRaptorConfigGroup.class));
