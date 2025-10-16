@@ -259,7 +259,7 @@ input/v1.0/prepare-100pct-with-trips-split-merged.plans.xml.gz: input/plans-long
 	$(sc) prepare generate-short-distance-trips\
    	 --population $(word 2,$^)\
    	 --input-crs $(CRS)\
-  	 --shp $(shared)/data/dresden-model/shp/vvo_tarifzone_10_dresden_utm32n.shp --shp-crs $(CRS)\
+  	 --shp $(shared)/data/dresden-model/shp/v1.0_vvo_tarifzone_10_dresden_utm32n.shp --shp-crs $(CRS)\
   	 --range 700\
     --num-trips 43524\
     --output $@
@@ -289,7 +289,7 @@ input/v1.0/dresden-v1.0-100pct.plans-initial.xml.gz: input/$V/prepare-100pct-wit
 check: input/$V/$N-$V-100pct.plans-initial.xml.gz
 	$(sc) analysis check-population $<\
  	 --input-crs $(CRS)\
-	 --shp $(shared)/data/dresden-model/shp/vvo_tarifzone_10_dresden_utm32n.shp --shp-crs $(CRS)
+	 --shp $(shared)/data/dresden-model/shp/v1.0_vvo_tarifzone_10_dresden_utm32n.shp --shp-crs $(CRS)
 
 # Aggregated target
 prepare: input/$V/$N-$V-100pct.plans-initial.xml.gz input/$V/$N-$V-network-with-pt.xml.gz

@@ -103,7 +103,7 @@ if __name__ == "__main__":
 
     # Defines the study area
     # this is needed because we need to filter the agents with home loc in out study area.
-    region = gpd.read_file("../../../../../shared-svn/projects/agimo/data/dresden-model/shp/vvo_tarifzone_10_dresden_utm32n.shp").to_crs(CRS)
+    region = gpd.read_file("../../../../../shared-svn/projects/agimo/data/dresden-model/shp/v1.0_vvo_tarifzone_10_dresden_utm32n.shp").to_crs(CRS)
 
     sim_persons = gpd.sjoin(sim_persons, region, how="inner", predicate="intersects")
     print("Filtered residents of shp file: ", len(sim_persons))
