@@ -30,6 +30,12 @@
 		<param name="laneDefinitionsFile" value="null"/>
 	</module>
 
+	<module name="facilities" >
+		<param name="facilitiesSource" value="fromFile" />
+		<param name="inputCRS" value="EPSG:25832" />
+		<param name="inputFacilitiesFile" value="https://svn.vsp.tu-berlin.de/repos/public-svn/matsim/scenarios/countries/de/dresden/dresden-v1.0/input/dresden-v1.0-activity-facilities.xml.gz" />
+	</module>
+
 	<module name="plans">
 		<param name="inputPlansFile"
 			   value="https://svn.vsp.tu-berlin.de/repos/public-svn/matsim/scenarios/countries/de/dresden/dresden-v1.0/input/dresden-v1.0-10pct.plans-initial.xml.gz"/>
