@@ -18,7 +18,7 @@ dresden := $(CURDIR)/../../public-svn/matsim/scenarios/countries/de/dresden/dres
 
 MEMORY ?= 30G
 #JAR := matsim-$(N)-*.jar
-JAR := matsim-dresden-1.0-00c6d14-dirty.jar
+JAR := matsim-dresden-1.0-1bd1112.jar
 NETWORK := $(germany)/maps/germany-250127.osm.pbf
 
 # Scenario creation tool
@@ -240,13 +240,16 @@ input/v1.0/prepare-cutout-fixed-subtours-100pct.plans.xml.gz: input/$V/prepare-c
 # set car availability for agents below 18 to false, standardize some person attrs, set home coords, set person income
 	$(sc) prepare population $@ --output $@
 
+# this step is necessary to process the plans for a 0it test. the 0it test is used to generate trips and persons tables
+# for the calculation of a number of short distance trips to add (compared to reference data).
+# the calculation is done in python script extract_ref_data.py
 input/v1.0/prepare-100pct-with-trips-split-merged.plans_FOR_0IT_TEST.xml.gz: input/v1.0/prepare-cutout-fixed-subtours-100pct.plans.xml.gz
 	$(sc) prepare split-activity-types-duration\
 		--input $<\
 		--exclude commercial_start,commercial_end,freight_start,freight_end,service\
 		--output $@
 
-input/v1.0/prepare-100pct-with-trips-split-merged.plans.xml.gz: input/plans-longHaulFreight.xml.gz input/$V/prepare-cutout-100pct.plans.xml.gz input/$V/$N-small-scale-commercialTraffic-$V-100pct.xml.gz
+input/v1.0/prepare-100pct-with-trips-split-merged.plans.xml.gz: input/plans-longHaulFreight.xml.gz input/v1.0/prepare-cutout-fixed-subtours-100pct.plans.xml.gz input/$V/$N-small-scale-commercialTraffic-$V-100pct.xml.gz
 # generate some short distance trips, which in senozon data generally are missing
 # 1) we have to calculate the number of trips to add with python script create_ref.py
 # for that it might be necessary to run split-activity-types-duration (see below) separately.
@@ -280,12 +283,12 @@ input/v1.0/dresden-v1.0-100pct.plans-initial.xml.gz: input/$V/prepare-100pct-wit
             --network $(word 2,$^)\
             --output-population $@\
             --output-facilities input/$V/$N-$V-activity-facilities.xml.gz
-	$(sc) prepare downsample-population $<\
+	$(sc) prepare downsample-population $@\
     	 --sample-size 1\
     	 --samples 0.25 0.1 0.01 0.001\
 
 # output of check-population was compared to initial output in matsim-oberlausitz-dresden scenario documentation, they align -sm0225
-# TODO: compare new dresden only output to senozon data
+# I also compared the dresden only plans to the oberlausitz-dresden plans and the snz modellsteckbrief. see internal documentation. -sm1025
 check: input/$V/$N-$V-100pct.plans-initial.xml.gz
 	$(sc) analysis check-population $<\
  	 --input-crs $(CRS)\
