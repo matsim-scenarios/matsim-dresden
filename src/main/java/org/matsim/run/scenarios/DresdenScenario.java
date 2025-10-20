@@ -68,7 +68,7 @@ import static org.matsim.utils.DresdenUtils.*;
 })
 public class DresdenScenario extends MATSimApplication {
 
-	static final String VERSION = "v1.0";
+	public static final String VERSION = "v1.0";
 
 	@CommandLine.Mixin
 	private final SampleOptions sample = new SampleOptions(100, 25, 10, 1);
@@ -104,7 +104,7 @@ public class DresdenScenario extends MATSimApplication {
 		simWrapper.defaultParams().setMapCenter("14.5,51.53");
 		simWrapper.defaultParams().setMapZoomLevel(6.8);
 //		the tarifzone shp file basically is a dresden shp file with fare prices as additional information
-		simWrapper.defaultParams().setShp("./vvo_tarifzone10_dresden/v%s_vvo_tarifzone_10_dresden_utm32n.shp");
+		simWrapper.defaultParams().setShp(String.format("./vvo_tarifzone10_dresden/%s_vvo_tarifzone_10_dresden_utm32n.shp", VERSION));
 
 		if (sample.isSet()){
 			config.controller().setOutputDirectory(sample.adjustName(config.controller().getOutputDirectory()));
@@ -165,7 +165,7 @@ public class DresdenScenario extends MATSimApplication {
 		vvo10.setTransactionPartner("VVO Tarifzone 10 Dresden");
 		vvo10.setDescription("VVO Tarifzone 10 Dresden");
 		vvo10.setOrder(1);
-		vvo10.setFareZoneShp(String.format("./vvo_tarifzone10_dresden/v%s_vvo_tarifzone_10_dresden_utm32n.shp", VERSION));
+		vvo10.setFareZoneShp(String.format("./vvo_tarifzone10_dresden/%s_vvo_tarifzone_10_dresden_utm32n.shp", VERSION));
 
 		DistanceBasedPtFareParams germany = DistanceBasedPtFareParams.GERMAN_WIDE_FARE_2024;
 		germany.setTransactionPartner("Deutschlandtarif");
@@ -204,6 +204,9 @@ public class DresdenScenario extends MATSimApplication {
 
 	@Override
 	protected void prepareScenario(Scenario scenario) {
+
+//		TODO: small scale commercial agents have incorrect vehTypes and legModes.
+//		all leg modes are car. vehTypes should be named truck8t, truck18t or truck40t, but have names like light8t.
 
 		//		add freight modes of DresdenUtils to network.
 //		this happens in the makefile pipeline already, but we do it here anyways, in case somebody uses a preliminary network.
@@ -273,7 +276,7 @@ public class DresdenScenario extends MATSimApplication {
 		config.scoring().addActivityParams(new ScoringConfigGroup.ActivityParams("freight_end").setTypicalDuration(30 * 60.));
 
 //		replanning strategies for small scale commercial traffic
-		for (String subpopulation : List.of("commercialPersonTraffic", "commercialPersonTraffic_service", "goodsTraffic")) {
+		for (String subpopulation : SMALL_SCALE_COM_SUBPOPS) {
 			config.replanning().addStrategySettings(
 				new ReplanningConfigGroup.StrategySettings()
 					.setStrategyName(DefaultPlanStrategiesModule.DefaultSelector.ChangeExpBeta)
@@ -294,13 +297,13 @@ public class DresdenScenario extends MATSimApplication {
 			new ReplanningConfigGroup.StrategySettings()
 				.setStrategyName(DefaultPlanStrategiesModule.DefaultSelector.ChangeExpBeta)
 				.setWeight(0.95)
-				.setSubpopulation("longDistanceFreight")
+				.setSubpopulation(LONG_DIST_FREIGHT_SUBPOP)
 		);
 		config.replanning().addStrategySettings(
 			new ReplanningConfigGroup.StrategySettings()
 				.setStrategyName(DefaultPlanStrategiesModule.DefaultStrategy.ReRoute)
 				.setWeight(0.05)
-				.setSubpopulation("longDistanceFreight")
+				.setSubpopulation(LONG_DIST_FREIGHT_SUBPOP)
 		);
 
 //		analyze travel times for all qsim main modes

@@ -22,6 +22,12 @@ public final class DresdenUtils {
 	public static final String LIGHT_MODE = "truck8t";
 	public static final Set<String> FREIGHT_MODES = Set.of(HEAVY_MODE, MEDIUM_MODE, LIGHT_MODE);
 
+	public static final String LONG_DIST_FREIGHT_SUBPOP = "longDistanceFreight";
+	public static final String COM_SUBPOP = "commercialPersonTraffic";
+	public static final String COM_SERVICE_SUBPOP = "commercialPersonTraffic_service";
+	public static final String GOODS_SUBPOP = "goodsTraffic";
+	public static final Set<String> SMALL_SCALE_COM_SUBPOPS = Set.of(COM_SUBPOP, COM_SERVICE_SUBPOP, GOODS_SUBPOP);
+
 	//	To decrypt hbefa input files set MATSIM_DECRYPTION_PASSWORD as environment variable. ask VSP for access.
 	public static final String HBEFA_2020_PATH = "https://svn.vsp.tu-berlin.de/repos/public-svn/3507bb3997e5657ab9da76dbedbb13c9b5991d3e/0e73947443d68f95202b71a156b337f7f71604ae/";
 	public static final String HBEFA_FILE_COLD_DETAILED = HBEFA_2020_PATH + "82t7b02rc0rji2kmsahfwp933u2rfjlkhfpi2u9r20.enc";
