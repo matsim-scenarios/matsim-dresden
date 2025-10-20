@@ -18,7 +18,7 @@ dresden := $(CURDIR)/../../public-svn/matsim/scenarios/countries/de/dresden/dres
 
 MEMORY ?= 30G
 #JAR := matsim-$(N)-*.jar
-JAR := matsim-dresden-1.0-b25cc72.jar
+JAR := matsim-dresden-1.0-657e2c5.jar
 NETWORK := $(germany)/maps/germany-250127.osm.pbf
 
 # Scenario creation tool
@@ -283,6 +283,12 @@ input/v1.0/dresden-v1.0-100pct.plans-initial.xml.gz: input/$V/prepare-100pct-wit
             --network $(word 2,$^)\
             --output-population $@\
             --output-facilities input/$V/$N-$V-activity-facilities.xml.gz
+# for small scale commercial traffic generation some vehicle types (truck8t, truck18t and truck40t) are named differently than in this scenario.
+# this causes a crash of simulation. We delete them here and they will be auto generated when starting the sim. For car the veh types are named equally.
+	$(sc) prepare remove-vehicles\
+			$@\
+			--output $@\
+			--skip car
 	$(sc) prepare downsample-population $@\
     	 --sample-size 1\
     	 --samples 0.25 0.1 0.01 0.001\

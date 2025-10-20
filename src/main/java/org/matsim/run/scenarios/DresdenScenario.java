@@ -103,7 +103,7 @@ public class DresdenScenario extends MATSimApplication {
 		simWrapper.defaultParams().setMapCenter("14.5,51.53");
 		simWrapper.defaultParams().setMapZoomLevel(6.8);
 //		the tarifzone shp file basically is a dresden shp file with fare prices as additional information
-		simWrapper.defaultParams().setShp(String.format("./vvo_tarifzone10_dresden/%s_vvo_tarifzone_10_dresden_utm32n.shp", VERSION));
+		simWrapper.defaultParams().setShp(String.format("vvo_tarifzone_10_dresden/%s_vvo_tarifzone_10_dresden_utm32n.shp", VERSION));
 
 		if (sample.isSet()){
 			config.controller().setOutputDirectory(sample.adjustName(config.controller().getOutputDirectory()));
@@ -164,7 +164,7 @@ public class DresdenScenario extends MATSimApplication {
 		vvo10.setTransactionPartner("VVO Tarifzone 10 Dresden");
 		vvo10.setDescription("VVO Tarifzone 10 Dresden");
 		vvo10.setOrder(1);
-		vvo10.setFareZoneShp(String.format("./vvo_tarifzone10_dresden/%s_vvo_tarifzone_10_dresden_utm32n.shp", VERSION));
+		vvo10.setFareZoneShp(String.format("./vvo_tarifzone_10_dresden/%s_vvo_tarifzone_10_dresden_utm32n.shp", VERSION));
 
 		DistanceBasedPtFareParams germany = DistanceBasedPtFareParams.GERMAN_WIDE_FARE_2024;
 		germany.setTransactionPartner("Deutschlandtarif");
@@ -203,10 +203,6 @@ public class DresdenScenario extends MATSimApplication {
 
 	@Override
 	protected void prepareScenario(Scenario scenario) {
-
-//		TODO: small scale commercial agents have incorrect vehTypes and legModes.
-//		all leg modes are car. vehTypes should be named truck8t, truck18t or truck40t, but have names like light8t.
-
 		//		add freight modes of DresdenUtils to network.
 //		this happens in the makefile pipeline already, but we do it here anyways, in case somebody uses a preliminary network.
 		PrepareNetwork.prepareFreightNetwork(scenario.getNetwork());
