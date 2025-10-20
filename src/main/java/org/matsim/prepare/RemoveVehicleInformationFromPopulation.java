@@ -2,11 +2,18 @@ package org.matsim.prepare;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.population.Person;
 import org.matsim.api.core.v01.population.Population;
 import org.matsim.application.MATSimAppCommand;
 import org.matsim.core.population.PopulationUtils;
+import org.matsim.vehicles.VehicleType;
+import org.matsim.vehicles.VehicleUtils;
 import picocli.CommandLine;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 
 @CommandLine.Command(
 	name = "remove-vehicles",
@@ -17,9 +24,10 @@ public class RemoveVehicleInformationFromPopulation implements MATSimAppCommand 
 
 	@CommandLine.Parameters(arity = "1", paramLabel = "INPUT", description = "Path to input population")
 	private String input;
-
 	@CommandLine.Option(names = "--output", description = "Path to output population", required = true)
 	private String output;
+	@CommandLine.Option(names = "--skip", description = "List of modes to skip for vehicle type deletion. Separated by ,", split = ",")
+	private List<String> modesToSkip = new ArrayList<>();
 
 	public static void main(String[] args) {
 		new RemoveVehicleInformationFromPopulation().execute(args);
@@ -33,16 +41,28 @@ public class RemoveVehicleInformationFromPopulation implements MATSimAppCommand 
 		int vehicleTypeCount = 0;
 
 		for (Person person : population.getPersons().values()) {
-//			if attrs are present, delete them from person.
 
+			Map<String, Id<VehicleType>> types = VehicleUtils.getVehicleTypes(person);
+
+			boolean skipPerson = false;
+			if (types != null) {
+				for (String mode : modesToSkip) {
+					if (types.containsKey(mode)) {
+						skipPerson = true;
+						break;
+					}
+				}
+			}
+
+			if (types != null && !skipPerson) {
+				person.getAttributes().removeAttribute("vehicleTypes");
+				vehicleTypeCount++;
+			}
+
+//			if attrs are present, delete them from person.
 			if (person.getAttributes().getAttribute("vehicles") != null) {
 				person.getAttributes().removeAttribute("vehicles");
 				vehicleCount++;
-			}
-
-			if (person.getAttributes().getAttribute("vehicleTypes") != null) {
-				person.getAttributes().removeAttribute("vehicleTypes");
-				vehicleTypeCount++;
 			}
 		}
 		PopulationUtils.writePopulation(population, output);
