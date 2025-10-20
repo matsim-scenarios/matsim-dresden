@@ -49,7 +49,6 @@ import picocli.CommandLine;
 import playground.vsp.scoring.IncomeDependentUtilityOfMoneyPersonScoringParameters;
 
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 
 import static org.matsim.utils.DresdenUtils.*;
