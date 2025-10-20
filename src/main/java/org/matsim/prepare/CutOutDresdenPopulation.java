@@ -71,24 +71,6 @@ public class CutOutDresdenPopulation implements MATSimAppCommand {
 			geom = geom.buffer(buffer);
 		}
 
-		final TripsToLegsAlgorithm trips2Legs = new TripsToLegsAlgorithm(new RoutingModeMainModeIdentifier());
-
-		for (Person person : population.getPersons().values()) {
-			for (Plan plan : person.getPlans()) {
-//					make trips = legs
-				trips2Legs.run(plan);
-
-				for (PlanElement el : plan.getPlanElements()) {
-					if (el instanceof Leg leg) {
-//							remove routes from legs
-						CleanPopulation.removeRouteFromLeg(leg);
-						leg.setRoutingMode(mode);
-						leg.setMode(mode);
-					}
-				}
-			}
-		}
-
 		// Create router
 		FreeSpeedTravelTime travelTime = new FreeSpeedTravelTime();
 		LeastCostPathCalculatorFactory fastAStarLandmarksFactory = new SpeedyALTFactory();
