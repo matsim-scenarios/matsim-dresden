@@ -289,6 +289,8 @@ input/v1.0/dresden-v1.0-100pct.plans-initial.xml.gz: input/$V/prepare-100pct-wit
 			$@\
 			--output $@\
 			--skip car
+# we need to fix subtours again after assignment of facilities to activities.
+	$(sc) prepare fix-subtour-modes --coord-dist 100 --input $@ --output $@
 	$(sc) prepare downsample-population $@\
     	 --sample-size 1\
     	 --samples 0.25 0.1 0.01 0.001\

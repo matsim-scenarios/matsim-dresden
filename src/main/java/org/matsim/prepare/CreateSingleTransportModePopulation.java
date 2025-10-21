@@ -67,7 +67,7 @@ public class CreateSingleTransportModePopulation implements MATSimAppCommand {
 	}
 
 	private static void logMessage(String mode) {
-		log.info("For all agents with subpopulation=person: Unselected plans have been removed. Trips were converted to legs. Routes have been removed." +
+		log.info("For all agents with subpopulation=person: Trips were converted to legs. Routes have been removed." +
 			" For every leg, the mode was changed to {}", mode);
 	}
 }
