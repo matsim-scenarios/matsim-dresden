@@ -9,7 +9,6 @@
 		<!-- <version>15.0</version> -->
 
 		<!-- PR-labelled release -->
-		<!-- FIXME: Decide on version -->
 		<version>2026.0-PR4282</version>
 
 		<!-- snapshot == not recommended: rather use PR-labelled release!-->
@@ -25,7 +24,6 @@
 	<description>A transport model of Dresden</description>
 
 	<properties>
-		<!-- FIXME: change main class -->
 		<main.class>org.matsim.run.RunDresdenScenario</main.class>
 
 		<!-- Don't modify, will use the same version as parent -->
@@ -40,7 +38,6 @@
 		<repository>
 			<id>github</id>
 			<name>GitHub Packages</name>
-			<!-- FIXME: Update Repo -->
 			<url>https://maven.pkg.github.com/matsim-scenarios/matsim-dresden</url>
 		</repository>
 	</distributionManagement>
