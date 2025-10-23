@@ -18,7 +18,7 @@ dresden := $(CURDIR)/../../public-svn/matsim/scenarios/countries/de/dresden/dres
 
 MEMORY ?= 30G
 #JAR := matsim-$(N)-*.jar
-JAR := matsim-dresden-1.0-657e2c5.jar
+JAR := matsim-dresden-1.0-f9eab41.jar
 NETWORK := $(germany)/maps/germany-250127.osm.pbf
 
 # Scenario creation tool

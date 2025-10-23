@@ -2,6 +2,7 @@ package org.matsim.run.scenarios;
 
 import ch.sbb.matsim.config.SwissRailRaptorConfigGroup;
 import com.google.common.collect.Sets;
+import com.google.inject.multibindings.Multibinder;
 import jakarta.annotation.Nullable;
 import org.matsim.analysis.CheckAndSummarizeLongDistanceFreightPopulation;
 import org.matsim.analysis.CheckStayHomeAgents;
@@ -39,7 +40,9 @@ import org.matsim.core.network.turnRestrictions.DisallowedNextLinks;
 import org.matsim.core.replanning.annealing.ReplanningAnnealerConfigGroup;
 import org.matsim.core.replanning.strategies.DefaultPlanStrategiesModule;
 import org.matsim.core.scoring.functions.ScoringParametersForPerson;
+import org.matsim.dashboards.DresdenDashboardProvider;
 import org.matsim.prepare.*;
+import org.matsim.simwrapper.DashboardProvider;
 import org.matsim.simwrapper.SimWrapperConfigGroup;
 import org.matsim.simwrapper.SimWrapperModule;
 import org.matsim.smallScaleCommercialTrafficGeneration.GenerateSmallScaleCommercialTrafficDemand;
@@ -242,6 +245,9 @@ public class DresdenScenario extends MATSimApplication {
 
 				addTravelTimeBinding(TransportMode.ride).to(carTravelTime());
 				addTravelDisutilityFactoryBinding(TransportMode.ride).to(carTravelDisutilityFactoryKey());
+//				this binds the DresdenDashboardProvider with guice instead of resources/services/.../file.
+//				This is way more convenient imho.
+				Multibinder.newSetBinder(binder(), DashboardProvider.class).addBinding().to(DresdenDashboardProvider.class);
 			}
 		});
 	}
