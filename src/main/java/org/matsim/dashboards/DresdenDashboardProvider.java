@@ -15,14 +15,16 @@ import java.util.List;
 public class DresdenDashboardProvider implements DashboardProvider {
 	@Override
 	public List<Dashboard> getDashboards(Config config, SimWrapper simWrapper) {
-
-		TripDashboard trips = new TripDashboard(
+//		create TripDashboard with reference files for calibration
+//		this has to be generic type Dashboard because otherwise we cannot use Dashboard.customize(...).context("calibration")
+//		we need to set the context here, otherwise simwrapper adds the default TripDashboard without reference files.
+		Dashboard trips = Dashboard.customize(new TripDashboard(
 			"mode_share_ref.csv",
 			"mode_share_per_dist_ref.csv",
 			"mode_users_ref.csv")
 			.withGroupedRefData("mode_share_per_group_dist_ref.csv", "age", "economic_status", "income", "employment")
 			.withDistanceDistribution("mode_share_distance_distribution.csv")
-			.setAnalysisArgs("--person-filter", "subpopulation=person");
+			.setAnalysisArgs("--person-filter", "subpopulation=person")).context("calibration").title("Trips (calibration)");
 
 		return List.of(trips,
 			new EmissionsDashboard(config.global().getCoordinateSystem())
