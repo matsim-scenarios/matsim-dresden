@@ -13,7 +13,6 @@
 This repository provides an open MATSim transport model for Dresden, provided by the [Transport Systems Planning and Transport Telematics group](https://www.vsp.tu-berlin.de) of [Technische Universität Berlin](https://www.tu.berlin/).
 
 <a rel="TU Berlin" href="https://www.vsp.tu-berlin.de"><img src="https://svn.vsp.tu-berlin.de/repos/public-svn/ueber_uns/logo/TU_BERLIN_Logo_Lang_RGB_SR_rot.svg" width="35%" height="35%"/></a>
-<a rel="TU Berlin" href="https://www.vsp.tu-berlin.de"><img src="https://svn.vsp.tu-berlin.de/repos/public-svn/ueber_uns/logo/vsp-2024/vsp-logo-2024-red-fulltext.png" width="64%" height="35%"/></a>
 
 This scenario contains a 10pct sample of Dresden and its surrounding area; road capacities are accordingly reduced. The scenario is calibrated taking into consideration the traffic counts, modal split and mode-specific trip distance distributions.
 
