@@ -106,12 +106,13 @@ public final class DresdenSimWrapperRunner implements MATSimAppCommand {
 			}
 
 			if (trips) {
-				sw.addDashboard(new TripDashboard(
-					"lausitz_mode_share.csv",
-					"lausitz_mode_share_per_dist.csv",
-					"lausitz_mode_users.csv")
-					.withGroupedRefData("lausitz_mode_share_per_group_dist_ref.csv", "age", "economic_status", "income")
-					.withDistanceDistribution("lausitz_mode_share_distance_distribution.csv"));
+				sw.addDashboard(Dashboard.customize(new TripDashboard(
+					"mode_share_ref.csv",
+					"mode_share_per_dist_ref.csv",
+					"mode_users_ref.csv")
+					.withGroupedRefData("mode_share_per_group_dist_ref.csv", "age", "economic_status", "income", "employment")
+					.withDistanceDistribution("mode_share_distance_distribution.csv")
+					.setAnalysisArgs("--person-filter", "subpopulation=person")).context("calibration").title("Trips (calibration)"));
 			}
 
 			if (emissions) {
