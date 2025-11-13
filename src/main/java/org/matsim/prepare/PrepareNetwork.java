@@ -14,7 +14,7 @@ import picocli.CommandLine;
 
 import java.util.Set;
 
-import static org.matsim.utils.DresdenUtils.FREIGHT_MODES;
+import static org.matsim.utils.DresdenUtils.getFreightModes;
 
 @CommandLine.Command(
 		name = "network",
@@ -59,14 +59,14 @@ public class PrepareNetwork implements MATSimAppCommand {
 
 			// allow freight traffic together with cars
 			if (modes.contains(TransportMode.car)) {
-				modes.addAll(FREIGHT_MODES);
+				modes.addAll(getFreightModes());
 				linkCount++;
 			}
 			link.setAllowedModes(modes);
 		}
 
-		log.info("For {} links the freight modes {} have been added as allowed modes.", linkCount, FREIGHT_MODES);
-		NetworkUtils.cleanNetwork(network, FREIGHT_MODES);
+		log.info("For {} links the freight modes {} have been added as allowed modes.", linkCount, getFreightModes());
+		NetworkUtils.cleanNetwork(network, getFreightModes());
 	}
 
 	/**

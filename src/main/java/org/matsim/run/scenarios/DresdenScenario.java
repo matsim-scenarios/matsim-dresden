@@ -257,16 +257,16 @@ public class DresdenScenario extends MATSimApplication {
 	 */
 	private static void prepareCommercialTrafficConfig(Config config) {
 
-		FREIGHT_MODES.forEach(mode -> {
+		getFreightModes().forEach(mode -> {
 			ScoringConfigGroup.ModeParams thisModeParams = new ScoringConfigGroup.ModeParams(mode);
 			config.scoring().addModeParams(thisModeParams);
 		});
 
 		Set<String> qsimModes = new HashSet<>(config.qsim().getMainModes());
-		config.qsim().setMainModes(Sets.union(qsimModes, FREIGHT_MODES));
+		config.qsim().setMainModes(Sets.union(qsimModes, getFreightModes()));
 
 		Set<String> networkModes = new HashSet<>(config.routing().getNetworkModes());
-		config.routing().setNetworkModes(Sets.union(networkModes, FREIGHT_MODES));
+		config.routing().setNetworkModes(Sets.union(networkModes, getFreightModes()));
 
 		config.scoring().addActivityParams(new ScoringConfigGroup.ActivityParams("commercial_start").setTypicalDuration(30 * 60.));
 		config.scoring().addActivityParams(new ScoringConfigGroup.ActivityParams("commercial_end").setTypicalDuration(30 * 60.));
@@ -277,7 +277,7 @@ public class DresdenScenario extends MATSimApplication {
 		config.scoring().addActivityParams(new ScoringConfigGroup.ActivityParams("freight_end").setTypicalDuration(30 * 60.));
 
 //		replanning strategies for small scale commercial traffic
-		for (String subpopulation : SMALL_SCALE_COM_SUBPOPS) {
+		for (String subpopulation : getSmallScaleComSubpops()) {
 			config.replanning().addStrategySettings(
 				new ReplanningConfigGroup.StrategySettings()
 					.setStrategyName(DefaultPlanStrategiesModule.DefaultSelector.ChangeExpBeta)
@@ -308,7 +308,7 @@ public class DresdenScenario extends MATSimApplication {
 		);
 
 //		analyze travel times for all qsim main modes
-		config.travelTimeCalculator().setAnalyzedModes(Sets.union(qsimModes, FREIGHT_MODES));
+		config.travelTimeCalculator().setAnalyzedModes(Sets.union(qsimModes, getFreightModes()));
 
 	}
 }

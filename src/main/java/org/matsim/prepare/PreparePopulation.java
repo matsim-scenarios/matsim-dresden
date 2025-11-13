@@ -11,6 +11,7 @@ import org.matsim.application.prepare.population.ExtractHomeCoordinates;
 import org.matsim.core.population.PersonUtils;
 import org.matsim.core.population.PopulationUtils;
 import org.matsim.core.router.TripStructureUtils;
+import org.matsim.utils.DresdenUtils;
 import picocli.CommandLine;
 
 import java.math.BigDecimal;
@@ -81,17 +82,17 @@ public class PreparePopulation implements MATSimAppCommand {
 		// Set car availability to "never" for agents below 18 years old
 		// Standardize the attribute "age"
 		String avail = "always";
-		Object age = person.getAttributes().getAttribute("age");
+		Object age = person.getAttributes().getAttribute(DresdenUtils.SNZPersonAttributeNames.getAgeAttributeName());
 		if (age != null && (int) age < 18) {
 			avail = "never";
 		}
 
 		// Replace with standardized car availability attribute
+		//		not replacing the attr anymore because the snz car availability might be useful for analysis.
 		PersonUtils.setCarAvail(person, avail);
-		person.getAttributes().removeAttribute("carAvailability");
 
 		// Standardize the attribute "sex"
-		Object sex = person.getAttributes().getAttribute("gender");
+		Object sex = person.getAttributes().getAttribute(DresdenUtils.SNZPersonAttributeNames.getGenderAttributeName());
 		if (sex != null) {
 			PersonUtils.setSex(person, (String) sex);
 //			gender and sex are two different things: sex is the biological sex, assigned at birth
@@ -107,8 +108,8 @@ public class PreparePopulation implements MATSimAppCommand {
 
 		ExtractHomeCoordinates.setHomeCoordinate(person);
 
-		String incomeGroupString = (String) person.getAttributes().getAttribute("hhIncome");
-		String householdSizeString = (String) person.getAttributes().getAttribute("hhSize");
+		String incomeGroupString = (String) person.getAttributes().getAttribute(DresdenUtils.SNZPersonAttributeNames.getHhIncomeAttributeName());
+		String householdSizeString = (String) person.getAttributes().getAttribute(DresdenUtils.SNZPersonAttributeNames.getHhSizeAttributeName());
 		int incomeGroup = 0;
 		double householdSize = 1;
 		if (incomeGroupString != null && householdSizeString != null) {
@@ -138,6 +139,12 @@ public class PreparePopulation implements MATSimAppCommand {
 			// https://www.destatis.de/EN/Themes/Society-Environment/Population/Current-Population/_node.html;jsessionid=E0D7A060D654B31C3045AAB1E884CA75.live711
 		};
 		PersonUtils.setIncome(person, (int) income);
+
+		//		mark all attributes which come from SNZ as such
+		for (String name : DresdenUtils.getSNZPersonAttrNames()) {
+			person.getAttributes().putAttribute("SNZ_" + name, person.getAttributes().getAttribute(name));
+			person.getAttributes().removeAttribute(name);
+		}
 
 	}
 
