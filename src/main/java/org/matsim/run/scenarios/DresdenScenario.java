@@ -119,6 +119,16 @@ public class DresdenScenario extends MATSimApplication {
 			simWrapper.setSampleSize(sample.getSample());
 		}
 
+//		We would like to "switch off" the usage of LastestActivityEndTime, but this is not possible with just setting the value.
+//		Option 1: set latestActivityEndTime = 0; The all mutated act end times would become 0 because in class MutateActivityTimeAllocation the following line is used to set the act end time
+//		double newEndTime = Math.min(mutateTime(endTime, mutationRange),this.latestActivityEndTime);
+//		Option 2: set latestActivityEndTIme = 36h = qsim endtime, but doesn't this cause a postponing of the act end time until we reach 36h ulimatively? This is not what we want I think..
+		config.timeAllocationMutator().setLatestActivityEndTime(String.valueOf(config.qsim().getEndTime().seconds()));
+//		if mutateAroundInitialEndTImeOnly = true we potentially trap acts with start and/or end outside of act type opening times, so we switch it off here.
+		config.timeAllocationMutator().setMutateAroundInitialEndTimeOnly(false);
+		//		mutation should not affect act duration because otherwise short acts can end up with max_dur=0s.
+		config.timeAllocationMutator().setAffectingDuration(false);
+
 		config.vspExperimental().setVspDefaultsCheckingLevel(VspExperimentalConfigGroup.VspDefaultsCheckingLevel.abort);
 
 		//		performing set to 6.0 after calibration task force july 24
@@ -135,6 +145,7 @@ public class DresdenScenario extends MATSimApplication {
 //		2.0 + 1.0 = alpha + 1
 //		ride cost = alpha * car cost
 //		ride marg utility of traveling = (alpha + 1) * marg utility travelling car + alpha * beta perf
+//		TODO: calibrate ride alpha. We should always calibrate different alpha sets of 1.0, 1.5 and 2.0
 		double alpha = 2;
 		RideScoringParamsFromCarParams.setRideScoringParamsBasedOnCarParams(scoringConfigGroup, alpha);
 
