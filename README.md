@@ -3,7 +3,7 @@
 [![build](https://github.com/matsim-scenarios/matsim-dresden/actions/workflows/build.yaml/badge.svg)](https://github.com/matsim-scenarios/matsim-dresden/actions/workflows/build.yaml)
 ![license](https://img.shields.io/github/license/matsim-scenarios/matsim-dresden.svg)
 ![JDK](https://img.shields.io/badge/JDK-21+-green.svg)
-[![DOI (v2.0)](TODO)](TODO)
+![DOI v1.0](https://doi.org/10.5072/FK2/XOVGAP)
 
 
 ![MATSim network and agents](matsim-dresden-visualization.png "MATSim network and agents")

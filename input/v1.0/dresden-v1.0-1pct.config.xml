@@ -10,8 +10,8 @@
 	<module name="controller">
 		<param name="lastIteration" value="500"/>
 		<param name="overwriteFiles" value="failIfDirectoryExists"/>
-		<param name="runId" value="dresden-10pct"/>
-		<param name="outputDirectory" value="./output/output-dresden-10pct"/>
+		<param name="runId" value="dresden-1pct"/>
+		<param name="outputDirectory" value="./output/output-dresden-1pct"/>
 		<param name="writeEventsInterval" value="100"/>
 		<param name="writePlansInterval" value="100"/>
 		<param name="enableLinkToLinkRouting" value="false"/>
@@ -38,7 +38,7 @@
 
 	<module name="plans">
 		<param name="inputPlansFile"
-			   value="https://svn.vsp.tu-berlin.de/repos/public-svn/matsim/scenarios/countries/de/dresden/dresden-v1.0/input/dresden-v1.0-10pct.plans-initial.xml.gz"/>
+			   value="https://svn.vsp.tu-berlin.de/repos/public-svn/matsim/scenarios/countries/de/dresden/dresden-v1.0/input/dresden-v1.0-1pct.plans-initial.xml.gz"/>
 		<param name="removingUnnecessaryPlanAttributes" value="true"/>
 	</module>
 
@@ -69,8 +69,8 @@
 
 	<module name="qsim">
 		<param name="endTime" value="36:00:00"/>
-		<param name="flowCapacityFactor" value="0.1"/>
-		<param name="storageCapacityFactor" value="0.1"/>
+		<param name="flowCapacityFactor" value="0.01"/>
+		<param name="storageCapacityFactor" value="0.01"/>
 		<param name="mainMode" value="car,bike"/>
 		<param name="numberOfThreads" value="12"/>
 		<param name="startTime" value="00:00:00"/>
@@ -179,7 +179,7 @@
 		<param name="fractionOfIterationsToStartScoreMSA" value="0.9"/>
 		<parameterset type="scoringParameters">
 			<parameterset type="modeParams">
-				<param name="constant" value="0.31670929636482503"/>
+				<param name="constant" value="1.5732261503548772"/>
 				<param name="marginalUtilityOfTraveling_util_hr" value="0.0"/>
 				<param name="mode" value="car"/>
 				<param name="monetaryDistanceRate" value="-0.00025"/>
@@ -187,7 +187,7 @@
 				<param name="dailyMonetaryConstant" value="-13.22"/>
 			</parameterset>
 			<parameterset type="modeParams">
-				<param name="constant" value="-0.3181313429018894"/>
+				<param name="constant" value="-0.7035386992373185"/>
 				<param name="mode" value="ride"/>
 <!--				the following are set in code, see run class -->
 <!--				<param name="marginalUtilityOfTraveling_util_hr" value="-18.0"/>-->
@@ -195,13 +195,13 @@
 <!--				<param name="dailyMonetaryConstant" value="-0.0"/>-->
 			</parameterset>
 			<parameterset type="modeParams">
-				<param name="constant" value="-0.8143658493278783"/>
+				<param name="constant" value="-1.753998059890016"/>
 				<param name="marginalUtilityOfTraveling_util_hr" value="0.0"/>
 				<param name="mode" value="pt"/>
 				<param name="dailyMonetaryConstant" value="0.0"/>
 			</parameterset>
 			<parameterset type="modeParams">
-				<param name="constant" value="-1.4063545335132797"/>
+				<param name="constant" value="-0.3939329356885151"/>
 				<param name="marginalUtilityOfTraveling_util_hr" value="-4.0"/>
 				<param name="mode" value="bike"/>
 			</parameterset>
