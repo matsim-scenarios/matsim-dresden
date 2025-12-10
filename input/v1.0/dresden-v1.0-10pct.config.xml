@@ -179,7 +179,7 @@
 		<param name="fractionOfIterationsToStartScoreMSA" value="0.9"/>
 		<parameterset type="scoringParameters">
 			<parameterset type="modeParams">
-				<param name="constant" value="0.29066953938829737"/>
+				<param name="constant" value="0.31670929636482503"/>
 				<param name="marginalUtilityOfTraveling_util_hr" value="0.0"/>
 				<param name="mode" value="car"/>
 				<param name="monetaryDistanceRate" value="-0.00025"/>
@@ -187,7 +187,7 @@
 				<param name="dailyMonetaryConstant" value="-13.22"/>
 			</parameterset>
 			<parameterset type="modeParams">
-				<param name="constant" value="-0.3899210734374805"/>
+				<param name="constant" value="-0.3181313429018894"/>
 				<param name="mode" value="ride"/>
 <!--				the following are set in code, see run class -->
 <!--				<param name="marginalUtilityOfTraveling_util_hr" value="-18.0"/>-->
@@ -195,13 +195,13 @@
 <!--				<param name="dailyMonetaryConstant" value="-0.0"/>-->
 			</parameterset>
 			<parameterset type="modeParams">
-				<param name="constant" value="-2.458426826223411"/>
+				<param name="constant" value="-0.8143658493278783"/>
 				<param name="marginalUtilityOfTraveling_util_hr" value="0.0"/>
 				<param name="mode" value="pt"/>
 				<param name="dailyMonetaryConstant" value="0.0"/>
 			</parameterset>
 			<parameterset type="modeParams">
-				<param name="constant" value="-2.2217257149145353"/>
+				<param name="constant" value="-1.4063545335132797"/>
 				<param name="marginalUtilityOfTraveling_util_hr" value="-4.0"/>
 				<param name="mode" value="bike"/>
 			</parameterset>
