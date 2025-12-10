@@ -56,7 +56,7 @@ import java.util.Set;
 
 import static org.matsim.utils.DresdenUtils.*;
 
-@CommandLine.Command(header = ":: Dresden Scenario ::", version = DresdenScenario.VERSION, mixinStandardHelpOptions = true)
+@CommandLine.Command(header = ":: Dresden Scenario ::", version = DresdenModel.VERSION, mixinStandardHelpOptions = true)
 @MATSimApplication.Prepare({
 		CreateNetworkFromSumo.class, CreateTransitScheduleFromGtfs.class, TrajectoryToPlans.class, GenerateShortDistanceTrips.class,
 		MergePopulations.class, ExtractRelevantFreightTrips.class, DownSamplePopulation.class, ExtractHomeCoordinates.class,
@@ -68,7 +68,7 @@ import static org.matsim.utils.DresdenUtils.*;
 @MATSimApplication.Analysis({
 		LinkStats.class, CheckPopulation.class, CheckAndSummarizeLongDistanceFreightPopulation.class, CheckStayHomeAgents.class
 })
-public class DresdenScenario extends MATSimApplication {
+public class DresdenModel extends MATSimApplication {
 
 	public static final String VERSION = "v1.0";
 
@@ -80,16 +80,16 @@ public class DresdenScenario extends MATSimApplication {
 	static DresdenUtils.FunctionalityHandling explicitWalkIntermodality;
 
 
-	public DresdenScenario(@Nullable Config config) {
+	public DresdenModel(@Nullable Config config) {
 		super(config);
 	}
 
-	public DresdenScenario() {
+	public DresdenModel() {
 		super(String.format("input/%s/dresden-%s-10pct.config.xml", VERSION, VERSION));
 	}
 
 	public static void main(String[] args) {
-		MATSimApplication.run(DresdenScenario.class, args);
+		MATSimApplication.execute(DresdenModel.class, args);
 	}
 
 	@Nullable

@@ -24,7 +24,7 @@
 	<description>A transport model of Dresden</description>
 
 	<properties>
-		<main.class>org.matsim.run.RunDresdenScenario</main.class>
+		<main.class>org.matsim.run.DresdenModelWrapper</main.class>
 
 		<!-- Don't modify, will use the same version as parent -->
 		<matsim.version>${project.parent.version}</matsim.version>
