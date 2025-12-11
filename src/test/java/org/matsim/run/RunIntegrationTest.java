@@ -63,9 +63,9 @@ class RunIntegrationTest {
 		DresdenModel.main(new String[]{"--config", configPath,
 			"--1pct",
 			"--iterations", "1",
-			"--config:plans.inputPlansFile", "https://svn.vsp.tu-berlin.de/repos/public-svn/matsim/scenarios/countries/de/dresden/dresden-v1.0/input/dresden-v1.0-0.1pct.plans-initial.xml.gz",
-			"--output", utils.getOutputDirectory(),
-			"--config:controller.overwriteFiles=deleteDirectoryIfExists",
+			"--config:plans.inputPlansFile", "https://svn.vsp.tu-berlin.de/repos/public-svn/matsim/scenarios/countries/de/dresden/dresden-v1.0/input/dresden-v1.0-0.1pct.plans-initial.xml.gz",//记录使用的样品数量
+			"--output", utils.getOutputDirectory(),//记录output路径
+			"--config:controller.overwriteFiles=deleteDirectoryIfExists",//刷新output
 			"--config:global.numberOfThreads", "2",
 			"--config:qsim.numberOfThreads", "2",
 			"--config:simwrapper.defaultDashboards", "disabled",
@@ -80,7 +80,7 @@ class RunIntegrationTest {
 		String configPath = String.format("input/%s/dresden-%s-10pct.config.xml", DresdenModel.VERSION, DresdenModel.VERSION);
 
 		// start with wrong plans file
-		Assertions.assertThrows(UncheckedIOException.class, () ->
+		Assertions.assertThrows(UncheckedIOException.class, () ->//if fail go pass, if pass go fail
 			DresdenModel.main(new String[]{"--config", configPath,
 				"--1pct",
 				"--iterations", "1",
