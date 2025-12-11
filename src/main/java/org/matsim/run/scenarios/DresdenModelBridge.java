@@ -7,6 +7,7 @@ import jakarta.annotation.Nullable;
 import org.matsim.analysis.CheckAndSummarizeLongDistanceFreightPopulation;
 import org.matsim.analysis.CheckStayHomeAgents;
 import org.matsim.analysis.personMoney.PersonMoneyEventsAnalysisModule;
+import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.Scenario;
 import org.matsim.api.core.v01.TransportMode;
 import org.matsim.api.core.v01.network.Link;
@@ -223,6 +224,22 @@ public class DresdenModelBridge extends MATSimApplication {
 		//		add freight modes of DresdenUtils to network.
 //		this happens in the makefile pipeline already, but we do it here anyways, in case somebody uses a preliminary network.
 		PrepareNetwork.prepareFreightNetwork(scenario.getNetwork());
+
+		Set<Id<Link>> closedLinks = Set.of(
+			Id.createLinkId("-488766980"),
+			Id.createLinkId("761288685"),
+			Id.createLinkId("-264360396#1"),
+			Id.createLinkId("505502627#0")
+		);
+
+		for (Id<Link> linkId : closedLinks) {
+			Link link = scenario.getNetwork().getLinks().get(linkId);
+			if (link != null) {
+				link.setCapacity(0.001);
+			} else {
+				System.out.println("WARNING: link not found: " + linkId);
+			}
+		}
 
 //		remove disallowed links. The disallowed links cause many problems and (usually) are not useful in our rather macroscopic view on transport systems.
 		for (Link link : scenario.getNetwork().getLinks().values()) {
