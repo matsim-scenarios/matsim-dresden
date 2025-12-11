@@ -39,7 +39,7 @@ public class DresdenScenarioWithSpeedReduction extends DresdenScenario{
 
 
 	public static void main(String[] args) {
-		MATSimApplication.runWithDefaults(DresdenScenarioWithSpeedReduction.class, args);
+		MATSimApplication.run(DresdenScenarioWithSpeedReduction.class, args);
 	}
 
 
