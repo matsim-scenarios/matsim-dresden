@@ -22,7 +22,9 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import static java.lang.Character.isDefined;
+/**
+ * Dresden scenario with option to reduce speed in certain area.
+ */
 
 public class DresdenScenarioWithSpeedReduction extends DresdenScenario{
 
@@ -74,6 +76,9 @@ public class DresdenScenarioWithSpeedReduction extends DresdenScenario{
 
 	/**
 	 * Reduce speed of link in certain zone. Does not affect motorways and trunks. The speed is reduced by a relative factor.
+	 * @param network             the network to be modified
+	 * @param geometries          the geometries defining the area
+	 * @param relativeSpeedChange the relative speed change (e.g. 0.5 reduces speedby 50%)
 	 */
 	private static void prepareSlowSpeed(Network network, List<PreparedGeometry> geometries, Double relativeSpeedChange) {
 
