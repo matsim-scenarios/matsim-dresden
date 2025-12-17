@@ -13,7 +13,7 @@ osmosis := "C:/Program Files/osmosis-0.49.2//bin/osmosis.bat"
 germany := $(CURDIR)/../../shared-svn/projects/matsim-germany
 shared := $(CURDIR)/../../shared-svn/projects/agimo
 sharedOberlausitzDresden := $(CURDIR)/../../shared-svn/projects/matsim-oberlausitz-dresden
-sharedLausitz := $(CURDIR)/../../shared-svn/projects/DiTriMo
+sharedLausitz := $(CURDIR)/../../shared-svn/projects/DiTriMo # TODO; mv to matsim-germany
 dresden := $(CURDIR)/../../public-svn/matsim/scenarios/countries/de/dresden/dresden-$V/input/
 
 MEMORY ?= 30G
@@ -30,6 +30,9 @@ $(JAR):
 	mvn package -DskipTests
 
 ######################################### network creation ############################################################################################
+
+# !! There are important commands in the following, which need to be run to get started.  However, it seems that window systems
+# quite often run them also in situations where this should not be needed, and so we comment them out to avoid that. !!
 
 # Required files
 #this step is only necessary once. The downloaded network is uploaded to shared-svn/projects/matsim-germany/maps
@@ -58,7 +61,7 @@ $(JAR):
 #	 --bounding-polygon file="$(shared)/data/dresden-model/dresden-extended.poly"\
 #	 --used-node --wb $@
 
-  #	retrieve germany wide network (see param highway) from OSM
+#	retrieve germany wide network (see param highway) from OSM
 #input/network-germany.osm.pbf: $(NETWORK)
 #	$(osmosis) --rb file=$<\
 # 	 --tf accept-ways highway=motorway,motorway_link,motorway_junction,trunk,trunk_link,primary,primary_link\
@@ -70,20 +73,21 @@ $(JAR):
 #  	 --tag-transform file=input/remove-railway.xml\
 #  	 --wx $@
 
+# !! See comment above on commented-out material.  !!
 
 #	roadTypes are taken either from the general file "osmNetconvert.typ.xml"
 #	or from the german one "osmNetconvertUrbanDe.ty.xml"
-#input/sumo.net.xml: ./input/network.osm
-#	$(SUMO_HOME)/bin/netconvert --geometry.remove --ramps.guess --ramps.no-split\
-#	 --type-files $(SUMO_HOME)/data/typemap/osmNetconvert.typ.xml,$(SUMO_HOME)/data/typemap/osmNetconvertUrbanDe.typ.xml\
-#	 --tls.guess-signals true --tls.discard-simple --tls.join --tls.default-type actuated\
-#	 --junctions.join --junctions.corner-detail 5\
-#	 --roundabouts.guess --remove-edges.isolated\
-#	 --no-internal-links --keep-edges.by-vclass passenger,bicycle\
-#	 --remove-edges.by-vclass hov,tram,rail,rail_urban,rail_fast,pedestrian\
-#	 --output.original-names --output.street-names\
-#	 --proj "+proj=utm +zone=32 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs"\
-#	 --osm-files $< -o=$@
+input/sumo.net.xml: ./input/network.osm
+	$(SUMO_HOME)/bin/netconvert --geometry.remove --ramps.guess --ramps.no-split\
+	 --type-files $(SUMO_HOME)/data/typemap/osmNetconvert.typ.xml,$(SUMO_HOME)/data/typemap/osmNetconvertUrbanDe.typ.xml\
+	 --tls.guess-signals true --tls.discard-simple --tls.join --tls.default-type actuated\
+	 --junctions.join --junctions.corner-detail 5\
+	 --roundabouts.guess --remove-edges.isolated\
+	 --no-internal-links --keep-edges.by-vclass passenger,bicycle\
+	 --remove-edges.by-vclass hov,tram,rail,rail_urban,rail_fast,pedestrian\
+	 --output.original-names --output.street-names\
+	 --proj "+proj=utm +zone=32 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs"\
+	 --osm-files $< -o=$@
 
 # transform sumo network to matsim network and clean it afterwards
 # free-speed-factor 0.7 (standard is 0.9): see VSP WP 24-08 Figure 2. Dresden is most similar to metropolitan.
@@ -268,6 +272,7 @@ input/v1.0/prepare-100pct-with-trips-split-merged.plans.xml.gz: input/plans-long
     --output $@
 #   this step *has to* be done after the generation of short distance trips.
 #	split activity types to type_duration for the scoring to take into account the typical duration
+#	TODO: usage of --end-time-to-duration does not remove all end times of activities below 1800s (default value)
 	$(sc) prepare split-activity-types-duration\
 		--input $@\
 		--exclude commercial_start,commercial_end,freight_start,freight_end,service\
