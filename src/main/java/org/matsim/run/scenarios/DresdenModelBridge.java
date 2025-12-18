@@ -105,7 +105,7 @@ public class DresdenModelBridge extends DresdenModel {
 			"--config:global.numberOfThreads", "2",
 			"--config:qsim.numberOfThreads", "2",
 			"--config:simwrapper.defaultDashboards", "disabled",
-			"--config:plans.inputPlansFile","../../output/1pct/009.output_plans.xml.gz",
+			"--config:plans.inputPlansFile","https://svn.vsp.tu-berlin.de/repos/public-svn/matsim/scenarios/countries/de/dresden/dresden-v1.0/output/1pct/009.output_plans.xml.gz",
 			"--emissions", "DISABLED"};
 		//对比test生成的output与预期output是否一致
 
