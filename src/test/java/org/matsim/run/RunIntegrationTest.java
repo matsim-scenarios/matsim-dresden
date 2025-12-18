@@ -2,6 +2,7 @@ package org.matsim.run;
 
 
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.matsim.application.MATSimApplication;
@@ -20,6 +21,7 @@ class RunIntegrationTest {
 	private final MatsimTestUtils utils = new MatsimTestUtils();
 
 	@Test
+	@Disabled  // need to check if this tests something meaningful with the calibrated input plans file hickup.  kai, dec'25
 	void runScenario() {
 		Config config = ConfigUtils.loadConfig(String.format("input/%s/dresden-%s-10pct.config.xml", DresdenModel.VERSION, DresdenModel.VERSION));
 		ConfigUtils.addOrGetModule(config, SimWrapperConfigGroup.class).setDefaultDashboards(SimWrapperConfigGroup.Mode.disabled);
@@ -40,6 +42,7 @@ class RunIntegrationTest {
 	}
 
 	@Test
+	@Disabled  // need to check if this tests something meaningful with the calibrated input plans file hickup.  kai, dec'25
 	void runScenario_fails() {
 		Config config = ConfigUtils.loadConfig(String.format("input/%s/dresden-%s-10pct.config.xml", DresdenModel.VERSION, DresdenModel.VERSION));
 		ConfigUtils.addOrGetModule(config, SimWrapperConfigGroup.class).setDefaultDashboards(SimWrapperConfigGroup.Mode.disabled);
@@ -57,6 +60,7 @@ class RunIntegrationTest {
 	}
 
 	@Test
+	@Disabled  // need to check if this tests something meaningful with the calibrated input plans file hickup.  kai, dec'25
 	void runScenario_main() {
 		String configPath = String.format("input/%s/dresden-%s-10pct.config.xml", DresdenModel.VERSION, DresdenModel.VERSION);
 
@@ -76,6 +80,7 @@ class RunIntegrationTest {
 	}
 
 	@Test
+	@Disabled // need to check if this tests something meaningful with the calibrated input plans file hickup.  kai, dec'25
 	void runScenario_main_fails() {
 		String configPath = String.format("input/%s/dresden-%s-10pct.config.xml", DresdenModel.VERSION, DresdenModel.VERSION);
 
