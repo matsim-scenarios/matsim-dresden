@@ -72,42 +72,22 @@ public class DresdenModelBridge extends DresdenModel {
 
 	public static final String VERSION = "v1.0";
 
-//	@CommandLine.Mixin
-//	private final SampleOptions sample = new SampleOptions(100, 25, 10, 1);
-//	@CommandLine.Option(names = "--emissions", defaultValue = "ENABLED", description = "Define if emission analysis should be performed or not.")
-//	FunctionalityHandling emissions;
-//	@CommandLine.Option(names = "--explicit-walk-intermodality", defaultValue = "ENABLED", description = "Define if explicit walk intermodality parameter to/from pt should be set or not (use default).")
-//	static FunctionalityHandling explicitWalkIntermodality;
-
-
-//	public DresdenModelBridge(@Nullable Config config) {
-//		super(config);
-//	}
-//
-//	public DresdenModelBridge() {
-//		super(String.format("input/%s/dresden-%s-10pct.config.xml", VERSION, VERSION));
-//	}
-
 	public static void main(String[] args) {
 		if ( args != null && args.length > 0 ) {
-			throw new RuntimeException("there is something in args but this code is ignoring it. Clarify");
+			// use the given args
+		} else{
+			args = new String[]{
+				"--1pct",
+				"--iterations", "10",
+				"--output", "./output/bridge/",
+				"--config:controller.overwriteFiles=deleteDirectoryIfExists",//刷新output
+				"--config:global.numberOfThreads", "2",
+				"--config:qsim.numberOfThreads", "2",
+				"--config:simwrapper.defaultDashboards", "disabled",
+				"--emissions", "DISABLED"};
+			//对比test生成的output与预期output是否一致
+			// yy If we collaborate on code, could you please do comments in english?  Thanks.  kai, dec'25
 		}
-		String configPath = String.format("input/%s/dresden-%s-1pct.config.xml", DresdenModel.VERSION, DresdenModel.VERSION);
-//		String configPath = "https://svn.vsp.tu-berlin.de/repos/public-svn/matsim/scenarios/countries/de/dresden/dresden-v1.0/input/v1.0/dresden-v1.0-1pct.config.xml";
-//		String configPath = "https://svn.vsp.tu-berlin.de/repos/public-svn/matsim/scenarios/countries/de/dresden/dresden-v1.0/output/1pct/009.output_config.xml";
-		// it was the more flexible variant above but that did not work. kai/gregorL, dec'25
-
-		args = new String[]{"--config", configPath,
-			"--1pct",
-			"--iterations", "10",
-			"--output", "./output/bridge/",
-			"--config:controller.overwriteFiles=deleteDirectoryIfExists",//刷新output
-			"--config:global.numberOfThreads", "2",
-			"--config:qsim.numberOfThreads", "2",
-			"--config:simwrapper.defaultDashboards", "disabled",
-			"--config:plans.inputPlansFile","https://svn.vsp.tu-berlin.de/repos/public-svn/matsim/scenarios/countries/de/dresden/dresden-v1.0/output/1pct/009.output_plans.xml.gz",
-			"--emissions", "DISABLED"};
-		//对比test生成的output与预期output是否一致
 
 		MATSimApplication.execute(DresdenModelBridge.class, args);
 	}
@@ -116,6 +96,7 @@ public class DresdenModelBridge extends DresdenModel {
 	@Override
 	protected Config prepareConfig(Config config) {
 		super.prepareConfig( config );
+		// add own config modifications here:
 
 		return config;
 	}
@@ -123,24 +104,24 @@ public class DresdenModelBridge extends DresdenModel {
 	@Override
 	protected void prepareScenario(Scenario scenario) {
 		super.prepareScenario( scenario );
+		// add own scenario modifications here:
 
 		//-488766980
 		//761288685
 		//-264360396#1
 		//505502627#0
-		//		add freight modes of DresdenUtils to network.
-//		this happens in the makefile pipeline already, but we do it here anyways, in case somebody uses a preliminary network.
-		PrepareNetwork.prepareFreightNetwork(scenario.getNetwork());
 
 		Set<Id<Link>> closedLinks = Set.of(
 			Id.createLinkId("-488766980"),
 			Id.createLinkId("761288685"),
 			Id.createLinkId("-264360396#1"),
 			Id.createLinkId("505502627#0"),
-			Id.createLinkId( 132572494 ), // providing a number is also ok. kai, dec'25
+			Id.createLinkId( 132572494 ), // providing a number instead of a string is also ok. kai, dec'25
 			Id.createLinkId( 277710971 ),
 			Id.createLinkId( 4214231 ),
-			Id.createLinkId( 901959078 )
+			Id.createLinkId( 901959078 ),
+			Id.createLinkId( 1031454500 ),
+			Id.createLinkId( -264360404 )
 										  );
 
 		for (Id<Link> linkId : closedLinks) {
@@ -153,23 +134,12 @@ public class DresdenModelBridge extends DresdenModel {
 			}
 		}
 
-		// I do not know what the following might mean.  kai, dec'25
-//		remove disallowed links. The disallowed links cause many problems and (usually) are not useful in our rather macroscopic view on transport systems.
-//		for (Link link : scenario.getNetwork().getLinks().values()) {
-//			DisallowedNextLinks disallowed = NetworkUtils.getDisallowedNextLinks(link);
-//			if (disallowed != null) {
-//				link.getAllowedModes().forEach(disallowed::removeDisallowedLinkSequences);
-//				if (disallowed.isEmpty()) {
-//					NetworkUtils.removeDisallowedNextLinks(link);
-//				}
-//			}
-//		}
-
 	}
 
 	@Override
 	protected void prepareControler(Controler controler) {
 		super.prepareControler( controler );
+		// add own Controller configurations here:
 	}
 
 }
