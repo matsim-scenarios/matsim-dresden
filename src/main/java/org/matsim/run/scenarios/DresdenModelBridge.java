@@ -92,8 +92,8 @@ public class DresdenModelBridge extends DresdenModel {
 		if ( args != null && args.length > 0 ) {
 			throw new RuntimeException("there is something in args but this code is ignoring it. Clarify");
 		}
-//		String configPath = String.format("input/%s/dresden-%s-10pct.config.xml", DresdenModel.VERSION, DresdenModel.VERSION);
-		String configPath = "https://svn.vsp.tu-berlin.de/repos/public-svn/matsim/scenarios/countries/de/dresden/dresden-v1.0/input/v1.0/dresden-v1.0-1pct.config.xml";
+		String configPath = String.format("input/%s/dresden-%s-10pct.config.xml", DresdenModel.VERSION, DresdenModel.VERSION);
+//		String configPath = "https://svn.vsp.tu-berlin.de/repos/public-svn/matsim/scenarios/countries/de/dresden/dresden-v1.0/input/v1.0/dresden-v1.0-1pct.config.xml";
 //		String configPath = "https://svn.vsp.tu-berlin.de/repos/public-svn/matsim/scenarios/countries/de/dresden/dresden-v1.0/output/1pct/009.output_config.xml";
 		// it was the more flexible variant above but that did not work. kai/gregorL, dec'25
 
