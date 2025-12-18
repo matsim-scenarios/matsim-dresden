@@ -23,9 +23,8 @@ public class TestZAY {
 
 	@Test
 	void runScenario_main() {
-		String configPath = String.format("input/%s/dresden-%s-10pct.config.xml", DresdenModel.VERSION, DresdenModel.VERSION);
 
-		DresdenModel.main(new String[]{"--config", configPath,
+		DresdenModel.main(new String[]{
 			"--1pct",
 			"--iterations", "1",
 			"--output", utils.getOutputDirectory(),//记录output路径
@@ -35,6 +34,7 @@ public class TestZAY {
 			"--config:simwrapper.defaultDashboards", "disabled",
 			"--emissions", "DISABLED"});
 		//对比test生成的output与预期output是否一致
+		// yy could you please use comments in english?  thx. kai, dec'25
 
 		{
 			Population expected = PopulationUtils.createPopulation( ConfigUtils.createConfig() ) ;

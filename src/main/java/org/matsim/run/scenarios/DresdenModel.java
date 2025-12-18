@@ -2,6 +2,7 @@ package org.matsim.run.scenarios;
 
 import ch.sbb.matsim.config.SwissRailRaptorConfigGroup;
 import com.google.common.collect.Sets;
+import com.google.inject.Singleton;
 import com.google.inject.multibindings.Multibinder;
 import jakarta.annotation.Nullable;
 import org.matsim.analysis.CheckAndSummarizeLongDistanceFreightPopulation;
@@ -109,8 +110,15 @@ public class DresdenModel extends MATSimApplication {
 		simWrapper.defaultParams().setShp(String.format("vvo_tarifzone_10_dresden/%s_vvo_tarifzone_10_dresden_utm32n.shp", VERSION));
 
 		if (sample.isSet()){
+			if ( sample.getSample() != 0.01 ) {
+				throw new RuntimeException( "other sample sizes than 1pct are currently not supported ... since this version of the code changes " +
+												"the input plans file manually to the calibrated version. Needs to be fixed.  kai, dec'25");
+			} else{
+//				config.plans().setInputFile( sample.adjustName( config.plans().getInputFile() ) );
+				// yyyy the above line is what _should_ be used, but we are instead using:
+				config.plans().setInputFile( "https://svn.vsp.tu-berlin.de/repos/public-svn/matsim/scenarios/countries/de/dresden/dresden-v1.0/output/1pct/009.output_plans.xml.gz" );
+			}
 			config.controller().setOutputDirectory(sample.adjustName(config.controller().getOutputDirectory()));
-			config.plans().setInputFile(sample.adjustName(config.plans().getInputFile()));
 			config.controller().setRunId(sample.adjustName(config.controller().getRunId()));
 
 			config.qsim().setFlowCapFactor(sample.getSample());
@@ -222,12 +230,16 @@ public class DresdenModel extends MATSimApplication {
 		PrepareNetwork.prepareFreightNetwork(scenario.getNetwork());
 
 //		remove disallowed links. The disallowed links cause many problems and (usually) are not useful in our rather macroscopic view on transport systems.
+		// yyyy I have no idea what this means; could someone please explain?  kai, dec'25
+		// --> The way this reads to me is that we may have a network where the "disallowedNextLinks" attribute is used.    In the
+		// code that follows here, we disable those attributes.  kai, dec'25
 		for (Link link : scenario.getNetwork().getLinks().values()) {
 			DisallowedNextLinks disallowed = NetworkUtils.getDisallowedNextLinks(link);
 			if (disallowed != null) {
 				link.getAllowedModes().forEach(disallowed::removeDisallowedLinkSequences);
 				if (disallowed.isEmpty()) {
 					NetworkUtils.removeDisallowedNextLinks(link);
+					// yyyy whey do we only do this if disallowed is empty, and not in all cases?  kai, dec'25
 				}
 			}
 		}
@@ -252,10 +264,11 @@ public class DresdenModel extends MATSimApplication {
 			@Override
 			public void install() {
 				install(new PtFareModule());
-				bind(ScoringParametersForPerson.class).to(IncomeDependentUtilityOfMoneyPersonScoringParameters.class).asEagerSingleton();
+				bind(ScoringParametersForPerson.class).to(IncomeDependentUtilityOfMoneyPersonScoringParameters.class).in( Singleton.class );
 
 				addTravelTimeBinding(TransportMode.ride).to(carTravelTime());
 				addTravelDisutilityFactoryBinding(TransportMode.ride).to(carTravelDisutilityFactoryKey());
+
 //				this binds the DresdenDashboardProvider with guice instead of resources/services/.../file.
 //				This is way more convenient imho.
 				Multibinder.newSetBinder(binder(), DashboardProvider.class).addBinding().to(DresdenDashboardProvider.class);
