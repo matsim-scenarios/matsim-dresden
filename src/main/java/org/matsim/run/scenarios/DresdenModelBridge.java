@@ -99,7 +99,7 @@ public class DresdenModelBridge extends DresdenModel {
 
 		args = new String[]{"--config", configPath,
 			"--1pct",
-			"--iterations", "1",
+			"--iterations", "10",
 			"--output", "./output/bridge/",
 			"--config:controller.overwriteFiles=deleteDirectoryIfExists",//刷新output
 			"--config:global.numberOfThreads", "2",
@@ -136,18 +136,24 @@ public class DresdenModelBridge extends DresdenModel {
 			Id.createLinkId("-488766980"),
 			Id.createLinkId("761288685"),
 			Id.createLinkId("-264360396#1"),
-			Id.createLinkId("505502627#0")
-		);
+			Id.createLinkId("505502627#0"),
+			Id.createLinkId( 132572494 ), // providing a number is also ok. kai, dec'25
+			Id.createLinkId( 277710971 ),
+			Id.createLinkId( 4214231 ),
+			Id.createLinkId( 901959078 )
+										  );
 
 		for (Id<Link> linkId : closedLinks) {
 			Link link = scenario.getNetwork().getLinks().get(linkId);
 			if (link != null) {
-				link.setCapacity(0.001);
+				link.setCapacity(0.00001);
+				link.setFreespeed( 0.000001/3.6 );
 			} else {
 				System.out.println("WARNING: link not found: " + linkId);
 			}
 		}
 
+		// I do not know what the following might mean.  kai, dec'25
 //		remove disallowed links. The disallowed links cause many problems and (usually) are not useful in our rather macroscopic view on transport systems.
 //		for (Link link : scenario.getNetwork().getLinks().values()) {
 //			DisallowedNextLinks disallowed = NetworkUtils.getDisallowedNextLinks(link);
