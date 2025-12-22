@@ -22,13 +22,13 @@ public final class DresdenModelBridge extends DresdenModel {
 			args = new String[]{
 				"--1pct",
 				"--iterations", "10",
-				"--output", "./output/bridge/",
-				"--config:controller.overwriteFiles=deleteDirectoryIfExists",//刷新output
+				"--output", "./output/bridge_more4/",
+				"--config:controller.overwriteFiles=deleteDirectoryIfExists",// Refresh the output
 				"--config:global.numberOfThreads", "2",
 				"--config:qsim.numberOfThreads", "2",
 				"--config:simwrapper.defaultDashboards", "disabled",
 				"--emissions", "DISABLED"};
-			//对比test生成的output与预期output是否一致
+			// Compare the test output with the expected output
 			// yy If we collaborate on code, could you please do comments in english?  Thanks.  kai, dec'25
 		}
 
@@ -53,10 +53,15 @@ public final class DresdenModelBridge extends DresdenModel {
 		//761288685
 		//-264360396#1
 		//505502627#0
+		//14448952
+		//-30129851
+		//30129851
+		//425728245
+		//14448952
 
 		Set<Id<Link>> closedLinks = Set.of(
-			Id.createLinkId("-488766980"),
-			Id.createLinkId("761288685"),
+			Id.createLinkId(-488766980),
+			Id.createLinkId(761288685),
 			Id.createLinkId("-264360396#1"),
 			Id.createLinkId("505502627#0"),
 			Id.createLinkId( 132572494 ), // providing a number instead of a string is also ok. kai, dec'25
@@ -64,7 +69,11 @@ public final class DresdenModelBridge extends DresdenModel {
 			Id.createLinkId( 4214231 ),
 			Id.createLinkId( 901959078 ),
 			Id.createLinkId( 1031454500 ),
-			Id.createLinkId( -264360404 )
+			Id.createLinkId( -264360404 ),
+			Id.createLinkId(30129851),
+			Id.createLinkId(-30129851),
+			Id.createLinkId(425728245),
+			Id.createLinkId(14448952)
 										  );
 
 		for (Id<Link> linkId : closedLinks) {
@@ -76,7 +85,6 @@ public final class DresdenModelBridge extends DresdenModel {
 				System.out.println("WARNING: link not found: " + linkId);
 			}
 		}
-
 	}
 
 	@Override
