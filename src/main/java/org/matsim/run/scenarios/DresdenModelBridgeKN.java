@@ -11,9 +11,18 @@ import org.matsim.core.config.Config;
 import org.matsim.core.config.ConfigWriter;
 import org.matsim.core.controler.Controler;
 import org.matsim.core.controler.OutputDirectoryHierarchy;
+import org.matsim.core.controler.OutputDirectoryHierarchy.OverwriteFileSetting;
+import org.matsim.simwrapper.SimWrapperConfigGroup;
+import org.matsim.utils.DresdenUtils;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.net.MalformedURLException;
+import java.net.URI;
+import java.net.URL;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.List;
 import java.util.Set;
 
 import static org.matsim.core.config.groups.ReplanningConfigGroup.StrategySettings;
@@ -26,21 +35,25 @@ public final class DresdenModelBridgeKN extends DresdenModel {
 
 //	public static final String VERSION = "v1.0";
 
+	private static final String pct = "1";
+
 	public static void main(String[] args) {
 
 		if ( args != null && args.length > 0 ) {
 			// use the given args
 		} else{
+			final String nIterations = "0";
 			args = new String[]{
-				"--10pct",
-				"--iterations", "0",
-//				"--output", "./output/bridge_more4/",
-				"--runId", "bridge_more4",
-				"--config:controller.overwriteFiles", OutputDirectoryHierarchy.OverwriteFileSetting.deleteDirectoryIfExists.name(),
+				"--" + pct + "pct",
+				"--iterations", nIterations,
+				"--output", "./output/bridge_more4_kn_" + pct + "pct" + nIterations + "it",
+				"--runId", "",
+				"--config:controller.overwriteFiles", OverwriteFileSetting.deleteDirectoryIfExists.name(),
 				"--config:global.numberOfThreads", "2",
 				"--config:qsim.numberOfThreads", "2",
-				"--config:simwrapper.defaultDashboards", "disabled",
-				"--emissions", "DISABLED"};
+				"--config:simwrapper.defaultDashboards", SimWrapperConfigGroup.Mode.disabled.name(), // yyyy make enum and config option of same name
+				"--emissions", DresdenUtils.FunctionalityHandling.DISABLED.name()
+			};
 		}
 
 		MATSimApplication.execute( DresdenModelBridgeKN.class, args );
@@ -48,7 +61,7 @@ public final class DresdenModelBridgeKN extends DresdenModel {
 
 	@Nullable
 	@Override
-	protected Config prepareConfig(Config config) {
+	protected Config prepareConfig(Config config){
 		super.prepareConfig( config );
 		// add own config modifications here:
 
@@ -56,24 +69,47 @@ public final class DresdenModelBridgeKN extends DresdenModel {
 		config.controller().setWriteEventsUntilIteration( 0 );
 
 		for( StrategySettings strategySetting : config.replanning().getStrategySettings() ){
-			if ( strategySetting.getStrategyName().contains( DefaultStrategy.TimeAllocationMutator ) ) {
+			if( strategySetting.getStrategyName().contains( DefaultStrategy.TimeAllocationMutator ) ){
 				strategySetting.setWeight( 0.0 );
 			}
-			if ( strategySetting.getStrategyName().contains( DefaultStrategy.SubtourModeChoice ) ) {
+			if( strategySetting.getStrategyName().contains( DefaultStrategy.SubtourModeChoice ) ){
 				strategySetting.setWeight( 0.0 );
 			}
 		}
 
 //		config.vspExperimental().setVspDefaultsCheckingLevel( VspExperimentalConfigGroup.VspDefaultsCheckingLevel.warn );
 
+		// The following does not work since the files are not in the same dir.  :-(
+//		URL currentDir;
+//		try{
+//			currentDir = Paths.get( "/Users/kainagel/public-svn/matsim/scenarios/countries/de/dresden/dresden-v1.0/output/" + pct + "pct/").toUri().toURL();
+//		} catch( MalformedURLException e ){
+//			throw new RuntimeException( e );
+//		}
+//		config.setContext( currentDir );
+//		// convert https filenames to stripped filenames.  Should be possible to write a more general method for that.
+//		{
+//			Path filename = Path.of( URI.create( config.network().getInputFile() ).getPath() ).getFileName();
+//			config.network().setInputFile( filename.toString() );
+//		}
+//		{
+//			Path filename = Path.of( URI.create( config.plans().getInputFile() ).getPath() ).getFileName();
+//			config.plans().setInputFile( filename.toString() );
+//		}
+//		{
+//			Path filename = Path.of( URI.create( config.facilities().getInputFile() ).getPath() ).getFileName();
+//			config.facilities().setInputFile( filename.toString() );
+//		}
+
 		log.info( "at end of prepareConfig" );
 		StringWriter writer = new StringWriter();
-		new ConfigWriter( config, ConfigWriter.Verbosity.all ).writeStream(new PrintWriter(writer), System.lineSeparator() );
+		new ConfigWriter( config, ConfigWriter.Verbosity.minimalAndWOActivities ).writeStream( new PrintWriter( writer ), System.lineSeparator() );
 		log.info( System.lineSeparator() + System.lineSeparator() + writer.getBuffer() );
-		log.info("Complete config dump done." );
-		log.info("Checking consistency of config..." );
+		log.info( "Complete config dump done." );
+		log.info( "Checking consistency of config..." );
 		config.checkConsistency();
-		log.info("Checking consistency of config done." );
+		log.info( "Checking consistency of config done." );
+
 		return config;
 	}
 
@@ -109,15 +145,20 @@ public final class DresdenModelBridgeKN extends DresdenModel {
 			Id.createLinkId(14448952)
 										  );
 
-		for (Id<Link> linkId : closedLinks) {
-			Link link = scenario.getNetwork().getLinks().get(linkId);
-			if (link != null) {
-				link.setCapacity(0.00001);
-				link.setFreespeed( 0.000001/3.6 );
-			} else {
-				System.out.println("WARNING: link not found: " + linkId);
-			}
+//		for (Id<Link> linkId : closedLinks) {
+//			Link link = scenario.getNetwork().getLinks().get(linkId);
+//			if (link != null) {
+//				link.setCapacity(0.00001);
+//				link.setFreespeed( 0.000001/3.6 );
+//			} else {
+//				System.out.println("WARNING: link not found: " + linkId);
+//			}
+//		}
+
+		for( Id<Link> closedLinkId : closedLinks ){
+			scenario.getNetwork().removeLink( closedLinkId );
 		}
+
 	}
 
 	@Override
