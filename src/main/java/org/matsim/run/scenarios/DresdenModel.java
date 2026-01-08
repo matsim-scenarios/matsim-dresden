@@ -110,13 +110,15 @@ public class DresdenModel extends MATSimApplication {
 		simWrapper.defaultParams().setShp(String.format("vvo_tarifzone_10_dresden/%s_vvo_tarifzone_10_dresden_utm32n.shp", VERSION));
 
 		if (sample.isSet()){
-			if ( sample.getSample() != 0.01 ) {
-				throw new RuntimeException( "other sample sizes than 1pct are currently not supported ... since this version of the code changes " +
-												"the input plans file manually to the calibrated version. Needs to be fixed.  kai, dec'25");
-			} else{
+			if ( sample.getSample()== 0.01 ) {
 //				config.plans().setInputFile( sample.adjustName( config.plans().getInputFile() ) );
 				// yyyy the above line is what _should_ be used, but we are instead using:
 				config.plans().setInputFile( "https://svn.vsp.tu-berlin.de/repos/public-svn/matsim/scenarios/countries/de/dresden/dresden-v1.0/output/1pct/009.output_plans.xml.gz" );
+			} else if ( sample.getSample()==0.1 ) {
+				config.plans().setInputFile( "https://svn.vsp.tu-berlin.de/repos/public-svn/matsim/scenarios/countries/de/dresden/dresden-v1.0/output/10pct/007.output_plans.xml.gz" );
+			} else {
+				throw new RuntimeException( "sampleSize=" + sample.getSize() + " is currently not supported ... since this version of the code changes " +
+												"the input plans file manually to the calibrated version. Needs to be fixed.  kai, dec'25");
 			}
 			config.controller().setOutputDirectory(sample.adjustName(config.controller().getOutputDirectory()));
 			config.controller().setRunId(sample.adjustName(config.controller().getRunId()));
