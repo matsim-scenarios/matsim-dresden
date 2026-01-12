@@ -1,17 +1,30 @@
 package org.matsim.run.scenarios;
 
 import jakarta.annotation.Nullable;
+import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.apache.logging.log4j.core.config.Configurator;
 import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.Scenario;
+import org.matsim.api.core.v01.TransportMode;
 import org.matsim.api.core.v01.network.Link;
+import org.matsim.api.core.v01.population.Leg;
+import org.matsim.api.core.v01.population.Person;
+import org.matsim.api.core.v01.population.Plan;
+import org.matsim.api.core.v01.population.PlanElement;
 import org.matsim.application.MATSimApplication;
 import org.matsim.core.config.Config;
 import org.matsim.core.config.ConfigWriter;
 import org.matsim.core.controler.Controler;
+import org.matsim.core.controler.ControllerUtils;
 import org.matsim.core.controler.OutputDirectoryHierarchy;
 import org.matsim.core.controler.OutputDirectoryHierarchy.OverwriteFileSetting;
+import org.matsim.core.network.NetworkUtils;
+import org.matsim.core.population.PopulationUtils;
+import org.matsim.core.population.routes.NetworkRoute;
+import org.matsim.core.utils.collections.CollectionUtils;
+import org.matsim.facilities.FacilitiesUtils;
 import org.matsim.simwrapper.SimWrapperConfigGroup;
 import org.matsim.utils.DresdenUtils;
 
@@ -22,6 +35,7 @@ import java.net.URI;
 import java.net.URL;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
@@ -35,24 +49,28 @@ public final class DresdenModelBridgeKN extends DresdenModel {
 
 //	public static final String VERSION = "v1.0";
 
-	private static final String pct = "1";
+	private static final String pct = "10";
 
 	public static void main(String[] args) {
+		Configurator.setLevel( ControllerUtils.class, Level.DEBUG );
 
 		if ( args != null && args.length > 0 ) {
 			// use the given args
 		} else{
-			final String nIterations = "0";
+			final String nIterations = "500";
 			args = new String[]{
+				// CLI params processed by MATSimApplication:
 				"--" + pct + "pct",
 				"--iterations", nIterations,
-				"--output", "./output/bridge_more4_kn_" + pct + "pct" + nIterations + "it",
+				"--output", "./output/bridge_more4_c_kn_" + pct + "pct" + nIterations + "it",
 				"--runId", "",
-				"--config:controller.overwriteFiles", OverwriteFileSetting.deleteDirectoryIfExists.name(),
-				"--config:global.numberOfThreads", "2",
-				"--config:qsim.numberOfThreads", "2",
-				"--config:simwrapper.defaultDashboards", SimWrapperConfigGroup.Mode.disabled.name(), // yyyy make enum and config option of same name
-				"--emissions", DresdenUtils.FunctionalityHandling.DISABLED.name()
+				"--emissions", DresdenUtils.FunctionalityHandling.DISABLED.name(),
+				"--generate-dashboards=false",
+
+				// CLI params processed by standard MATSim:
+				"--config:global.numberOfThreads", "4",
+				"--config:qsim.numberOfThreads", "4",
+				"--config:simwrapper.defaultDashboards", SimWrapperConfigGroup.Mode.disabled.name() // yyyy make enum and config option of same name
 			};
 		}
 
@@ -67,15 +85,7 @@ public final class DresdenModelBridgeKN extends DresdenModel {
 
 		config.controller().setWriteEventsInterval( 10 );
 		config.controller().setWriteEventsUntilIteration( 0 );
-
-		for( StrategySettings strategySetting : config.replanning().getStrategySettings() ){
-			if( strategySetting.getStrategyName().contains( DefaultStrategy.TimeAllocationMutator ) ){
-				strategySetting.setWeight( 0.0 );
-			}
-			if( strategySetting.getStrategyName().contains( DefaultStrategy.SubtourModeChoice ) ){
-				strategySetting.setWeight( 0.0 );
-			}
-		}
+		config.controller().setOverwriteFileSetting( OverwriteFileSetting.deleteDirectoryIfExists );
 
 //		config.vspExperimental().setVspDefaultsCheckingLevel( VspExperimentalConfigGroup.VspDefaultsCheckingLevel.warn );
 
@@ -101,14 +111,14 @@ public final class DresdenModelBridgeKN extends DresdenModel {
 //			config.facilities().setInputFile( filename.toString() );
 //		}
 
-		log.info( "at end of prepareConfig" );
-		StringWriter writer = new StringWriter();
-		new ConfigWriter( config, ConfigWriter.Verbosity.minimalAndWOActivities ).writeStream( new PrintWriter( writer ), System.lineSeparator() );
-		log.info( System.lineSeparator() + System.lineSeparator() + writer.getBuffer() );
-		log.info( "Complete config dump done." );
-		log.info( "Checking consistency of config..." );
-		config.checkConsistency();
-		log.info( "Checking consistency of config done." );
+//		log.info( "at end of prepareConfig" );
+//		StringWriter writer = new StringWriter();
+//		new ConfigWriter( config, ConfigWriter.Verbosity.minimalAndWOActivities ).writeStream( new PrintWriter( writer ), System.lineSeparator() );
+//		log.info( System.lineSeparator() + System.lineSeparator() + writer.getBuffer() );
+//		log.info( "Complete config dump done." );
+//		log.info( "Checking consistency of config..." );
+//		config.checkConsistency();
+//		log.info( "Checking consistency of config done." );
 
 		return config;
 	}
@@ -148,8 +158,9 @@ public final class DresdenModelBridgeKN extends DresdenModel {
 //		for (Id<Link> linkId : closedLinks) {
 //			Link link = scenario.getNetwork().getLinks().get(linkId);
 //			if (link != null) {
-//				link.setCapacity(0.00001);
-//				link.setFreespeed( 0.000001/3.6 );
+////				link.setCapacity(0.00001);
+//				link.setFreespeed( link.getLength() / (2*3600.) ); // so that it takes two hours to traverse
+////				link.setAllowedModes( Collections.emptySet() );
 //			} else {
 //				System.out.println("WARNING: link not found: " + linkId);
 //			}
@@ -158,6 +169,25 @@ public final class DresdenModelBridgeKN extends DresdenModel {
 		for( Id<Link> closedLinkId : closedLinks ){
 			scenario.getNetwork().removeLink( closedLinkId );
 		}
+
+		Set<String> set = CollectionUtils.stringArrayToSet( new String [] {TransportMode.car, "truck8t", "truck18t", "truck40t","ride", "bike"} );
+		NetworkUtils.cleanNetwork( scenario.getNetwork(), set );
+
+		for( Person person : scenario.getPopulation().getPersons().values() ){
+			for( Plan plan : person.getPlans() ){
+				for( PlanElement planElement : plan.getPlanElements() ){
+					if ( planElement instanceof Leg ) {
+						((Leg) planElement).setRoute( null );
+					}
+				}
+			}
+		}
+
+		FacilitiesUtils.removeInvalidNetworkReferences( scenario.getActivityFacilities(), scenario.getNetwork() );
+
+//		PopulationUtils.checkRouteModeAndReset( scenario.getPopulation(), scenario.getNetwork() );
+		// tests if the mode is on the link, but does not hedge against link fully gone.  Should be adaptable, though.
+
 
 	}
 

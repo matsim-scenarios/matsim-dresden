@@ -75,11 +75,15 @@ public class DresdenModel extends MATSimApplication {
 
 	@CommandLine.Mixin
 	private final SampleOptions sample = new SampleOptions(100, 25, 10, 1);
+
 	@CommandLine.Option(names = "--emissions", defaultValue = "ENABLED", description = "Define if emission analysis should be performed or not.")
 	DresdenUtils.FunctionalityHandling emissions;
+
 	@CommandLine.Option(names = "--explicit-walk-intermodality", defaultValue = "ENABLED", description = "Define if explicit walk intermodality parameter to/from pt should be set or not (use default).")
 	static DresdenUtils.FunctionalityHandling explicitWalkIntermodality;
 
+	@CommandLine.Option( names = "--generate-dashboards", defaultValue = "true" )
+	static Boolean generateDashboards;
 
 	public DresdenModel(@Nullable Config config) {
 		super(config);
@@ -271,9 +275,11 @@ public class DresdenModel extends MATSimApplication {
 				addTravelTimeBinding(TransportMode.ride).to(carTravelTime());
 				addTravelDisutilityFactoryBinding(TransportMode.ride).to(carTravelDisutilityFactoryKey());
 
+				if ( generateDashboards ){
 //				this binds the DresdenDashboardProvider with guice instead of resources/services/.../file.
 //				This is way more convenient imho.
-				Multibinder.newSetBinder(binder(), DashboardProvider.class).addBinding().to(DresdenDashboardProvider.class);
+					Multibinder.newSetBinder( binder(), DashboardProvider.class ).addBinding().to( DresdenDashboardProvider.class );
+				}
 			}
 		});
 	}

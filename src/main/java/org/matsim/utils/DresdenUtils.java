@@ -168,6 +168,9 @@ public final class DresdenUtils {
 
 	/**
 	 * Helper enum to enable/disable functionalities.
+	 *
+	 * @deprecated -- Ich sage zwar immer "bitte enum statt Boolean", aber ein enum, der ein Boolean emuliert, finde ich dann eher noch schlechter; dann doch lieber Boolean.  kai, jan'26
 	 */
+	@Deprecated // Ich sage zwar immer "bitte enum statt Boolean", aber ein enum, der ein Boolean emuliert, finde ich dann eher noch schlechter; dann doch lieber Boolean.  kai, jan'26
 	public enum FunctionalityHandling {ENABLED, DISABLED}
 }
