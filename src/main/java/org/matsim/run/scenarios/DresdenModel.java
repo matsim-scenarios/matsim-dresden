@@ -114,6 +114,11 @@ public class DresdenModel extends MATSimApplication {
 //		the tarifzone shp file basically is a dresden shp file with fare prices as additional information
 		simWrapper.defaultParams().setShp(String.format("vvo_tarifzone_10_dresden/%s_vvo_tarifzone_10_dresden_utm32n.shp", VERSION));
 
+		/*
+		 *  To me this is somewhat awkward. In line 88 we intialize this class with the 10-pct config. However, with some automagic from
+		 *   MATSimApplication we can set (via CLI) a sample. If we do so, we adapt (!) the 10pct-config here. Note, in the 
+		 *   input-directory we have a 1pct-config which (I think) is never used. To me this is not very intuitive and might be errorprone. // DR20260116
+		 */
 		if (sample.isSet()){
 			if ( sample.getSample()== 0.01 ) {
 //				config.plans().setInputFile( sample.adjustName( config.plans().getInputFile() ) );
@@ -132,7 +137,13 @@ public class DresdenModel extends MATSimApplication {
 			config.qsim().setStorageCapFactor(sample.getSample());
 			config.counts().setCountsScaleFactor(sample.getSample());
 			simWrapper.setSampleSize(sample.getSample());
+			// we might also think about scaling the stuckTime here. // DR20260116
 		}
+		
+		/*
+		 * Is there any reason that we set config-params here, although we have an input-config. This might be somehow misleading to users, 
+		 * because someone might change the config and the change might be overwritten here... // DR202160116
+		 */
 
 //		We would like to "switch off" the usage of LastestActivityEndTime, but this is not possible with just setting the value.
 //		Option 1: set latestActivityEndTime = 0; The all mutated act end times would become 0 because in class MutateActivityTimeAllocation the following line is used to set the act end time
