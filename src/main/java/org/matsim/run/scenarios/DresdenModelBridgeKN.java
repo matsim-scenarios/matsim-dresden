@@ -9,10 +9,8 @@ import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.Scenario;
 import org.matsim.api.core.v01.TransportMode;
 import org.matsim.api.core.v01.network.Link;
-import org.matsim.api.core.v01.population.Leg;
-import org.matsim.api.core.v01.population.Person;
-import org.matsim.api.core.v01.population.Plan;
-import org.matsim.api.core.v01.population.PlanElement;
+import org.matsim.api.core.v01.network.Network;
+import org.matsim.api.core.v01.population.*;
 import org.matsim.application.MATSimApplication;
 import org.matsim.core.config.Config;
 import org.matsim.core.config.ConfigWriter;
@@ -23,6 +21,7 @@ import org.matsim.core.controler.OutputDirectoryHierarchy.OverwriteFileSetting;
 import org.matsim.core.network.NetworkUtils;
 import org.matsim.core.population.PopulationUtils;
 import org.matsim.core.population.routes.NetworkRoute;
+import org.matsim.core.scenario.ScenarioUtils;
 import org.matsim.core.utils.collections.CollectionUtils;
 import org.matsim.facilities.FacilitiesUtils;
 import org.matsim.simwrapper.SimWrapperConfigGroup;
@@ -38,6 +37,7 @@ import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Function;
 
 import static org.matsim.core.config.groups.ReplanningConfigGroup.StrategySettings;
 import static org.matsim.core.replanning.strategies.DefaultPlanStrategiesModule.DefaultStrategy;
@@ -49,7 +49,7 @@ public final class DresdenModelBridgeKN extends DresdenModel {
 
 //	public static final String VERSION = "v1.0";
 
-	private static final String pct = "10";
+	private static final String pct = "1";
 
 	public static void main(String[] args) {
 		Configurator.setLevel( ControllerUtils.class, Level.DEBUG );
@@ -57,7 +57,7 @@ public final class DresdenModelBridgeKN extends DresdenModel {
 		if ( args != null && args.length > 0 ) {
 			// use the given args
 		} else{
-			final String nIterations = "500";
+			final String nIterations = "0";
 			args = new String[]{
 				// CLI params processed by MATSimApplication:
 				"--" + pct + "pct",
@@ -166,24 +166,37 @@ public final class DresdenModelBridgeKN extends DresdenModel {
 //			}
 //		}
 
+//		for( Id<Link> closedLinkId : closedLinks ){
+//
+//			Function<Id<Link>, Set<String>> modesToRemoveByLinkId;
+//			NetworkUtils.restrictModesAndCleanNetwork(scenario.getNetwork(), modesToRemoveByLinkId );
+////			scenario.getNetwork().removeLink( closedLinkId );
+//		}
+
+
 		for( Id<Link> closedLinkId : closedLinks ){
 			scenario.getNetwork().removeLink( closedLinkId );
 		}
 
-		Set<String> set = CollectionUtils.stringArrayToSet( new String [] {TransportMode.car, "truck8t", "truck18t", "truck40t","ride", "bike"} );
-		NetworkUtils.cleanNetwork( scenario.getNetwork(), set );
+		ScenarioUtils.cleanScenario( scenario );
 
-		for( Person person : scenario.getPopulation().getPersons().values() ){
-			for( Plan plan : person.getPlans() ){
-				for( PlanElement planElement : plan.getPlanElements() ){
-					if ( planElement instanceof Leg ) {
-						((Leg) planElement).setRoute( null );
-					}
-				}
-			}
-		}
+//		NetworkUtils.cleanNetwork( scenario );
+//
+//		PopulationUtils.cleanPopulation( scenario );
+//
+//		FacilitiesUtils.cleanFacilities( scenario );
 
-		FacilitiesUtils.removeInvalidNetworkReferences( scenario.getActivityFacilities(), scenario.getNetwork() );
+//		for( Person person : scenario.getPopulation().getPersons().values() ){
+//			for( Plan plan : person.getPlans() ){
+//				for( PlanElement planElement : plan.getPlanElements() ){
+//					if ( planElement instanceof Leg ) {
+//						((Leg) planElement).setRoute( null );
+//					}
+//				}
+//			}
+//		}
+//
+//		FacilitiesUtils.removeInvalidNetworkReferences( scenario.getActivityFacilities(), scenario.getNetwork() );
 
 //		PopulationUtils.checkRouteModeAndReset( scenario.getPopulation(), scenario.getNetwork() );
 		// tests if the mode is on the link, but does not hedge against link fully gone.  Should be adaptable, though.

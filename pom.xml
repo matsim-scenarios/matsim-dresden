@@ -9,10 +9,10 @@
 		<!-- <version>15.0</version> -->
 
 		<!-- PR-labelled release -->
-<!--		<version>2026.0-PR4282</version>-->
+		<version>2026.0-PR4282</version>
 
-		<!-- snapshot == not recommended: rather use PR-labelled release!-->
-		<version>2026.0-SNAPSHOT</version>
+		<!-- snapshot; ONLY use for "sharing in the IDE" -->
+<!--		<version>2026.0-SNAPSHOT</version>-->
 	</parent>
 
 	<modelVersion>4.0.0</modelVersion>
