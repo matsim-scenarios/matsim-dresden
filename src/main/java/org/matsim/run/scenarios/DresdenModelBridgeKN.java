@@ -155,12 +155,13 @@ public final class DresdenModelBridgeKN extends DresdenModel {
 			Id.createLinkId(14448952)
 										  );
 
+
 //		for (Id<Link> linkId : closedLinks) {
 //			Link link = scenario.getNetwork().getLinks().get(linkId);
 //			if (link != null) {
-////				link.setCapacity(0.00001);
+// //				link.setCapacity(0.00001);
 //				link.setFreespeed( link.getLength() / (2*3600.) ); // so that it takes two hours to traverse
-////				link.setAllowedModes( Collections.emptySet() );
+// //				link.setAllowedModes( Collections.emptySet() );
 //			} else {
 //				System.out.println("WARNING: link not found: " + linkId);
 //			}
@@ -170,7 +171,7 @@ public final class DresdenModelBridgeKN extends DresdenModel {
 //
 //			Function<Id<Link>, Set<String>> modesToRemoveByLinkId;
 //			NetworkUtils.restrictModesAndCleanNetwork(scenario.getNetwork(), modesToRemoveByLinkId );
-////			scenario.getNetwork().removeLink( closedLinkId );
+// //			scenario.getNetwork().removeLink( closedLinkId );
 //		}
 
 
