@@ -5,11 +5,15 @@
 		<groupId>org.matsim</groupId>
 		<artifactId>matsim-all</artifactId>
 		<!-- Define MATSim version here -->
+
 		<!-- release -->
 		<!-- <version>15.0</version> -->
 
+		<!-- weekly release -->
+<!--		<version>2026.0-2026w03</version>-->
+
 		<!-- PR-labelled release -->
-		<version>2026.0-PR4282</version>
+		<version>2026.0-PR4649</version>
 
 		<!-- snapshot; ONLY use for "sharing in the IDE" -->
 <!--		<version>2026.0-SNAPSHOT</version>-->

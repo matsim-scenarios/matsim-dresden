@@ -87,39 +87,6 @@ public final class DresdenModelBridgeKN extends DresdenModel {
 		config.controller().setWriteEventsUntilIteration( 0 );
 		config.controller().setOverwriteFileSetting( OverwriteFileSetting.deleteDirectoryIfExists );
 
-//		config.vspExperimental().setVspDefaultsCheckingLevel( VspExperimentalConfigGroup.VspDefaultsCheckingLevel.warn );
-
-		// The following does not work since the files are not in the same dir.  :-(
-//		URL currentDir;
-//		try{
-//			currentDir = Paths.get( "/Users/kainagel/public-svn/matsim/scenarios/countries/de/dresden/dresden-v1.0/output/" + pct + "pct/").toUri().toURL();
-//		} catch( MalformedURLException e ){
-//			throw new RuntimeException( e );
-//		}
-//		config.setContext( currentDir );
-//		// convert https filenames to stripped filenames.  Should be possible to write a more general method for that.
-//		{
-//			Path filename = Path.of( URI.create( config.network().getInputFile() ).getPath() ).getFileName();
-//			config.network().setInputFile( filename.toString() );
-//		}
-//		{
-//			Path filename = Path.of( URI.create( config.plans().getInputFile() ).getPath() ).getFileName();
-//			config.plans().setInputFile( filename.toString() );
-//		}
-//		{
-//			Path filename = Path.of( URI.create( config.facilities().getInputFile() ).getPath() ).getFileName();
-//			config.facilities().setInputFile( filename.toString() );
-//		}
-
-//		log.info( "at end of prepareConfig" );
-//		StringWriter writer = new StringWriter();
-//		new ConfigWriter( config, ConfigWriter.Verbosity.minimalAndWOActivities ).writeStream( new PrintWriter( writer ), System.lineSeparator() );
-//		log.info( System.lineSeparator() + System.lineSeparator() + writer.getBuffer() );
-//		log.info( "Complete config dump done." );
-//		log.info( "Checking consistency of config..." );
-//		config.checkConsistency();
-//		log.info( "Checking consistency of config done." );
-
 		return config;
 	}
 
@@ -127,16 +94,6 @@ public final class DresdenModelBridgeKN extends DresdenModel {
 	protected void prepareScenario(Scenario scenario) {
 		super.prepareScenario( scenario );
 		// add own scenario modifications here:
-
-		//-488766980
-		//761288685
-		//-264360396#1
-		//505502627#0
-		//14448952
-		//-30129851
-		//30129851
-		//425728245
-		//14448952
 
 		Set<Id<Link>> closedLinks = Set.of(
 			Id.createLinkId(-488766980),
@@ -154,54 +111,15 @@ public final class DresdenModelBridgeKN extends DresdenModel {
 			Id.createLinkId(425728245),
 			Id.createLinkId(14448952)
 										  );
-
-
-//		for (Id<Link> linkId : closedLinks) {
-//			Link link = scenario.getNetwork().getLinks().get(linkId);
-//			if (link != null) {
-// //				link.setCapacity(0.00001);
-//				link.setFreespeed( link.getLength() / (2*3600.) ); // so that it takes two hours to traverse
-// //				link.setAllowedModes( Collections.emptySet() );
-//			} else {
-//				System.out.println("WARNING: link not found: " + linkId);
-//			}
-//		}
-
-//		for( Id<Link> closedLinkId : closedLinks ){
-//
-//			Function<Id<Link>, Set<String>> modesToRemoveByLinkId;
-//			NetworkUtils.restrictModesAndCleanNetwork(scenario.getNetwork(), modesToRemoveByLinkId );
-// //			scenario.getNetwork().removeLink( closedLinkId );
-//		}
-
-
 		for( Id<Link> closedLinkId : closedLinks ){
 			scenario.getNetwork().removeLink( closedLinkId );
 		}
 
-		ScenarioUtils.cleanScenario( scenario );
+//		ScenarioUtils.cleanScenario( scenario );
 
-//		NetworkUtils.cleanNetwork( scenario );
-//
-//		PopulationUtils.cleanPopulation( scenario );
-//
-//		FacilitiesUtils.cleanFacilities( scenario );
-
-//		for( Person person : scenario.getPopulation().getPersons().values() ){
-//			for( Plan plan : person.getPlans() ){
-//				for( PlanElement planElement : plan.getPlanElements() ){
-//					if ( planElement instanceof Leg ) {
-//						((Leg) planElement).setRoute( null );
-//					}
-//				}
-//			}
-//		}
-//
-//		FacilitiesUtils.removeInvalidNetworkReferences( scenario.getActivityFacilities(), scenario.getNetwork() );
-
-//		PopulationUtils.checkRouteModeAndReset( scenario.getPopulation(), scenario.getNetwork() );
-		// tests if the mode is on the link, but does not hedge against link fully gone.  Should be adaptable, though.
-
+		NetworkUtils.cleanNetwork( scenario );
+		PopulationUtils.cleanPopulation( scenario );
+		FacilitiesUtils.cleanFacilities( scenario );
 
 	}
 
