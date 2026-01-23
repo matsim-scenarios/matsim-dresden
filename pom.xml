@@ -185,6 +185,8 @@
 							<goal>shade</goal>
 						</goals>
 						<configuration>
+							<!-- should result in a file like this: matsim-dresden-VERSION-TAG-nCommitsAfterTag
+							However, for me (DR) this is not completely clear. To be discussed. -->
 							<outputFile>${project.basedir}/${project.build.finalName}-${git.commit.id.describe-short}.jar</outputFile>
 							<transformers>
 								<!-- The following sets the main class for the executable jar as you otherwise would with the assembly plugin -->
