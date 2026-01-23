@@ -12,9 +12,6 @@ import org.matsim.core.scenario.ScenarioUtils;
 
 import picocli.CommandLine;
 
-/**
- * @author d-roeder (vsp)
- */
 @CommandLine.Command(
 		name = "DummyPopulationProcess",
 		description = "read a configuration, read the population, maipulate the config and write an adapted config that pointers to the new population"
