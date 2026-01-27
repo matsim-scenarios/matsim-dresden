@@ -17,7 +17,7 @@ public class InputPlansAnalysis {
 	public static void main(String[] args) throws IOException {
 		Population plans = PopulationUtils.readPopulation("https://svn.vsp.tu-berlin.de/repos/public-svn/matsim/scenarios/countries/de/dresden/dresden-v1.0/input/dresden-v1.0-10pct.plans.xml.gz");
 
-		String outputPath = args.length == 1 ? args[0] : "/Users/luchengqi/Documents/MATSimScenarios/Dresden/distortion-study-analysis/dresden-v1.x-10pct-person-analysis.tsv";
+		String outputPath = args.length == 1 ? args[0] : "/Users/luchengqi/Documents/MATSimScenarios/Dresden/distortion-study-analysis/dresden-v1.0-10pct-person-analysis.tsv";
 
 		CSVPrinter csvPrinter = new CSVPrinter(new FileWriter(outputPath), CSVFormat.TDF);
 		csvPrinter.printRecord("person_id", "age", "sex", "car_availability", "pt_subscription", "income", "household_size", "household_income", "total_trips",
@@ -36,9 +36,9 @@ public class InputPlansAnalysis {
 
 			int age = PersonUtils.getAge(person);
 			String sex = PersonUtils.getSex(person);
-			String ptAbo = person.getAttributes().getAttribute("sim_ptAbo").toString();
+			String ptAbo = person.getAttributes().getAttribute("ptTicket").toString();
 			double income = PersonUtils.getIncome(person);
-			int householdSize = Integer.parseInt(person.getAttributes().getAttribute("MiD:hhgr_gr").toString());
+			int householdSize = Integer.parseInt(person.getAttributes().getAttribute("hhSize").toString());
 			double householdIncome = income * householdSize;
 			String carAvailability = PersonUtils.getCarAvail(person);
 			Plan plan = person.getSelectedPlan();
