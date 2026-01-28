@@ -7,9 +7,13 @@ import jakarta.annotation.Nullable;
 import org.matsim.analysis.CheckAndSummarizeLongDistanceFreightPopulation;
 import org.matsim.analysis.CheckStayHomeAgents;
 import org.matsim.analysis.personMoney.PersonMoneyEventsAnalysisModule;
+import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.Scenario;
 import org.matsim.api.core.v01.TransportMode;
 import org.matsim.api.core.v01.network.Link;
+import org.matsim.api.core.v01.network.Network;
+import org.matsim.api.core.v01.population.*;
+import org.matsim.core.population.routes.*;
 import org.matsim.application.MATSimApplication;
 import org.matsim.application.analysis.CheckPopulation;
 import org.matsim.application.analysis.traffic.LinkStats;
@@ -78,6 +82,8 @@ public class DresdenModel extends MATSimApplication {
 	DresdenUtils.FunctionalityHandling emissions;
 	@CommandLine.Option(names = "--explicit-walk-intermodality", defaultValue = "ENABLED", description = "Define if explicit walk intermodality parameter to/from pt should be set or not (use default).")
 	static DresdenUtils.FunctionalityHandling explicitWalkIntermodality;
+	@CommandLine.Option(names = "--close-carola-bridge", defaultValue = "DISABLED", description = "Close down the Carola bridge (by default is false)")
+	static DresdenUtils.FunctionalityHandling closeCarolaBridge;
 
 
 	public DresdenModel(@Nullable Config config) {
@@ -238,6 +244,35 @@ public class DresdenModel extends MATSimApplication {
 			PrepareNetwork.prepareEmissionsAttributes(scenario.getNetwork());
 //			prepare vehicle types for emission analysis
 			prepareVehicleTypesForEmissionAnalysis(scenario);
+		}
+
+		if (closeCarolaBridge == FunctionalityHandling.ENABLED){
+			// link ids for the Carola bridge
+			Id<Link> carolaBridgeLinkId1 = Id.createLinkId("901959078");
+			Id<Link> carolaBridgeLinkId2 = Id.createLinkId("4214231");
+
+			// reduce the free speed to a very small value
+			Network network = scenario.getNetwork();
+			network.getLinks().get(carolaBridgeLinkId1).setFreespeed(0.00001);
+			network.getLinks().get(carolaBridgeLinkId2).setFreespeed(0.00001);
+
+			// remove the route in the plan, if the route covers carola bridge (i.e., they need to re-route at the first iteration already).
+			for (Person person : scenario.getPopulation().getPersons().values()) {
+				for (Plan plan : person.getPlans()) {
+					for (PlanElement planElement : plan.getPlanElements()) {
+						if (planElement instanceof Leg leg){
+							Route route = leg.getRoute();
+							if (route instanceof NetworkRoute networkRoute){
+								boolean routeIsImpacted = networkRoute.getLinkIds().contains(carolaBridgeLinkId1) ||
+									networkRoute.getLinkIds().contains(carolaBridgeLinkId2);
+								if (routeIsImpacted){
+									CleanPopulation.removeRouteFromLeg(leg);
+								}
+							}
+						}
+					}
+				}
+			}
 		}
 	}
 
