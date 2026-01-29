@@ -2,6 +2,7 @@ package org.matsim.run.scenarios;
 
 import ch.sbb.matsim.config.SwissRailRaptorConfigGroup;
 import com.google.common.collect.Sets;
+import com.google.inject.Singleton;
 import com.google.inject.multibindings.Multibinder;
 import jakarta.annotation.Nullable;
 import org.matsim.analysis.CheckAndSummarizeLongDistanceFreightPopulation;
@@ -56,7 +57,7 @@ import java.util.Set;
 
 import static org.matsim.utils.DresdenUtils.*;
 
-@CommandLine.Command(header = ":: Dresden Scenario ::", version = DresdenScenario.VERSION, mixinStandardHelpOptions = true)
+@CommandLine.Command(header = ":: Dresden Scenario ::", version = DresdenModel.VERSION, mixinStandardHelpOptions = true)
 @MATSimApplication.Prepare({
 		CreateNetworkFromSumo.class, CreateTransitScheduleFromGtfs.class, TrajectoryToPlans.class, GenerateShortDistanceTrips.class,
 		MergePopulations.class, ExtractRelevantFreightTrips.class, DownSamplePopulation.class, ExtractHomeCoordinates.class,
@@ -68,28 +69,32 @@ import static org.matsim.utils.DresdenUtils.*;
 @MATSimApplication.Analysis({
 		LinkStats.class, CheckPopulation.class, CheckAndSummarizeLongDistanceFreightPopulation.class, CheckStayHomeAgents.class
 })
-public class DresdenScenario extends MATSimApplication {
+public class DresdenModel extends MATSimApplication {
 
 	public static final String VERSION = "v1.0";
 
 	@CommandLine.Mixin
 	private final SampleOptions sample = new SampleOptions(100, 25, 10, 1);
+
 	@CommandLine.Option(names = "--emissions", defaultValue = "ENABLED", description = "Define if emission analysis should be performed or not.")
 	DresdenUtils.FunctionalityHandling emissions;
+
 	@CommandLine.Option(names = "--explicit-walk-intermodality", defaultValue = "ENABLED", description = "Define if explicit walk intermodality parameter to/from pt should be set or not (use default).")
 	static DresdenUtils.FunctionalityHandling explicitWalkIntermodality;
 
+	@CommandLine.Option( names = "--generate-dashboards", defaultValue = "true" )
+	static Boolean generateDashboards;
 
-	public DresdenScenario(@Nullable Config config) {
+	public DresdenModel(@Nullable Config config) {
 		super(config);
 	}
 
-	public DresdenScenario() {
+	public DresdenModel() {
 		super(String.format("input/%s/dresden-%s-10pct.config.xml", VERSION, VERSION));
 	}
 
 	public static void main(String[] args) {
-		MATSimApplication.run(DresdenScenario.class, args);
+		MATSimApplication.execute(DresdenModel.class, args);
 	}
 
 	@Nullable
@@ -109,8 +114,17 @@ public class DresdenScenario extends MATSimApplication {
 		simWrapper.defaultParams().setShp(String.format("vvo_tarifzone_10_dresden/%s_vvo_tarifzone_10_dresden_utm32n.shp", VERSION));
 
 		if (sample.isSet()){
+			if ( sample.getSample()== 0.01 ) {
+//				config.plans().setInputFile( sample.adjustName( config.plans().getInputFile() ) );
+				// yyyy the above line is what _should_ be used, but we are instead using:
+				config.plans().setInputFile( "https://svn.vsp.tu-berlin.de/repos/public-svn/matsim/scenarios/countries/de/dresden/dresden-v1.0/output/1pct/009.output_plans.xml.gz" );
+			} else if ( sample.getSample()==0.1 ) {
+				config.plans().setInputFile( "https://svn.vsp.tu-berlin.de/repos/public-svn/matsim/scenarios/countries/de/dresden/dresden-v1.0/output/10pct/007.output_plans.xml.gz" );
+			} else {
+				throw new RuntimeException( "sampleSize=" + sample.getSize() + " is currently not supported ... since this version of the code changes " +
+												"the input plans file manually to the calibrated version. Needs to be fixed.  kai, dec'25");
+			}
 			config.controller().setOutputDirectory(sample.adjustName(config.controller().getOutputDirectory()));
-			config.plans().setInputFile(sample.adjustName(config.plans().getInputFile()));
 			config.controller().setRunId(sample.adjustName(config.controller().getRunId()));
 
 			config.qsim().setFlowCapFactor(sample.getSample());
@@ -118,6 +132,16 @@ public class DresdenScenario extends MATSimApplication {
 			config.counts().setCountsScaleFactor(sample.getSample());
 			simWrapper.setSampleSize(sample.getSample());
 		}
+
+//		We would like to "switch off" the usage of LastestActivityEndTime, but this is not possible with just setting the value.
+//		Option 1: set latestActivityEndTime = 0; The all mutated act end times would become 0 because in class MutateActivityTimeAllocation the following line is used to set the act end time
+//		double newEndTime = Math.min(mutateTime(endTime, mutationRange),this.latestActivityEndTime);
+//		Option 2: set latestActivityEndTIme = 36h = qsim endtime, but doesn't this cause a postponing of the act end time until we reach 36h ulimatively? This is not what we want I think..
+		config.timeAllocationMutator().setLatestActivityEndTime(String.valueOf(config.qsim().getEndTime().seconds()));
+//		if mutateAroundInitialEndTImeOnly = true we potentially trap acts with start and/or end outside of act type opening times, so we switch it off here.
+		config.timeAllocationMutator().setMutateAroundInitialEndTimeOnly(false);
+		//		mutation should not affect act duration because otherwise short acts can end up with max_dur=0s.
+		config.timeAllocationMutator().setAffectingDuration(false);
 
 		config.vspExperimental().setVspDefaultsCheckingLevel(VspExperimentalConfigGroup.VspDefaultsCheckingLevel.abort);
 
@@ -135,6 +159,7 @@ public class DresdenScenario extends MATSimApplication {
 //		2.0 + 1.0 = alpha + 1
 //		ride cost = alpha * car cost
 //		ride marg utility of traveling = (alpha + 1) * marg utility travelling car + alpha * beta perf
+//		TODO: calibrate ride alpha. We should always calibrate different alpha sets of 1.0, 1.5 and 2.0
 		double alpha = 2;
 		RideScoringParamsFromCarParams.setRideScoringParamsBasedOnCarParams(scoringConfigGroup, alpha);
 
@@ -211,12 +236,16 @@ public class DresdenScenario extends MATSimApplication {
 		PrepareNetwork.prepareFreightNetwork(scenario.getNetwork());
 
 //		remove disallowed links. The disallowed links cause many problems and (usually) are not useful in our rather macroscopic view on transport systems.
+		// yyyy I have no idea what this means; could someone please explain?  kai, dec'25
+		// --> The way this reads to me is that we may have a network where the "disallowedNextLinks" attribute is used.    In the
+		// code that follows here, we disable those attributes.  kai, dec'25
 		for (Link link : scenario.getNetwork().getLinks().values()) {
 			DisallowedNextLinks disallowed = NetworkUtils.getDisallowedNextLinks(link);
 			if (disallowed != null) {
 				link.getAllowedModes().forEach(disallowed::removeDisallowedLinkSequences);
 				if (disallowed.isEmpty()) {
 					NetworkUtils.removeDisallowedNextLinks(link);
+					// yyyy whey do we only do this if disallowed is empty, and not in all cases?  kai, dec'25
 				}
 			}
 		}
@@ -241,13 +270,16 @@ public class DresdenScenario extends MATSimApplication {
 			@Override
 			public void install() {
 				install(new PtFareModule());
-				bind(ScoringParametersForPerson.class).to(IncomeDependentUtilityOfMoneyPersonScoringParameters.class).asEagerSingleton();
+				bind(ScoringParametersForPerson.class).to(IncomeDependentUtilityOfMoneyPersonScoringParameters.class).in( Singleton.class );
 
 				addTravelTimeBinding(TransportMode.ride).to(carTravelTime());
 				addTravelDisutilityFactoryBinding(TransportMode.ride).to(carTravelDisutilityFactoryKey());
+
+				if ( generateDashboards ){
 //				this binds the DresdenDashboardProvider with guice instead of resources/services/.../file.
 //				This is way more convenient imho.
-				Multibinder.newSetBinder(binder(), DashboardProvider.class).addBinding().to(DresdenDashboardProvider.class);
+					Multibinder.newSetBinder( binder(), DashboardProvider.class ).addBinding().to( DresdenDashboardProvider.class );
+				}
 			}
 		});
 	}
