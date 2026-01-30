@@ -22,6 +22,10 @@ import org.matsim.application.prepare.network.CleanNetwork;
 import org.matsim.application.prepare.network.CreateNetworkFromSumo;
 import org.matsim.application.prepare.population.*;
 import org.matsim.application.prepare.pt.CreateTransitScheduleFromGtfs;
+import org.matsim.contrib.accessibility.AccessibilityConfigGroup;
+import org.matsim.contrib.accessibility.AccessibilityModule;
+import org.matsim.contrib.accessibility.AccessibilityUtils;
+import org.matsim.contrib.accessibility.Modes4Accessibility;
 import org.matsim.contrib.vsp.pt.fare.DistanceBasedPtFareParams;
 import org.matsim.contrib.vsp.pt.fare.FareZoneBasedPtFareParams;
 import org.matsim.contrib.vsp.pt.fare.PtFareConfigGroup;
@@ -53,6 +57,7 @@ import picocli.CommandLine;
 import playground.vsp.scoring.IncomeDependentUtilityOfMoneyPersonScoringParameters;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 import static org.matsim.utils.DresdenUtils.*;
@@ -84,6 +89,9 @@ public class DresdenModel extends MATSimApplication {
 
 	@CommandLine.Option( names = "--generate-dashboards", defaultValue = "true" )
 	static Boolean generateDashboards;
+
+	@CommandLine.Option(names = "--accessibility", defaultValue = "DISABLED", description = "Perform accessibility analysis")
+	DresdenUtils.FunctionalityHandling accessibility;
 
 	public DresdenModel(@Nullable Config config) {
 		super(config);
@@ -131,6 +139,12 @@ public class DresdenModel extends MATSimApplication {
 			config.qsim().setStorageCapFactor(sample.getSample());
 			config.counts().setCountsScaleFactor(sample.getSample());
 			simWrapper.setSampleSize(sample.getSample());
+
+			if (accessibility == FunctionalityHandling.ENABLED){
+				AccessibilityConfigGroup accConfig = ConfigUtils.addOrGetModule(config, AccessibilityConfigGroup.class ) ;
+				accConfig.setComputingAccessibilityForMode(Modes4Accessibility.car, true);
+			}
+
 		}
 
 //		We would like to "switch off" the usage of LastestActivityEndTime, but this is not possible with just setting the value.
@@ -279,6 +293,14 @@ public class DresdenModel extends MATSimApplication {
 //				this binds the DresdenDashboardProvider with guice instead of resources/services/.../file.
 //				This is way more convenient imho.
 					Multibinder.newSetBinder( binder(), DashboardProvider.class ).addBinding().to( DresdenDashboardProvider.class );
+				}
+
+				// Add an overriding module for each activity type.
+				List<String> activityTypes = AccessibilityUtils.collectAllFacilityOptionTypes(controler.getScenario());
+				for (final String actType : activityTypes) {
+					final AccessibilityModule module = new AccessibilityModule();
+					module.setConsideredActivityType(actType);
+					controler.addOverridingModule(module);
 				}
 			}
 		});
