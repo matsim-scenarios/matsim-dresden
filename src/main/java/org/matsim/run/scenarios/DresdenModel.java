@@ -56,6 +56,7 @@ import org.matsim.utils.DresdenUtils;
 import picocli.CommandLine;
 import playground.vsp.scoring.IncomeDependentUtilityOfMoneyPersonScoringParameters;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -92,6 +93,8 @@ public class DresdenModel extends MATSimApplication {
 
 	@CommandLine.Option(names = "--accessibility", defaultValue = "DISABLED", description = "Perform accessibility analysis")
 	DresdenUtils.FunctionalityHandling accessibility;
+
+	List<String> activityTypes = new ArrayList<>();
 
 	public DresdenModel(@Nullable Config config) {
 		super(config);
@@ -143,6 +146,9 @@ public class DresdenModel extends MATSimApplication {
 			if (accessibility == FunctionalityHandling.ENABLED){
 				AccessibilityConfigGroup accConfig = ConfigUtils.addOrGetModule(config, AccessibilityConfigGroup.class ) ;
 				accConfig.setComputingAccessibilityForMode(Modes4Accessibility.car, true);
+				accConfig.setAreaOfAccessibilityComputation(AccessibilityConfigGroup.AreaOfAccesssibilityComputation.fromShapeFile);
+				accConfig.setShapeFileCellBasedAccessibility("./vvo_tarifzone_10_dresden/v1.0_vvo_tarifzone_10_dresden_utm32n.shp");
+				accConfig.setTileSize_m(2000);
 			}
 
 		}
@@ -271,6 +277,8 @@ public class DresdenModel extends MATSimApplication {
 //			prepare vehicle types for emission analysis
 			prepareVehicleTypesForEmissionAnalysis(scenario);
 		}
+
+		activityTypes = AccessibilityUtils.collectAllFacilityOptionTypes(scenario);
 	}
 
 	@Override
@@ -295,12 +303,13 @@ public class DresdenModel extends MATSimApplication {
 					Multibinder.newSetBinder( binder(), DashboardProvider.class ).addBinding().to( DresdenDashboardProvider.class );
 				}
 
-				// Add an overriding module for each activity type.
-				List<String> activityTypes = AccessibilityUtils.collectAllFacilityOptionTypes(controler.getScenario());
-				for (final String actType : activityTypes) {
-					final AccessibilityModule module = new AccessibilityModule();
-					module.setConsideredActivityType(actType);
-					controler.addOverridingModule(module);
+				if (accessibility == FunctionalityHandling.ENABLED){
+					// Add an overriding module for each activity type.
+					for (final String actType : activityTypes) {
+						final AccessibilityModule module = new AccessibilityModule();
+						module.setConsideredActivityType(actType);
+						controler.addOverridingModule(module);
+					}
 				}
 			}
 		});
