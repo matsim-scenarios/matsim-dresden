@@ -249,7 +249,10 @@ public class DresdenScenario extends MATSimApplication {
 			prepareVehicleTypesForEmissionAnalysis(scenario);
 		}
 
-		activityTypes = AccessibilityUtils.collectAllFacilityOptionTypes(scenario);
+		if (accessibility == FunctionalityHandling.ENABLED){
+			activityTypes = AccessibilityUtils.collectAllFacilityOptionTypes(scenario);
+		}
+
 	}
 
 	@Override
