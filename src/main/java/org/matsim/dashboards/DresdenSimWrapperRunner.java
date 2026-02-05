@@ -36,6 +36,7 @@ import org.matsim.simwrapper.SimWrapperConfigGroup;
 import org.matsim.simwrapper.dashboard.EmissionsDashboard;
 import org.matsim.simwrapper.dashboard.NoiseDashboard;
 import org.matsim.simwrapper.dashboard.TripDashboard;
+import org.matsim.utils.DresdenUtils;
 import org.matsim.vehicles.MatsimVehicleWriter;
 import picocli.CommandLine;
 
@@ -60,12 +61,12 @@ public final class DresdenSimWrapperRunner implements MATSimAppCommand {
 	private List<Path> inputPaths;
 	@CommandLine.Mixin
 	private final ShpOptions shp = new ShpOptions();
-	@CommandLine.Option(names = "--noise", defaultValue = "false", description = "create noise dashboard")
-	private boolean noise;
-	@CommandLine.Option(names = "--trips", defaultValue = "false", description = "create trips dashboard")
-	private boolean trips;
-	@CommandLine.Option(names = "--emissions", defaultValue = "false", description = "create emission dashboard")
-	private boolean emissions;
+	@CommandLine.Option(names = "--noise", defaultValue = "RUN_NOISE_ANALYSIS", description = "create noise dashboard")
+	private DresdenUtils.NoiseAnalysisHandling noise;
+	@CommandLine.Option(names = "--trips", defaultValue = "RUN_TRIPS_ANALYSIS", description = "create trips dashboard")
+	private DresdenUtils.TripsAnalysisHandling trips;
+	@CommandLine.Option(names = "--emissions", defaultValue = "RUN_EMISSIONS_ANALYSIS", description = "create emission dashboard. Options: RUN_EMISSIONS_ANALYSIS, NO_EMISSIONS_ANALYSIS")
+	DresdenUtils.EmissionsAnalysisHandling emissions;
 
 	private static final String FILE_TYPE = "_before_emissions.xml";
 
@@ -81,7 +82,8 @@ public final class DresdenSimWrapperRunner implements MATSimAppCommand {
 	@Override
 	public Integer call() throws Exception {
 
-		if (!noise && !trips && !emissions){
+		if (noise == DresdenUtils.NoiseAnalysisHandling.NO_NOISE_ANALYSIS && trips == DresdenUtils.TripsAnalysisHandling.NO_TRIPS_ANALYSIS &&
+			emissions == DresdenUtils.EmissionsAnalysisHandling.NO_EMISSIONS_ANALYSIS){
 			throw new IllegalArgumentException("you have not configured any dashboard to be created! Please use command line parameters!");
 		}
 
@@ -101,11 +103,11 @@ public final class DresdenSimWrapperRunner implements MATSimAppCommand {
 
 			//add dashboards according to command line parameters
 //			if more dashboards are to be added here, we need to check if noise==true before adding noise dashboard here
-			if (noise) {
+			if (noise == DresdenUtils.NoiseAnalysisHandling.RUN_NOISE_ANALYSIS) {
 				sw.addDashboard(Dashboard.customize(new NoiseDashboard(config.global().getCoordinateSystem())).context("noise"));
 			}
 
-			if (trips) {
+			if (trips == DresdenUtils.TripsAnalysisHandling.RUN_TRIPS_ANALYSIS) {
 				sw.addDashboard(Dashboard.customize(new TripDashboard(
 					"mode_share_ref.csv",
 					"mode_share_per_dist_ref.csv",
@@ -115,7 +117,7 @@ public final class DresdenSimWrapperRunner implements MATSimAppCommand {
 					.setAnalysisArgs("--person-filter", "subpopulation=person")).context("calibration").title("Trips (calibration)"));
 			}
 
-			if (emissions) {
+			if (emissions == DresdenUtils.EmissionsAnalysisHandling.RUN_EMISSIONS_ANALYSIS) {
 				sw.addDashboard(Dashboard.customize(new EmissionsDashboard(config.global().getCoordinateSystem())).context("emissions"));
 
 				setEmissionsConfigs(config);

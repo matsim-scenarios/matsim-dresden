@@ -73,9 +73,8 @@ public class DresdenModel extends MATSimApplication {
 
 	public static final String VERSION = "v1.0";
 
-	@CommandLine.Option(names = "--emissions", defaultValue = "true",
-		description = "Define if emission analysis should be performed or not.")
-	boolean emissions;
+	@CommandLine.Option(names = "--emissions", defaultValue = "RUN_EMISSIONS_ANALYSIS", description = "Define if emission analysis should be performed or not. Options: RUN_EMISSIONS_ANALYSIS, NO_EMISSIONS_ANALYSIS")
+	EmissionsAnalysisHandling emissions;
 
 //	public DresdenModel(@Nullable Config config) {
 //		super(config);
@@ -191,7 +190,7 @@ public class DresdenModel extends MATSimApplication {
 
 		setExplicitIntermodalityParamsForWalkToPt(ConfigUtils.addOrGetModule(config, SwissRailRaptorConfigGroup.class));
 
-		if (emissions ) {
+		if (emissions == EmissionsAnalysisHandling.RUN_EMISSIONS_ANALYSIS) {
 //		set hbefa input files for emission analysis
 			setEmissionsConfigs(config);
 		}
@@ -219,7 +218,7 @@ public class DresdenModel extends MATSimApplication {
 			}
 		}
 
-		if (emissions ) {
+		if (emissions == EmissionsAnalysisHandling.RUN_EMISSIONS_ANALYSIS) {
 //			prepare hbefa link attributes + make link.getType() handable for OsmHbefaMapping
 //			this also happens in makefile pipeline. integrating it here for same reason as above.
 			PrepareNetwork.prepareEmissionsAttributes(scenario.getNetwork());

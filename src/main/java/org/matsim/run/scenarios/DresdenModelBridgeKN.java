@@ -64,7 +64,7 @@ public final class DresdenModelBridgeKN extends DresdenModel {
 				"--iterations", nIterations,
 				"--output", "./output/bridge_more4_c_kn_" + pct + "pct" + nIterations + "it",
 				"--runId", "",
-				"--emissions=false",
+				"--emissions", DresdenUtils.EmissionsAnalysisHandling.NO_EMISSIONS_ANALYSIS.name(),
 				"--generate-dashboards=false",
 
 				// CLI params processed by standard MATSim:
