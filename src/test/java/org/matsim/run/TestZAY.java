@@ -25,17 +25,14 @@ public class TestZAY {
 	void runScenario_main() {
 
 		DresdenModel.main(new String[]{
-			"--1pct",
+			"--config", "input/" + DresdenModel.VERSION + "/dresden-" + DresdenModel.VERSION + "-1pct.config.xml",
 			"--iterations", "1",
 			"--output", utils.getOutputDirectory(),//记录output路径
 			"--config:controller.overwriteFiles=deleteDirectoryIfExists",//刷新output
 			"--config:global.numberOfThreads", "2",
 			"--config:qsim.numberOfThreads", "2",
 			"--config:simwrapper.defaultDashboards", "disabled",
-			"--emissions", "DISABLED"});
-		//对比test生成的output与预期output是否一致
-		// yy could you please use comments in english?  thx. kai, dec'25
-
+			"--emissions", "NO_EMISSIONS_ANALYSIS"});
 		{
 			Population expected = PopulationUtils.createPopulation( ConfigUtils.createConfig() ) ;
 			PopulationUtils.readPopulation( expected, utils.getInputDirectory() + "/dresden-1pct.output_plans.xml.gz" );
