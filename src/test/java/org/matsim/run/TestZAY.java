@@ -32,7 +32,7 @@ public class TestZAY {
 			"--config:global.numberOfThreads", "2",
 			"--config:qsim.numberOfThreads", "2",
 			"--config:simwrapper.defaultDashboards", "disabled",
-			"--no-emissions"});
+			"--emissions", "NO_EMISSIONS_ANALYSIS"});
 		{
 			Population expected = PopulationUtils.createPopulation( ConfigUtils.createConfig() ) ;
 			PopulationUtils.readPopulation( expected, utils.getInputDirectory() + "/dresden-1pct.output_plans.xml.gz" );
