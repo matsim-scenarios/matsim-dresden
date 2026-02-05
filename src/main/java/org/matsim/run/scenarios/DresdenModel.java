@@ -73,14 +73,8 @@ public class DresdenModel extends MATSimApplication {
 
 	public static final String VERSION = "v1.0";
 
-	@CommandLine.Mixin
-	private final SampleOptions sample = new SampleOptions(100, 25, 10, 1);
-
 	@CommandLine.Option(names = "--emissions", defaultValue = "ENABLED", description = "Define if emission analysis should be performed or not.")
 	DresdenUtils.FunctionalityHandling emissions;
-
-	@CommandLine.Option(names = "--explicit-walk-intermodality", defaultValue = "ENABLED", description = "Define if explicit walk intermodality parameter to/from pt should be set or not (use default).")
-	static DresdenUtils.FunctionalityHandling explicitWalkIntermodality;
 
 	@CommandLine.Option( names = "--generate-dashboards", defaultValue = "true" )
 	static Boolean generateDashboards;
@@ -90,7 +84,6 @@ public class DresdenModel extends MATSimApplication {
 	}
 
 	public DresdenModel() {
-		super(String.format("input/%s/dresden-%s-10pct.config.xml", VERSION, VERSION));
 	}
 
 	public static void main(String[] args) {
@@ -112,26 +105,6 @@ public class DresdenModel extends MATSimApplication {
 		simWrapper.defaultParams().setMapZoomLevel(6.8);
 //		the tarifzone shp file basically is a dresden shp file with fare prices as additional information
 		simWrapper.defaultParams().setShp(String.format("vvo_tarifzone_10_dresden/%s_vvo_tarifzone_10_dresden_utm32n.shp", VERSION));
-
-		if (sample.isSet()){
-			if ( sample.getSample()== 0.01 ) {
-//				config.plans().setInputFile( sample.adjustName( config.plans().getInputFile() ) );
-				// yyyy the above line is what _should_ be used, but we are instead using:
-				config.plans().setInputFile( "https://svn.vsp.tu-berlin.de/repos/public-svn/matsim/scenarios/countries/de/dresden/dresden-v1.0/output/1pct/009.output_plans.xml.gz" );
-			} else if ( sample.getSample()==0.1 ) {
-				config.plans().setInputFile( "https://svn.vsp.tu-berlin.de/repos/public-svn/matsim/scenarios/countries/de/dresden/dresden-v1.0/output/10pct/007.output_plans.xml.gz" );
-			} else {
-				throw new RuntimeException( "sampleSize=" + sample.getSize() + " is currently not supported ... since this version of the code changes " +
-												"the input plans file manually to the calibrated version. Needs to be fixed.  kai, dec'25");
-			}
-			config.controller().setOutputDirectory(sample.adjustName(config.controller().getOutputDirectory()));
-			config.controller().setRunId(sample.adjustName(config.controller().getRunId()));
-
-			config.qsim().setFlowCapFactor(sample.getSample());
-			config.qsim().setStorageCapFactor(sample.getSample());
-			config.counts().setCountsScaleFactor(sample.getSample());
-			simWrapper.setSampleSize(sample.getSample());
-		}
 
 //		We would like to "switch off" the usage of LastestActivityEndTime, but this is not possible with just setting the value.
 //		Option 1: set latestActivityEndTime = 0; The all mutated act end times would become 0 because in class MutateActivityTimeAllocation the following line is used to set the act end time
@@ -218,9 +191,7 @@ public class DresdenModel extends MATSimApplication {
 		ptFareConfigGroup.addParameterSet(vvo10);
 		ptFareConfigGroup.addParameterSet(germany);
 
-		if (explicitWalkIntermodality == DresdenUtils.FunctionalityHandling.ENABLED) {
-			setExplicitIntermodalityParamsForWalkToPt(ConfigUtils.addOrGetModule(config, SwissRailRaptorConfigGroup.class));
-		}
+		setExplicitIntermodalityParamsForWalkToPt(ConfigUtils.addOrGetModule(config, SwissRailRaptorConfigGroup.class));
 
 		if (emissions == DresdenUtils.FunctionalityHandling.ENABLED) {
 //		set hbefa input files for emission analysis
