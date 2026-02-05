@@ -40,6 +40,7 @@ import org.matsim.core.network.NetworkUtils;
 import org.matsim.core.network.turnRestrictions.DisallowedNextLinks;
 import org.matsim.core.replanning.annealing.ReplanningAnnealerConfigGroup;
 import org.matsim.core.replanning.strategies.DefaultPlanStrategiesModule;
+import org.matsim.core.replanning.strategies.DefaultPlanStrategiesModule.DefaultStrategy;
 import org.matsim.core.scoring.functions.ScoringParametersForPerson;
 import org.matsim.dashboards.DresdenDashboardProvider;
 import org.matsim.prepare.*;
@@ -76,18 +77,20 @@ public class DresdenModel extends MATSimApplication {
 	@CommandLine.Mixin
 	private final SampleOptions sample = new SampleOptions(100, 25, 10, 1);
 
-	@CommandLine.Option(names = "--emissions", defaultValue = "ENABLED", description = "Define if emission analysis should be performed or not.")
-	DresdenUtils.FunctionalityHandling emissions;
+	@CommandLine.Option(names = "--emissions", defaultValue = "true",
+		description = "Define if emission analysis should be performed or not.")
+	boolean emissions;
 
-	@CommandLine.Option(names = "--explicit-walk-intermodality", defaultValue = "ENABLED", description = "Define if explicit walk intermodality parameter to/from pt should be set or not (use default).")
-	static DresdenUtils.FunctionalityHandling explicitWalkIntermodality;
+	@CommandLine.Option(names = "--explicit-walk-intermodality", defaultValue = "true",
+		description = "Define if explicit walk intermodality parameter to/from pt should be set or not (use default).")
+	boolean explicitWalkIntermodality;
 
-	@CommandLine.Option( names = "--generate-dashboards", defaultValue = "true" )
-	static Boolean generateDashboards;
+//	@CommandLine.Option( names = "--generate-dashboards", defaultValue = "true" )
+//	boolean generateDashboards;
 
-	public DresdenModel(@Nullable Config config) {
-		super(config);
-	}
+//	public DresdenModel(@Nullable Config config) {
+//		super(config);
+//	}
 
 	public DresdenModel() {
 		super(String.format("input/%s/dresden-%s-10pct.config.xml", VERSION, VERSION));
@@ -218,11 +221,11 @@ public class DresdenModel extends MATSimApplication {
 		ptFareConfigGroup.addParameterSet(vvo10);
 		ptFareConfigGroup.addParameterSet(germany);
 
-		if (explicitWalkIntermodality == DresdenUtils.FunctionalityHandling.ENABLED) {
+		if (explicitWalkIntermodality ) {
 			setExplicitIntermodalityParamsForWalkToPt(ConfigUtils.addOrGetModule(config, SwissRailRaptorConfigGroup.class));
 		}
 
-		if (emissions == DresdenUtils.FunctionalityHandling.ENABLED) {
+		if (emissions ) {
 //		set hbefa input files for emission analysis
 			setEmissionsConfigs(config);
 		}
@@ -250,7 +253,7 @@ public class DresdenModel extends MATSimApplication {
 			}
 		}
 
-		if (emissions == FunctionalityHandling.ENABLED) {
+		if (emissions ) {
 //			prepare hbefa link attributes + make link.getType() handable for OsmHbefaMapping
 //			this also happens in makefile pipeline. integrating it here for same reason as above.
 			PrepareNetwork.prepareEmissionsAttributes(scenario.getNetwork());
@@ -275,11 +278,7 @@ public class DresdenModel extends MATSimApplication {
 				addTravelTimeBinding(TransportMode.ride).to(carTravelTime());
 				addTravelDisutilityFactoryBinding(TransportMode.ride).to(carTravelDisutilityFactoryKey());
 
-				if ( generateDashboards ){
-//				this binds the DresdenDashboardProvider with guice instead of resources/services/.../file.
-//				This is way more convenient imho.
-					Multibinder.newSetBinder( binder(), DashboardProvider.class ).addBinding().to( DresdenDashboardProvider.class );
-				}
+				Multibinder.newSetBinder( binder(), DashboardProvider.class ).addBinding().to( DresdenDashboardProvider.class );
 			}
 		});
 	}
@@ -296,9 +295,7 @@ public class DresdenModel extends MATSimApplication {
 
 		Set<String> qsimModes = new HashSet<>(config.qsim().getMainModes());
 		config.qsim().setMainModes(Sets.union(qsimModes, getFreightModes()));
-
-		Set<String> networkModes = new HashSet<>(config.routing().getNetworkModes());
-		config.routing().setNetworkModes(Sets.union(networkModes, getFreightModes()));
+		config.routing().setNetworkModes(Sets.union( new HashSet<>( config.routing().getNetworkModes() ), getFreightModes() ) );
 
 		config.scoring().addActivityParams(new ScoringConfigGroup.ActivityParams("commercial_start").setTypicalDuration(30 * 60.));
 		config.scoring().addActivityParams(new ScoringConfigGroup.ActivityParams("commercial_end").setTypicalDuration(30 * 60.));
@@ -310,31 +307,28 @@ public class DresdenModel extends MATSimApplication {
 
 //		replanning strategies for small scale commercial traffic
 		for (String subpopulation : getSmallScaleComSubpops()) {
-			config.replanning().addStrategySettings(
-				new ReplanningConfigGroup.StrategySettings()
+
+			config.replanning().addStrategySettings( new ReplanningConfigGroup.StrategySettings()
 					.setStrategyName(DefaultPlanStrategiesModule.DefaultSelector.ChangeExpBeta)
 					.setWeight(0.85)
 					.setSubpopulation(subpopulation)
 			);
 
-			config.replanning().addStrategySettings(
-				new ReplanningConfigGroup.StrategySettings()
-					.setStrategyName(DefaultPlanStrategiesModule.DefaultStrategy.ReRoute)
+			config.replanning().addStrategySettings( new ReplanningConfigGroup.StrategySettings()
+					.setStrategyName( DefaultStrategy.ReRoute )
 					.setWeight(0.1)
 					.setSubpopulation(subpopulation)
 			);
 		}
 
 //		replanning strategies for longDistanceFreight
-		config.replanning().addStrategySettings(
-			new ReplanningConfigGroup.StrategySettings()
+		config.replanning().addStrategySettings( new ReplanningConfigGroup.StrategySettings()
 				.setStrategyName(DefaultPlanStrategiesModule.DefaultSelector.ChangeExpBeta)
 				.setWeight(0.95)
 				.setSubpopulation(LONG_DIST_FREIGHT_SUBPOP)
 		);
-		config.replanning().addStrategySettings(
-			new ReplanningConfigGroup.StrategySettings()
-				.setStrategyName(DefaultPlanStrategiesModule.DefaultStrategy.ReRoute)
+		config.replanning().addStrategySettings( new ReplanningConfigGroup.StrategySettings()
+				.setStrategyName( DefaultStrategy.ReRoute )
 				.setWeight(0.05)
 				.setSubpopulation(LONG_DIST_FREIGHT_SUBPOP)
 		);
