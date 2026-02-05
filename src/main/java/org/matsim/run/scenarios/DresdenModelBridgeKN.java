@@ -7,40 +7,19 @@ import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.core.config.Configurator;
 import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.Scenario;
-import org.matsim.api.core.v01.TransportMode;
 import org.matsim.api.core.v01.network.Link;
-import org.matsim.api.core.v01.network.Network;
-import org.matsim.api.core.v01.population.*;
 import org.matsim.application.MATSimApplication;
 import org.matsim.core.config.Config;
-import org.matsim.core.config.ConfigWriter;
 import org.matsim.core.controler.Controler;
 import org.matsim.core.controler.ControllerUtils;
-import org.matsim.core.controler.OutputDirectoryHierarchy;
 import org.matsim.core.controler.OutputDirectoryHierarchy.OverwriteFileSetting;
 import org.matsim.core.network.NetworkUtils;
 import org.matsim.core.population.PopulationUtils;
-import org.matsim.core.population.routes.NetworkRoute;
-import org.matsim.core.scenario.ScenarioUtils;
-import org.matsim.core.utils.collections.CollectionUtils;
 import org.matsim.facilities.FacilitiesUtils;
 import org.matsim.simwrapper.SimWrapperConfigGroup;
 import org.matsim.utils.DresdenUtils;
 
-import java.io.PrintWriter;
-import java.io.StringWriter;
-import java.net.MalformedURLException;
-import java.net.URI;
-import java.net.URL;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.Collections;
-import java.util.List;
 import java.util.Set;
-import java.util.function.Function;
-
-import static org.matsim.core.config.groups.ReplanningConfigGroup.StrategySettings;
-import static org.matsim.core.replanning.strategies.DefaultPlanStrategiesModule.DefaultStrategy;
 
 public final class DresdenModelBridgeKN extends DresdenModel {
 	// "final": for the time being, please try to avoid inheritance from inheritance.  kai, dec'25
@@ -64,7 +43,7 @@ public final class DresdenModelBridgeKN extends DresdenModel {
 				"--iterations", nIterations,
 				"--output", "./output/bridge_more4_c_kn_" + pct + "pct" + nIterations + "it",
 				"--runId", "",
-				"--emissions", DresdenUtils.FunctionalityHandling.DISABLED.name(),
+				"--emissions", DresdenUtils.EmissionsAnalysisHandling.NO_EMISSIONS_ANALYSIS.name(),
 				"--generate-dashboards=false",
 
 				// CLI params processed by standard MATSim:

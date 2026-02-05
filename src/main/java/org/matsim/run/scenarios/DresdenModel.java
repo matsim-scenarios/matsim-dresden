@@ -76,8 +76,8 @@ public class DresdenModel extends MATSimApplication {
 	@CommandLine.Mixin
 	private final SampleOptions sample = new SampleOptions(100, 25, 10, 1);
 
-	@CommandLine.Option(names = "--emissions", defaultValue = "ENABLED", description = "Define if emission analysis should be performed or not.")
-	DresdenUtils.FunctionalityHandling emissions;
+	@CommandLine.Option(names = "--emissions", defaultValue = "RUN_EMISSIONS_ANALYSIS", description = "Define if emission analysis should be performed or not. Options: RUN_EMISSIONS_ANALYSIS, NO_EMISSIONS_ANALYSIS")
+	EmissionsAnalysisHandling emissions;
 
 	@CommandLine.Option(names = "--explicit-walk-intermodality", defaultValue = "ENABLED", description = "Define if explicit walk intermodality parameter to/from pt should be set or not (use default).")
 	static DresdenUtils.FunctionalityHandling explicitWalkIntermodality;
@@ -222,7 +222,7 @@ public class DresdenModel extends MATSimApplication {
 			setExplicitIntermodalityParamsForWalkToPt(ConfigUtils.addOrGetModule(config, SwissRailRaptorConfigGroup.class));
 		}
 
-		if (emissions == DresdenUtils.FunctionalityHandling.ENABLED) {
+		if (emissions == EmissionsAnalysisHandling.RUN_EMISSIONS_ANALYSIS) {
 //		set hbefa input files for emission analysis
 			setEmissionsConfigs(config);
 		}
@@ -250,7 +250,7 @@ public class DresdenModel extends MATSimApplication {
 			}
 		}
 
-		if (emissions == FunctionalityHandling.ENABLED) {
+		if (emissions == EmissionsAnalysisHandling.RUN_EMISSIONS_ANALYSIS) {
 //			prepare hbefa link attributes + make link.getType() handable for OsmHbefaMapping
 //			this also happens in makefile pipeline. integrating it here for same reason as above.
 			PrepareNetwork.prepareEmissionsAttributes(scenario.getNetwork());
