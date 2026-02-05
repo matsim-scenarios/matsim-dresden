@@ -5,21 +5,13 @@ import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.core.config.Configurator;
-import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.Scenario;
-import org.matsim.api.core.v01.network.Link;
 import org.matsim.application.MATSimApplication;
 import org.matsim.core.config.Config;
 import org.matsim.core.controler.Controler;
 import org.matsim.core.controler.ControllerUtils;
 import org.matsim.core.controler.OutputDirectoryHierarchy.OverwriteFileSetting;
-import org.matsim.core.network.NetworkUtils;
-import org.matsim.core.population.PopulationUtils;
-import org.matsim.facilities.FacilitiesUtils;
 import org.matsim.simwrapper.SimWrapperConfigGroup;
-import org.matsim.utils.DresdenUtils;
-
-import java.util.Set;
 
 public final class DresdenModel4Moritz extends DresdenModel {
 	// "final": for the time being, please try to avoid inheritance from inheritance.  kai, dec'25
@@ -49,7 +41,7 @@ public final class DresdenModel4Moritz extends DresdenModel {
 				// CLI params processed by standard MATSim:
 				"--config:global.numberOfThreads", "4",
 				"--config:qsim.numberOfThreads", "4",
-				"--config:simwrapper.defaultDashboards", SimWrapperConfigGroup.Mode.disabled.name() // yyyy make enum and config option of same name
+				"--config:simwrapper.defaultDashboards", SimWrapperConfigGroup.DefaultDashboardsMode.disabled.name() // yyyy make enum and config option of same name
 			};
 		}
 

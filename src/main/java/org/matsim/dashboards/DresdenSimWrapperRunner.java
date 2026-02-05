@@ -99,7 +99,7 @@ public final class DresdenSimWrapperRunner implements MATSimAppCommand {
 				simwrapperCfg.get("").setShp(shp.getShapeFile());
 			}
 			//skip default dashboards
-			simwrapperCfg.setDefaultDashboards(SimWrapperConfigGroup.Mode.disabled);
+			simwrapperCfg.setDefaultDashboards( SimWrapperConfigGroup.DefaultDashboardsMode.disabled );
 
 			//add dashboards according to command line parameters
 //			if more dashboards are to be added here, we need to check if noise==true before adding noise dashboard here

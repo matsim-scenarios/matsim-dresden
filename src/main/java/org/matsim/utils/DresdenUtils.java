@@ -1,17 +1,31 @@
 package org.matsim.utils;
 
 import ch.sbb.matsim.config.SwissRailRaptorConfigGroup;
+import ch.sbb.matsim.config.SwissRailRaptorConfigGroup.IntermodalAccessEgressModeSelection;
+import ch.sbb.matsim.config.SwissRailRaptorConfigGroup.IntermodalAccessEgressParameterSet;
+import com.google.common.collect.Sets;
 import org.matsim.api.core.v01.Scenario;
 import org.matsim.api.core.v01.TransportMode;
 import org.matsim.contrib.emissions.HbefaVehicleCategory;
 import org.matsim.contrib.emissions.utils.EmissionsConfigGroup;
+import org.matsim.contrib.emissions.utils.EmissionsConfigGroup.DetailedVsAverageLookupBehavior;
+import org.matsim.contrib.emissions.utils.EmissionsConfigGroup.HbefaTableConsistencyCheckingLevel;
+import org.matsim.contrib.vsp.scenario.HbefaDefaultStrings;
 import org.matsim.core.config.Config;
 import org.matsim.core.config.ConfigUtils;
+import org.matsim.core.config.groups.ReplanningConfigGroup;
+import org.matsim.core.config.groups.ScoringConfigGroup;
+import org.matsim.core.replanning.strategies.DefaultPlanStrategiesModule;
 import org.matsim.vehicles.EngineInformation;
 import org.matsim.vehicles.VehicleType;
 import org.matsim.vehicles.VehicleUtils;
 
+import java.util.HashSet;
 import java.util.Set;
+
+import static org.matsim.contrib.vsp.scenario.HbefaDefaultStrings.*;
+import static org.matsim.utils.DresdenUtils.SNZPersonAttributeNames.*;
+import static org.matsim.utils.DresdenUtils.SNZPersonAttributeNames.*;
 
 /**
  * Utils class for Dresden scenario with often used parameters and/or methods.
@@ -26,12 +40,6 @@ public final class DresdenUtils {
 	public static final String COM_SERVICE_SUBPOP = "commercialPersonTraffic_service";
 	public static final String GOODS_SUBPOP = "goodsTraffic";
 
-	//	To decrypt hbefa input files set MATSIM_DECRYPTION_PASSWORD as environment variable. ask VSP for access.
-	public static final String HBEFA_2020_PATH = "https://svn.vsp.tu-berlin.de/repos/public-svn/3507bb3997e5657ab9da76dbedbb13c9b5991d3e/0e73947443d68f95202b71a156b337f7f71604ae/";
-	public static final String HBEFA_FILE_COLD_DETAILED = HBEFA_2020_PATH + "82t7b02rc0rji2kmsahfwp933u2rfjlkhfpi2u9r20.enc";
-	public static final String HBEFA_FILE_WARM_DETAILED = HBEFA_2020_PATH + "944637571c833ddcf1d0dfcccb59838509f397e6.enc";
-	public static final String HBEFA_FILE_COLD_AVERAGE = HBEFA_2020_PATH + "r9230ru2n209r30u2fn0c9rn20n2rujkhkjhoewt84202.enc" ;
-	public static final String HBEFA_FILE_WARM_AVERAGE = HBEFA_2020_PATH + "7eff8f308633df1b8ac4d06d05180dd0c5fdf577.enc";
 	private static final String AVERAGE = "average";
 
 	private DresdenUtils() {
@@ -53,10 +61,10 @@ public final class DresdenUtils {
 
 	public static void setExplicitIntermodalityParamsForWalkToPt(SwissRailRaptorConfigGroup srrConfig) {
 		srrConfig.setUseIntermodalAccessEgress(true);
-		srrConfig.setIntermodalAccessEgressModeSelection(SwissRailRaptorConfigGroup.IntermodalAccessEgressModeSelection.CalcLeastCostModePerStop);
+		srrConfig.setIntermodalAccessEgressModeSelection( IntermodalAccessEgressModeSelection.CalcLeastCostModePerStop );
 
 //			add walk as access egress mode to pt
-		SwissRailRaptorConfigGroup.IntermodalAccessEgressParameterSet accessEgressWalkParam = new SwissRailRaptorConfigGroup.IntermodalAccessEgressParameterSet();
+		IntermodalAccessEgressParameterSet accessEgressWalkParam = new IntermodalAccessEgressParameterSet();
 		accessEgressWalkParam.setMode(TransportMode.walk);
 //			initial radius for pt stop search
 		accessEgressWalkParam.setInitialSearchRadius(10000);
@@ -68,12 +76,12 @@ public final class DresdenUtils {
 
 	public static void setEmissionsConfigs(Config config) {
 		EmissionsConfigGroup eConfig = ConfigUtils.addOrGetModule(config, EmissionsConfigGroup.class);
-		eConfig.setDetailedColdEmissionFactorsFile(HBEFA_FILE_COLD_DETAILED);
+		eConfig.setDetailedColdEmissionFactorsFile( HBEFA_FILE_COLD_DETAILED );
 		eConfig.setDetailedWarmEmissionFactorsFile(HBEFA_FILE_WARM_DETAILED);
 		eConfig.setAverageColdEmissionFactorsFile(HBEFA_FILE_COLD_AVERAGE);
 		eConfig.setAverageWarmEmissionFactorsFile(HBEFA_FILE_WARM_AVERAGE);
-		eConfig.setHbefaTableConsistencyCheckingLevel(EmissionsConfigGroup.HbefaTableConsistencyCheckingLevel.consistent);
-		eConfig.setDetailedVsAverageLookupBehavior(EmissionsConfigGroup.DetailedVsAverageLookupBehavior.tryDetailedThenTechnologyAverageThenAverageTable);
+		eConfig.setHbefaTableConsistencyCheckingLevel( HbefaTableConsistencyCheckingLevel.consistent );
+		eConfig.setDetailedVsAverageLookupBehavior( DetailedVsAverageLookupBehavior.tryDetailedThenTechnologyAverageThenAverageTable );
 	}
 
 	/**
@@ -188,4 +196,58 @@ public final class DresdenUtils {
 	 * Switch on/off analysis on trips and creation of trips dashboard.
 	 */
 	public enum TripsAnalysisHandling {RUN_TRIPS_ANALYSIS, NO_TRIPS_ANALYSIS}
+	/**
+	 * Prepare the config for commercial traffic.
+	 */
+	public static void prepareCommercialTrafficConfig( Config config ) {
+
+		getFreightModes().forEach(mode -> {
+			ScoringConfigGroup.ModeParams thisModeParams = new ScoringConfigGroup.ModeParams(mode);
+			config.scoring().addModeParams(thisModeParams);
+		});
+
+		Set<String> qsimModes = new HashSet<>(config.qsim().getMainModes());
+		config.qsim().setMainModes( Sets.union(qsimModes, getFreightModes() ) );
+		config.routing().setNetworkModes(Sets.union( new HashSet<>( config.routing().getNetworkModes() ), getFreightModes() ) );
+
+		config.scoring().addActivityParams(new ScoringConfigGroup.ActivityParams("commercial_start").setTypicalDuration(30 * 60.));
+		config.scoring().addActivityParams(new ScoringConfigGroup.ActivityParams("commercial_end").setTypicalDuration(30 * 60.));
+		config.scoring().addActivityParams(new ScoringConfigGroup.ActivityParams("service").setTypicalDuration(30 * 60.));
+		config.scoring().addActivityParams(new ScoringConfigGroup.ActivityParams("start").setTypicalDuration(30 * 60.));
+		config.scoring().addActivityParams(new ScoringConfigGroup.ActivityParams("end").setTypicalDuration(30 * 60.));
+		config.scoring().addActivityParams(new ScoringConfigGroup.ActivityParams("freight_start").setTypicalDuration(30 * 60.));
+		config.scoring().addActivityParams(new ScoringConfigGroup.ActivityParams("freight_end").setTypicalDuration(30 * 60.));
+
+//		replanning strategies for small scale commercial traffic
+		for (String subpopulation : getSmallScaleComSubpops()) {
+
+			config.replanning().addStrategySettings( new ReplanningConfigGroup.StrategySettings()
+					.setStrategyName( DefaultPlanStrategiesModule.DefaultSelector.ChangeExpBeta )
+					.setWeight(0.85)
+					.setSubpopulation(subpopulation)
+			);
+
+			config.replanning().addStrategySettings( new ReplanningConfigGroup.StrategySettings()
+					.setStrategyName( DefaultPlanStrategiesModule.DefaultStrategy.ReRoute )
+					.setWeight(0.1)
+					.setSubpopulation(subpopulation)
+			);
+		}
+
+//		replanning strategies for longDistanceFreight
+		config.replanning().addStrategySettings( new ReplanningConfigGroup.StrategySettings()
+				.setStrategyName(DefaultPlanStrategiesModule.DefaultSelector.ChangeExpBeta)
+				.setWeight(0.95)
+				.setSubpopulation(LONG_DIST_FREIGHT_SUBPOP)
+		);
+		config.replanning().addStrategySettings( new ReplanningConfigGroup.StrategySettings()
+				.setStrategyName( DefaultPlanStrategiesModule.DefaultStrategy.ReRoute )
+				.setWeight(0.05)
+				.setSubpopulation(LONG_DIST_FREIGHT_SUBPOP)
+		);
+
+//		analyze travel times for all qsim main modes
+		config.travelTimeCalculator().setAnalyzedModes(Sets.union(qsimModes, getFreightModes()));
+
+	}
 }
