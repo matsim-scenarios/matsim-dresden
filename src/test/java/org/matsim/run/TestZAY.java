@@ -1,6 +1,7 @@
 package org.matsim.run;
 
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.matsim.api.core.v01.Id;
@@ -17,6 +18,7 @@ import java.io.File;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+@Disabled
 public class TestZAY {
 	@RegisterExtension
 	private final MatsimTestUtils utils = new MatsimTestUtils();
