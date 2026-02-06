@@ -49,7 +49,7 @@ import picocli.CommandLine;
 import playground.vsp.scoring.IncomeDependentUtilityOfMoneyPersonScoringParameters;
 
 import static java.lang.Double.*;
-import static org.matsim.utils.DresdenUtils.*;
+import static org.matsim.run.scenarios.DresdenUtils.*;
 
 @CommandLine.Command(header = ":: Dresden Scenario ::", version = DresdenModel.VERSION, mixinStandardHelpOptions = true)
 @MATSimApplication.Prepare({
@@ -75,12 +75,17 @@ public class DresdenModel extends MATSimApplication {
 		MATSimApplication.execute(DresdenModel.class, args);
 	}
 
+	protected void addScoringParams( Config config ) {
+		// yyyy need to find a way to remove the existing scoring params; then this can be programmed without inheritance
+		SnzActivities.addScoringParams(config);
+	}
+
 	@Nullable
 	@Override
 	protected Config prepareConfig(Config config) {
 
 		// Add all activity types with time bins
-		SnzActivities.addScoringParams(config);
+		this.addScoringParams( config );
 
 		//		add simwrapper config module
 		ConfigUtils.addOrGetModule(config, SimWrapperConfigGroup.class).defaultParams().setContext("").setMapCenter("14.5,51.53").setMapZoomLevel(6.8)

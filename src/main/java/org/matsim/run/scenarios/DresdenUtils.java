@@ -1,4 +1,4 @@
-package org.matsim.utils;
+package org.matsim.run.scenarios;
 
 import ch.sbb.matsim.config.SwissRailRaptorConfigGroup;
 import ch.sbb.matsim.config.SwissRailRaptorConfigGroup.IntermodalAccessEgressModeSelection;
@@ -10,7 +10,6 @@ import org.matsim.contrib.emissions.HbefaVehicleCategory;
 import org.matsim.contrib.emissions.utils.EmissionsConfigGroup;
 import org.matsim.contrib.emissions.utils.EmissionsConfigGroup.DetailedVsAverageLookupBehavior;
 import org.matsim.contrib.emissions.utils.EmissionsConfigGroup.HbefaTableConsistencyCheckingLevel;
-import org.matsim.contrib.vsp.scenario.HbefaDefaultStrings;
 import org.matsim.core.config.Config;
 import org.matsim.core.config.ConfigUtils;
 import org.matsim.core.config.groups.ReplanningConfigGroup;
@@ -23,9 +22,10 @@ import org.matsim.vehicles.VehicleUtils;
 import java.util.HashSet;
 import java.util.Set;
 
+import static ch.sbb.matsim.config.SwissRailRaptorConfigGroup.IntermodalAccessEgressModeSelection.*;
 import static org.matsim.contrib.vsp.scenario.HbefaDefaultStrings.*;
-import static org.matsim.utils.DresdenUtils.SNZPersonAttributeNames.*;
-import static org.matsim.utils.DresdenUtils.SNZPersonAttributeNames.*;
+import static org.matsim.contrib.vsp.scenario.SubpopulationDefaultNames.*;
+import static org.matsim.run.scenarios.DresdenUtils.SNZPersonAttributeNames.*;
 
 /**
  * Utils class for Dresden scenario with often used parameters and/or methods.
@@ -36,9 +36,6 @@ public final class DresdenUtils {
 	public static final String LIGHT_MODE = "truck8t";
 
 	public static final String LONG_DIST_FREIGHT_SUBPOP = "longDistanceFreight";
-	public static final String COM_SUBPOP = "commercialPersonTraffic";
-	public static final String COM_SERVICE_SUBPOP = "commercialPersonTraffic_service";
-	public static final String GOODS_SUBPOP = "goodsTraffic";
 
 	private static final String AVERAGE = "average";
 
@@ -47,8 +44,7 @@ public final class DresdenUtils {
 	}
 
 	public static Set<String> getSNZPersonAttrNames() {
-		return Set.of(SNZPersonAttributeNames.HH_INCOME, SNZPersonAttributeNames.HOME_REGIOSTAR_17, SNZPersonAttributeNames.HH_SIZE, SNZPersonAttributeNames.AGE,
-			SNZPersonAttributeNames.PT_TICKET, SNZPersonAttributeNames.CAR_AVAILABILITY, SNZPersonAttributeNames.GENDER);
+		return Set.of( HH_INCOME, HOME_REGIOSTAR_17, HH_SIZE, AGE, PT_TICKET, CAR_AVAILABILITY, GENDER);
 	}
 
 	public static Set<String> getFreightModes() {
@@ -56,12 +52,12 @@ public final class DresdenUtils {
 	}
 
 	public static Set<String> getSmallScaleComSubpops() {
-		return Set.of(COM_SUBPOP, COM_SERVICE_SUBPOP, GOODS_SUBPOP);
+		return Set.of( SUBPOP_COM_PERSON, SUBPOP_COM_PERSON_SERVICE, SUBPOP_GOODS );
 	}
 
 	public static void setExplicitIntermodalityParamsForWalkToPt(SwissRailRaptorConfigGroup srrConfig) {
 		srrConfig.setUseIntermodalAccessEgress(true);
-		srrConfig.setIntermodalAccessEgressModeSelection( IntermodalAccessEgressModeSelection.CalcLeastCostModePerStop );
+		srrConfig.setIntermodalAccessEgressModeSelection( CalcLeastCostModePerStop );
 
 //			add walk as access egress mode to pt
 		IntermodalAccessEgressParameterSet accessEgressWalkParam = new IntermodalAccessEgressParameterSet();
@@ -141,46 +137,17 @@ public final class DresdenUtils {
 	/**
 	 * original snz attribute names as delivered in personAttributes.xml (shared-svn/projects/agimo).
 	 */
-	public final class SNZPersonAttributeNames {
-		private static final String HH_INCOME = "hhIncome";
-		private static final String HOME_REGIOSTAR_17 = "homeRegioStaR17";
-		private static final String HH_SIZE = "hhSize";
-		private static final String AGE = "age";
-		private static final String PT_TICKET = "ptTicket";
-		private static final String CAR_AVAILABILITY = "carAvailability";
-		private static final String GENDER = "gender";
+	public static final class SNZPersonAttributeNames {
+		public static final String HH_INCOME = "hhIncome";
+		public static final String HOME_REGIOSTAR_17 = "homeRegioStaR17";
+		public static final String HH_SIZE = "hhSize";
+		public static final String AGE = "age";
+		public static final String PT_TICKET = "ptTicket";
+		public static final String CAR_AVAILABILITY = "carAvailability";
+		public static final String GENDER = "gender";
 
-		private SNZPersonAttributeNames() {
-
-		}
-
-		public static String getHhIncomeAttributeName() {
-			return HH_INCOME;
-		}
-		public static String getHomeRegiostar17AttributeName() {
-			return HOME_REGIOSTAR_17;
-		}
-		public static String getHhSizeAttributeName() {
-			return HH_SIZE;
-		}
-		public static String getAgeAttributeName() {
-			return AGE;
-		}
-		public static String getCarAvailabilityAttributeName() {
-			return CAR_AVAILABILITY;
-		}
-		public static String getGenderAttributeName() {
-			return GENDER;
-		}
+		private SNZPersonAttributeNames() { }
 	}
-
-//	/**
-//	 * Helper enum to enable/disable functionalities.
-//	 *
-//	 * @deprecated -- Ich sage zwar immer "bitte enum statt Boolean", aber ein enum, der ein Boolean emuliert, finde ich dann eher noch schlechter; dann doch lieber Boolean.  kai, jan'26
-//	 */
-//	@Deprecated // Ich sage zwar immer "bitte enum statt Boolean", aber ein enum, der ein Boolean emuliert, finde ich dann eher noch schlechter; dann doch lieber Boolean.  kai, jan'26
-//	public enum FunctionalityHandling {ENABLED, DISABLED}
 
 	/**
 	 * Switch on/off automatic analysis on air pollution emissions.

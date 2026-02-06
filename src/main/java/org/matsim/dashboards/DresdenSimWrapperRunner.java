@@ -36,7 +36,7 @@ import org.matsim.simwrapper.SimWrapperConfigGroup;
 import org.matsim.simwrapper.dashboard.EmissionsDashboard;
 import org.matsim.simwrapper.dashboard.NoiseDashboard;
 import org.matsim.simwrapper.dashboard.TripDashboard;
-import org.matsim.utils.DresdenUtils;
+import org.matsim.run.scenarios.DresdenUtils;
 import org.matsim.vehicles.MatsimVehicleWriter;
 import picocli.CommandLine;
 
@@ -47,8 +47,8 @@ import java.nio.file.Path;
 import java.util.List;
 
 import static org.matsim.prepare.PrepareNetwork.prepareEmissionsAttributes;
-import static org.matsim.utils.DresdenUtils.prepareVehicleTypesForEmissionAnalysis;
-import static org.matsim.utils.DresdenUtils.setEmissionsConfigs;
+import static org.matsim.run.scenarios.DresdenUtils.prepareVehicleTypesForEmissionAnalysis;
+import static org.matsim.run.scenarios.DresdenUtils.setEmissionsConfigs;
 
 @CommandLine.Command(
 	name = "simwrapper",
