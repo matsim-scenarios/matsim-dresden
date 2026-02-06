@@ -24,7 +24,7 @@ class RunIntegrationTest {
 	@Disabled  // need to check if this tests something meaningful with the calibrated input plans file hickup.  kai, dec'25
 	void runScenario() {
 		Config config = ConfigUtils.loadConfig(String.format("input/%s/dresden-%s-10pct.config.xml", DresdenModel.VERSION, DresdenModel.VERSION));
-		ConfigUtils.addOrGetModule(config, SimWrapperConfigGroup.class).setDefaultDashboards(SimWrapperConfigGroup.Mode.disabled);
+		ConfigUtils.addOrGetModule(config, SimWrapperConfigGroup.class).setDefaultDashboards( SimWrapperConfigGroup.DefaultDashboardsMode.disabled );
 
 		int code = MATSimApplication.execute(DresdenModel.class, config,
 			"--1pct",
@@ -45,7 +45,7 @@ class RunIntegrationTest {
 	@Disabled  // need to check if this tests something meaningful with the calibrated input plans file hickup.  kai, dec'25
 	void runScenario_fails() {
 		Config config = ConfigUtils.loadConfig(String.format("input/%s/dresden-%s-10pct.config.xml", DresdenModel.VERSION, DresdenModel.VERSION));
-		ConfigUtils.addOrGetModule(config, SimWrapperConfigGroup.class).setDefaultDashboards(SimWrapperConfigGroup.Mode.disabled);
+		ConfigUtils.addOrGetModule(config, SimWrapperConfigGroup.class).setDefaultDashboards( SimWrapperConfigGroup.DefaultDashboardsMode.disabled );
 
 		// start with wrong plans file
 		Assertions.assertThrows(UncheckedIOException.class, () -> MATSimApplication.execute(DresdenModel.class, config,

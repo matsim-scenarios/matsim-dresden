@@ -36,7 +36,7 @@ import org.matsim.simwrapper.SimWrapperConfigGroup;
 import org.matsim.simwrapper.dashboard.EmissionsDashboard;
 import org.matsim.simwrapper.dashboard.NoiseDashboard;
 import org.matsim.simwrapper.dashboard.TripDashboard;
-import org.matsim.utils.DresdenUtils;
+import org.matsim.run.scenarios.DresdenUtils;
 import org.matsim.vehicles.MatsimVehicleWriter;
 import picocli.CommandLine;
 
@@ -47,8 +47,8 @@ import java.nio.file.Path;
 import java.util.List;
 
 import static org.matsim.prepare.PrepareNetwork.prepareEmissionsAttributes;
-import static org.matsim.utils.DresdenUtils.prepareVehicleTypesForEmissionAnalysis;
-import static org.matsim.utils.DresdenUtils.setEmissionsConfigs;
+import static org.matsim.run.scenarios.DresdenUtils.prepareVehicleTypesForEmissionAnalysis;
+import static org.matsim.run.scenarios.DresdenUtils.setEmissionsConfigs;
 
 @CommandLine.Command(
 	name = "simwrapper",
@@ -99,7 +99,7 @@ public final class DresdenSimWrapperRunner implements MATSimAppCommand {
 				simwrapperCfg.get("").setShp(shp.getShapeFile());
 			}
 			//skip default dashboards
-			simwrapperCfg.setDefaultDashboards(SimWrapperConfigGroup.Mode.disabled);
+			simwrapperCfg.setDefaultDashboards( SimWrapperConfigGroup.DefaultDashboardsMode.disabled );
 
 			//add dashboards according to command line parameters
 //			if more dashboards are to be added here, we need to check if noise==true before adding noise dashboard here

@@ -14,7 +14,7 @@ import picocli.CommandLine;
 
 import java.util.Set;
 
-import static org.matsim.utils.DresdenUtils.getFreightModes;
+import static org.matsim.run.scenarios.DresdenUtils.getFreightModes;
 
 @CommandLine.Command(
 		name = "network",
