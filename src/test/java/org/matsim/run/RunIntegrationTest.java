@@ -36,7 +36,6 @@ class RunIntegrationTest {
 	private final MatsimTestUtils utils = new MatsimTestUtils();
 
 	@Test
-	@Disabled  // need to check if this tests something meaningful with the calibrated input plans file hickup.  kai, dec'25
 	void runScenario() {
 		Config config = ConfigUtils.loadConfig(String.format("input/%s/dresden-%s-0.1pct.config.xml", DresdenModel.VERSION, DresdenModel.VERSION));
 
