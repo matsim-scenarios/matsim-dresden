@@ -67,9 +67,21 @@ public class DresdenModel extends MATSimApplication {
 
 	public static final String VERSION = "v1.0";
 
-	@CommandLine.Option(names = "--emissions", defaultValue = "RUN_EMISSIONS_ANALYSIS",
-		description = "Define if emission analysis should be performed or not. Options: RUN_EMISSIONS_ANALYSIS, NO_EMISSIONS_ANALYSIS")
-	private EmissionsAnalysisHandling emissions;
+	@CommandLine.Option(names = "--emissions",
+		description = "Define if emission analysis should be performed or not" )
+	private EmissionsAnalysisHandling emissions = EmissionsAnalysisHandling.RUN_EMISSIONS_ANALYSIS;
+
+	@CommandLine.Option(names="--emissions-from-iteration")
+	private long emissionsFromIteration = 10;
+
+	public DresdenModel(){}
+
+	/**
+	 * This constructor is useful to pass a typed config rather than non-typed cl args.  E.g. for testing.
+	 */
+	public DresdenModel( Config config ) {
+		super( config );
+	}
 
 	public static void main(String[] args) {
 		MATSimApplication.execute(DresdenModel.class, args);
@@ -96,7 +108,7 @@ public class DresdenModel extends MATSimApplication {
 		config.timeAllocationMutator().setMutateAroundInitialEndTimeOnly(false);
 		config.timeAllocationMutator().setAffectingDuration(false);
 
-		config.vspExperimental().setVspDefaultsCheckingLevel( VspDefaultsCheckingLevel.abort );
+//		config.vspExperimental().setVspDefaultsCheckingLevel( VspDefaultsCheckingLevel.abort );
 
 		ScoringConfigGroup scoringConrig = config.scoring();
 		scoringConrig.setPerforming_utils_hr( 6.0 );
