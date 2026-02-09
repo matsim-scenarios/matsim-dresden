@@ -13,10 +13,10 @@
 <!--		<version>2026.0-2026w03</version>-->
 
 		<!-- PR-labelled release -->
-<!--		<version>2026.0-PR4691</version>-->
+		<version>2026.0-PR4697</version>
 
 		<!-- snapshot; ONLY use for "sharing in the IDE" -->
-		<version>2026.0-SNAPSHOT</version>
+<!--		<version>2026.0-SNAPSHOT</version>-->
 	</parent>
 
 	<modelVersion>4.0.0</modelVersion>
