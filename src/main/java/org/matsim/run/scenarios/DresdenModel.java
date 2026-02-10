@@ -178,6 +178,11 @@ public class DresdenModel extends MATSimApplication {
 
 	@Override
 	protected void prepareScenario(Scenario scenario) {
+		// 		fix the allowed modes for Augustus bridge.
+		// The Augustus bridge is only for walk, bike, PT in the reality.
+		// In the MATSim network, however, cars and trucks are allowed.
+		// It is right next to the Carola bridge, we should set it properly to observe the impact of the collapse of the Carola bridge.
+		PrepareNetwork.fixAugustusBridgeAllowedModes(scenario.getNetwork());
 		//		add freight modes of DresdenUtils to network.
 //		this happens in the makefile pipeline already, but we do it here anyways, in case somebody uses a preliminary network.
 		PrepareNetwork.prepareFreightNetwork(scenario.getNetwork());
