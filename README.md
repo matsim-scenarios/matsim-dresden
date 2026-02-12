@@ -3,6 +3,7 @@
 [![build](https://github.com/matsim-scenarios/matsim-dresden/actions/workflows/build.yaml/badge.svg)](https://github.com/matsim-scenarios/matsim-dresden/actions/workflows/build.yaml)
 ![license](https://img.shields.io/github/license/matsim-scenarios/matsim-dresden.svg)
 ![JDK](https://img.shields.io/badge/JDK-21+-green.svg)
+[![DOI](https://zenodo.org/badge/1057095662.svg)](https://doi.org/10.5281/zenodo.18622520)
 
 
 ![MATSim network and agents](matsim-dresden-visualization.png "MATSim network and agents")
