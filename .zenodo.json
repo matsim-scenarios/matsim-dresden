@@ -1,6 +1,6 @@
 {
-    "title": "The MATSim Dresden Scenario",
-    "description": "The MATSim Dresden scenario provides a transport simulation model for the Dresden region using the Multi-Agent Transport Simulation (MATSim) framework.",
+    "title": "The MATSim Open Dresden Scenario",
+    "description": "The MATSim Open Dresden scenario provides a transport simulation model for the Dresden region using the Multi-Agent Transport Simulation (MATSim) framework.",
     "upload_type": "software",
     "access_right": "open",
     "license": "AGPL-3.0-only",
