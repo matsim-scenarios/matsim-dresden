@@ -46,6 +46,7 @@ import org.matsim.core.replanning.annealing.ReplanningAnnealerConfigGroup;
 import org.matsim.core.replanning.strategies.DefaultPlanStrategiesModule;
 import org.matsim.core.scoring.functions.ScoringParametersForPerson;
 import org.matsim.dashboards.DresdenDashboardProvider;
+import org.matsim.facilities.FacilitiesUtils;
 import org.matsim.prepare.*;
 import org.matsim.simwrapper.DashboardProvider;
 import org.matsim.simwrapper.SimWrapperConfigGroup;
@@ -144,10 +145,12 @@ public class DresdenModel extends MATSimApplication {
 			simWrapper.setSampleSize(sample.getSample());
 
 			if (accessibility == FunctionalityHandling.ENABLED){
+				config.facilities().setInputFile("/Users/luchengqi/Desktop/dresden-facilities-merged.xml");
+				config.routing().setRoutingRandomness(0.);
 				AccessibilityConfigGroup accConfig = ConfigUtils.addOrGetModule(config, AccessibilityConfigGroup.class ) ;
-				accConfig.setComputingAccessibilityForMode(Modes4Accessibility.car, true);
+				accConfig.setComputingAccessibilityForMode(Modes4Accessibility.freespeed, true);
 				accConfig.setAreaOfAccessibilityComputation(AccessibilityConfigGroup.AreaOfAccesssibilityComputation.fromShapeFile);
-				accConfig.setShapeFileCellBasedAccessibility("./vvo_tarifzone_10_dresden/v1.0_vvo_tarifzone_10_dresden_utm32n.shp");
+				accConfig.setShapeFileCellBasedAccessibility("/Users/luchengqi/Documents/MATSimScenarios/Dresden/drt-study/shp/v1.0_vvo_tarifzone_10_dresden_utm32n.shp");
 				accConfig.setTileSize_m(2000);
 			}
 
@@ -305,17 +308,18 @@ public class DresdenModel extends MATSimApplication {
 //				This is way more convenient imho.
 					Multibinder.newSetBinder( binder(), DashboardProvider.class ).addBinding().to( DresdenDashboardProvider.class );
 				}
-
-				if (accessibility == FunctionalityHandling.ENABLED){
-					// Add an overriding module for each activity type.
-					for (final String actType : activityTypes) {
-						final AccessibilityModule module = new AccessibilityModule();
-						module.setConsideredActivityType(actType);
-						controler.addOverridingModule(module);
-					}
-				}
 			}
 		});
+
+		if (accessibility == FunctionalityHandling.ENABLED){
+			// Add an overriding module for each activity type.
+			for (final String actType : activityTypes) {
+				final AccessibilityModule module = new AccessibilityModule();
+				module.setConsideredActivityType(actType);
+				controler.addOverridingModule(module);
+			}
+		}
+
 	}
 
 	/**
