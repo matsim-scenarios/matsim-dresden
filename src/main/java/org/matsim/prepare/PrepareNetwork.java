@@ -30,6 +30,38 @@ public class PrepareNetwork implements MATSimAppCommand {
 	@CommandLine.Option(names = "--output", description = "Output path of the prepared network", required = true)
 	private String outputPath;
 
+	@CommandLine.Option(
+		names = "--pt-link-freespeed",
+		description = "Set freespeed (m/s) for PT links (mutually exclusive with --pt-link-min-freespeed and --pt-link-freespeed-factor)"
+	)
+	private Double ptLinkFreespeed;
+
+	@CommandLine.Option(
+		names = "--pt-link-min-freespeed",
+		description = "Set freespeed to at least this value (m/s) for PT links (mutually exclusive with --pt-link-freespeed and --pt-link-freespeed-factor)"
+	)
+	private Double ptLinkMinFreespeed;
+
+	@CommandLine.Option(
+		names = "--pt-link-freespeed-factor",
+		description = "Multiply freespeed for PT links by this factor (mutually exclusive with --pt-link-freespeed and --pt-link-min-freespeed)"
+	)
+	private Double ptLinkFreespeedFactor;
+
+	@CommandLine.Option(
+		names = "--pt-link-id-prefix",
+		description = "Only adjust links with this id prefix (default: pt_)",
+		defaultValue = "pt_"
+	)
+	private String ptLinkIdPrefix;
+
+	@CommandLine.Option(
+		names = "--pt-link-mode",
+		description = "Also adjust links whose allowed modes contain this mode (optional)",
+		defaultValue = ""
+	)
+	private String ptLinkMode;
+
 	public static void main(String[] args) {
 		new PrepareNetwork().execute(args);
 	}
@@ -41,6 +73,7 @@ public class PrepareNetwork implements MATSimAppCommand {
 
 		prepareFreightNetwork(network);
 		prepareEmissionsAttributes(network);
+		adjustPtLinkFreespeedIfConfigured(network);
 
 		NetworkUtils.writeNetwork(network, outputPath);
 
@@ -76,5 +109,60 @@ public class PrepareNetwork implements MATSimAppCommand {
 //		do not use VspHbefaRoadTypeMapping() as it results in almost every road to mapped to "highway"!
 		HbefaRoadTypeMapping roadTypeMapping = OsmHbefaMapping.build();
 		roadTypeMapping.addHbefaMappings(network);
+	}
+
+	private void adjustPtLinkFreespeedIfConfigured(Network network) {
+		int optionCount = 0;
+		if (ptLinkFreespeed != null) optionCount++;
+		if (ptLinkMinFreespeed != null) optionCount++;
+		if (ptLinkFreespeedFactor != null) optionCount++;
+		if (optionCount == 0) return;
+		if (optionCount > 1) {
+			throw new IllegalArgumentException("Use only one of --pt-link-freespeed, --pt-link-min-freespeed, --pt-link-freespeed-factor.");
+		}
+
+		if (ptLinkFreespeed != null && ptLinkFreespeed <= 0) {
+			throw new IllegalArgumentException("--pt-link-freespeed must be > 0");
+		}
+		if (ptLinkMinFreespeed != null && ptLinkMinFreespeed <= 0) {
+			throw new IllegalArgumentException("--pt-link-min-freespeed must be > 0");
+		}
+		if (ptLinkFreespeedFactor != null && ptLinkFreespeedFactor <= 0) {
+			throw new IllegalArgumentException("--pt-link-freespeed-factor must be > 0");
+		}
+
+		String mode = ptLinkMode == null ? "" : ptLinkMode.trim();
+		String prefix = ptLinkIdPrefix == null ? "" : ptLinkIdPrefix.trim();
+
+		int matched = 0;
+		int updated = 0;
+		for (Link link : network.getLinks().values()) {
+			if (!isPtLink(link, prefix, mode)) continue;
+			matched++;
+
+			double original = link.getFreespeed();
+			double next = original;
+			if (ptLinkFreespeed != null) {
+				next = ptLinkFreespeed;
+			} else if (ptLinkMinFreespeed != null) {
+				next = Math.max(original, ptLinkMinFreespeed);
+			} else if (ptLinkFreespeedFactor != null) {
+				next = original * ptLinkFreespeedFactor;
+			}
+
+			if (Double.compare(original, next) != 0) {
+				link.setFreespeed(next);
+				updated++;
+			}
+		}
+
+		log.info("PT link freespeed adjustment done. Matched: {}, updated: {}, mode: '{}', idPrefix: '{}', set: {}, min: {}, factor: {}",
+			matched, updated, mode, prefix, ptLinkFreespeed, ptLinkMinFreespeed, ptLinkFreespeedFactor);
+	}
+
+	private static boolean isPtLink(Link link, String idPrefix, String mode) {
+		boolean matchesPrefix = !idPrefix.isEmpty() && link.getId().toString().startsWith(idPrefix);
+		boolean matchesMode = !mode.isEmpty() && link.getAllowedModes().contains(mode);
+		return matchesPrefix || matchesMode;
 	}
 }
