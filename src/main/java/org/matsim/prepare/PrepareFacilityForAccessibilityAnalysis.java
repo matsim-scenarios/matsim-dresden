@@ -46,7 +46,6 @@ public class PrepareFacilityForAccessibilityAnalysis {
 		osmPoiReader.parseOsmFileAndAddFacilities(osmShopToMatsimTypeMap, OsmKeys.SHOP);
 		osmPoiReader.writeFacilities(facilityFile);
 
-
 		// merge facilities files
 		Config config = ConfigUtils.createConfig();
 		config.facilities().setInputFile(facilityFile);
@@ -69,6 +68,7 @@ public class PrepareFacilityForAccessibilityAnalysis {
 			}
 		}
 
+		// todo improve the output path
 		FacilitiesWriter facilitiesWriter = new FacilitiesWriter(originalFacilities);
 		facilitiesWriter.write("/Users/luchengqi/Documents/MATSimScenarios/Dresden/distortion-study-analysis/dresden-facilities-merged.xml.gz");
 
