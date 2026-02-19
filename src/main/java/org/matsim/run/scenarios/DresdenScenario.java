@@ -131,12 +131,15 @@ public class DresdenScenario extends MATSimApplication {
 			simWrapper.setSampleSize(sample.getSample());
 
 			if (accessibility == FunctionalityHandling.ENABLED){
-				config.facilities().setInputFile("/Users/luchengqi/Desktop/dresden-facilities-merged.xml");
+				config.facilities().setInputFile("/Users/luchengqi/Documents/MATSimScenarios/Dresden/distortion-study-analysis/dresden-facilities-merged.xml.gz");
 				config.routing().setRoutingRandomness(0.);
 				AccessibilityConfigGroup accConfig = ConfigUtils.addOrGetModule(config, AccessibilityConfigGroup.class ) ;
 				accConfig.setComputingAccessibilityForMode(Modes4Accessibility.freespeed, true);
+				accConfig.setComputingAccessibilityForMode(Modes4Accessibility.pt, true);
+				accConfig.setComputingAccessibilityForMode(Modes4Accessibility.teleportedWalk, true);
+				accConfig.setTimeOfDay(List.of(8*3600., 12*3600., 22*3600.));
 				accConfig.setAreaOfAccessibilityComputation(AccessibilityConfigGroup.AreaOfAccesssibilityComputation.fromShapeFile);
-				accConfig.setShapeFileCellBasedAccessibility("/Users/luchengqi/Documents/MATSimScenarios/Dresden/drt-study/shp/v1.0_vvo_tarifzone_10_dresden_utm32n.shp");
+				accConfig.setShapeFileCellBasedAccessibility("/Users/luchengqi/Documents/MATSimScenarios/Dresden/distortion-study-analysis/shp/v1.0_vvo_tarifzone_10_dresden_utm32n.shp");
 				accConfig.setTileSize_m(2000);
 			}
 
