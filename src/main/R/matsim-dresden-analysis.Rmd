@@ -1,0 +1,2190 @@
+---
+title: "MATSim Dresden: Campusbahn (CaBa) Policy Analysis"
+author: "Transport Analytics"
+date: "`r Sys.Date()`"
+output:
+html_document:
+theme: cosmo
+toc: true
+toc_float: true
+toc_depth: 3
+code_folding: hide
+df_print: paged
+fig_width: 12
+fig_height: 7
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = FALSE, warning = FALSE, message = FALSE,
+  fig.align = "center", dpi = 300
+)
+
+library(tidyverse)
+library(data.table)
+library(sf)
+library(scales)
+library(knitr)
+library(kableExtra)
+library(patchwork)
+library(ggalluvial)
+
+# Scale factor: 1% sample -> 100%
+SCALE_FACTOR <- 100
+
+# Marginal utility of money (from MATSim config)
+# Since this = 1.0, the score IS already in EUR
+MARG_UTIL_MONEY <- 1.0
+
+# PT mode labels (legs mode) used for remainer/switcher definitions
+PT_MODES <- c("pt")
+
+# Label helper for group-specific titles/captions (scaled to 100%)
+format_group_label <- function(label, ids) {
+  paste0(label, " (N scaled=", comma(length(ids) * SCALE_FACTOR), ")")
+}
+```
+
+## Different agent groups
+
+- **All agents** in the model
+- **Dresden city residents** (home within VVO Tarifzone 10 shapefile)
+- **Agents within 500m** walking distance of Campusbahn stations
+- **Directly impacted agents (Policy 1)** (Campusbahn users in Policy Case)
+- **Directly impacted agents (Policy 2)** (Campusbahn users in Policy Case 2)
+- **PT remainers (Base + Policy 1)** (use `pt` in base and policy 1)
+- **PT switchers (Base + Policy 1)** (no `pt` in base, `pt` in policy 1)
+- **PT remainers (Base + Policy 2)** (use `pt` in base and policy 2)
+- **PT switchers (Base + Policy 2)** (no `pt` in base, `pt` in policy 2)
+
+**Sample size:** 1% sample -- all absolute numbers are **scaled up to 100%** (x`r SCALE_FACTOR`)
+
+---
+
+## 1. Setup and Data Loading
+
+```{r paths, echo=FALSE}
+wd <- "/Users/mkreuschnervsp/git/claude-test/Rscripts/"
+sample_size <- "1pct" #10pct
+wraparound <-  "none"
+# wraparound <- "splitAndRemoveOpeningTimes"
+
+
+# Directories
+base_dir <- here::here(
+  wd,
+  "output",
+  paste0(sample_size,
+         "-base-ctd-wrap-around-handling-",wraparound,"-it500-20260218")
+)
+policy_dir <- here::here(
+  wd,
+  "output",
+  paste0(sample_size,
+         "-policy-wrap-around-handling-",wraparound,"-it500-20260218")
+)
+
+# File prefixes
+base_prefix <- paste0(sample_size,"-base-ctd-wrap-around-handling-",wraparound,"-it500-20260218")
+policy_prefix <- paste0(sample_size,"-policy-wrap-around-handling-",wraparound,"-it500-20260218")
+
+# --- Optional: Policy Case 2 ---
+# Uncomment and fill in to enable a second policy case comparison
+policy2_dir <- here::here(
+  wd,
+  "output",
+  paste0(sample_size,
+         "-policy-wrap-around-handling-",wraparound,"-it500-routesCleaned-20260218")
+)
+policy2_prefix <- paste0(sample_size,"-policy-wrap-around-handling-",wraparound,"-it500-routesCleaned-20260218")
+
+# Shapefile
+shp_path <- here::here(
+  wd, "shapefile", "vvo_tarifzone_10_dresden",
+  "v1.0_vvo_tarifzone_10_dresden_utm32n.shp"
+)
+```
+
+```{r helper-functions}
+# --- Time parsing: HH:MM:SS to seconds ---
+hms_to_sec <- function(x) {
+  parts <- strsplit(x, ":")
+  sapply(parts, function(p) {
+    sum(as.numeric(p) * c(3600, 60, 1))
+  })
+}
+
+# --- Prepare trips data with numeric columns ---
+prep_trips <- function(df) {
+  df %>%
+    mutate(
+      trav_time_s = hms_to_sec(trav_time),
+      dep_time_s  = hms_to_sec(dep_time),
+      dep_time_h  = dep_time_s / 3600,
+      trav_time_min = trav_time_s / 60,
+      dist_km = as.numeric(traveled_distance) / 1000,
+      speed_kmh = ifelse(trav_time_s > 0, dist_km / (trav_time_s / 3600), NA)
+    )
+}
+
+# --- Prepare legs data with numeric columns ---
+prep_legs <- function(df) {
+  df %>%
+    mutate(
+      trav_time_s = hms_to_sec(trav_time),
+      dep_time_s  = hms_to_sec(dep_time),
+      dep_time_h  = dep_time_s / 3600,
+      trav_time_min = trav_time_s / 60,
+      dist_km = as.numeric(distance) / 1000,
+      speed_kmh = ifelse(trav_time_s > 0, dist_km / (trav_time_s / 3600), NA)
+    )
+}
+
+# --- Modal split by trips (main_mode) ---
+calc_trip_modal_split <- function(base_t, policy_t, person_ids,
+                                  policy2_t = NULL,
+                                  policy_label  = "Policy Case",
+                                  policy2_label = "Policy Case 2") {
+  ms_row <- function(df, label) {
+    df %>% filter(person %in% person_ids) %>% count(main_mode, name = "n") %>%
+      mutate(n_scaled = n * SCALE_FACTOR, share = n / sum(n) * 100, scenario = label)
+  }
+  result <- bind_rows(ms_row(base_t, "Base Case"), ms_row(policy_t, policy_label))
+  if (!is.null(policy2_t)) result <- bind_rows(result, ms_row(policy2_t, policy2_label))
+  result
+}
+
+# --- Modal split by legs (mode) ---
+calc_leg_modal_split <- function(base_l, policy_l, person_ids,
+                                 policy2_l = NULL,
+                                 policy_label  = "Policy Case",
+                                 policy2_label = "Policy Case 2") {
+  ms_row <- function(df, label) {
+    df %>% filter(person %in% person_ids) %>% count(mode, name = "n") %>%
+      mutate(n_scaled = n * SCALE_FACTOR, share = n / sum(n) * 100, scenario = label)
+  }
+  result <- bind_rows(ms_row(base_l, "Base Case"), ms_row(policy_l, policy_label))
+  if (!is.null(policy2_l)) result <- bind_rows(result, ms_row(policy2_l, policy2_label))
+  result
+}
+
+# --- Mode statistics (distance, time, speed) ---
+calc_mode_stats <- function(base_t, policy_t, person_ids,
+                            policy2_t = NULL,
+                            policy_label  = "Policy Case",
+                            policy2_label = "Policy Case 2") {
+  compute <- function(df, label) {
+    df %>%
+      filter(person %in% person_ids) %>%
+      group_by(main_mode) %>%
+      summarise(
+        n_trips       = n(),
+        avg_dist_km   = mean(dist_km,       na.rm = TRUE),
+        avg_time_min  = mean(trav_time_min,  na.rm = TRUE),
+        avg_speed_kmh = mean(speed_kmh,      na.rm = TRUE),
+        .groups = "drop"
+      ) %>%
+      mutate(scenario = label)
+  }
+  result <- bind_rows(compute(base_t, "Base Case"), compute(policy_t, policy_label))
+  if (!is.null(policy2_t)) result <- bind_rows(result, compute(policy2_t, policy2_label))
+  result
+}
+
+# --- Plot modal split (supports 2 or 3 scenarios) ---
+SCENARIO_COLORS <- c(
+  "Base Case"     = "#3b82f6",
+  "Policy Case"   = "#22c55e",
+  "Policy Case 2" = "#f97316"
+)
+
+plot_modal_split <- function(ms_data, title_text, x_var = "main_mode") {
+  scenarios <- unique(ms_data$scenario)
+  colors    <- SCENARIO_COLORS[names(SCENARIO_COLORS) %in% scenarios]
+  dodge_w   <- ifelse(length(scenarios) == 3, 0.85, 0.8)
+
+  ggplot(ms_data, aes(x = reorder(!!sym(x_var), -share), y = share, fill = scenario)) +
+    geom_col(position = position_dodge(width = dodge_w), width = dodge_w * 0.85) +
+    geom_text(
+      aes(label = sprintf("%.1f%%", share)),
+      position = position_dodge(width = dodge_w), vjust = -0.5, size = 3.2
+    ) +
+    labs(title = title_text, x = "Mode", y = "Share (%)", fill = "Scenario") +
+    scale_fill_manual(values = colors) +
+    theme_minimal(base_size = 13) +
+    theme(
+      plot.title = element_text(face = "bold", size = 15),
+      axis.text.x = element_text(angle = 45, hjust = 1),
+      legend.position = "top"
+    )
+}
+
+# --- Format modal split table (supports 2 or 3 scenarios) ---
+format_modal_split_table <- function(ms_data, mode_col = "main_mode", caption_text) {
+  scenarios <- unique(ms_data$scenario)          # e.g. c("Base Case","Policy Case","Policy Case 2")
+  non_base  <- scenarios[scenarios != "Base Case"]
+
+  ms_wide <- ms_data %>%
+    select(!!sym(mode_col), scenario, n_scaled, share) %>%
+    pivot_wider(names_from = scenario, values_from = c(n_scaled, share), values_fill = 0)
+
+  # Add diff columns (vs Base) for each non-base scenario
+  for (sc in non_base) {
+    ms_wide[[paste0("Diff_", sc, " (pp)")]] <-
+      ms_wide[[paste0("share_", sc)]] - ms_wide[["share_Base Case"]]
+  }
+
+  ms_wide <- ms_wide %>% arrange(desc(.data[["share_Base Case"]]))
+
+  # Build ordered column selection and display names
+  trip_cols  <- c(paste0("n_scaled_Base Case"), paste0("n_scaled_", non_base))
+  share_cols <- c("share_Base Case",            paste0("share_",    non_base))
+  diff_cols  <- paste0("Diff_", non_base, " (pp)")
+
+  out <- ms_wide %>%
+    select(all_of(c(mode_col, trip_cols, share_cols, diff_cols))) %>%
+    mutate(across(all_of(c(share_cols, diff_cols)), ~round(., 2)))
+
+  col_names <- c(
+    "Mode",
+    paste("Trips", c("Base", non_base)),
+    paste("Share", c("Base", non_base), "(%)"),
+    paste("Diff", non_base, "(pp)")
+  )
+
+  kable(out, col.names = col_names,
+        caption = caption_text, format.args = list(big.mark = ",")) %>%
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = FALSE)
+}
+
+# --- Format mode stats table (supports 2 or 3 scenarios) ---
+format_mode_stats_table <- function(stats_data, caption_text) {
+  scenarios <- unique(stats_data$scenario)
+  non_base  <- scenarios[scenarios != "Base Case"]
+
+  stats_wide <- stats_data %>%
+    select(main_mode, scenario, avg_dist_km, avg_time_min, avg_speed_kmh) %>%
+    pivot_wider(names_from = scenario,
+                values_from = c(avg_dist_km, avg_time_min, avg_speed_kmh),
+                values_fill = 0) %>%
+    arrange(desc(`avg_dist_km_Base Case`))
+
+  dist_cols  <- c("avg_dist_km_Base Case",  paste0("avg_dist_km_",  non_base))
+  time_cols  <- c("avg_time_min_Base Case",  paste0("avg_time_min_",  non_base))
+  speed_cols <- c("avg_speed_kmh_Base Case", paste0("avg_speed_kmh_", non_base))
+
+  out <- stats_wide %>%
+    select(main_mode, all_of(c(dist_cols, time_cols, speed_cols))) %>%
+    mutate(across(where(is.numeric), ~round(., 2)))
+
+  col_names <- c(
+    "Mode",
+    paste("Dist", c("Base", non_base), "(km)"),
+    paste("Time", c("Base", non_base), "(min)"),
+    paste("Speed", c("Base", non_base), "(km/h)")
+  )
+
+  kable(out, col.names = col_names,
+        caption = caption_text, format.args = list(big.mark = ",")) %>%
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = FALSE)
+}
+
+# --- Persons analysis data ---
+calc_persons_data <- function(person_ids,
+                              base_persons_df, policy_persons_df,
+                              base_trips_df, policy_trips_df,
+                              base_money_df, policy_money_df) {
+  # Scores
+  scores <- inner_join(
+    base_persons_df %>%
+      filter(person %in% person_ids, subpopulation == "person") %>%
+      select(person, score_base = executed_score),
+    policy_persons_df %>%
+      filter(person %in% person_ids) %>%
+      select(person, score_policy = executed_score),
+    by = "person"
+  ) %>%
+    mutate(
+      score_diff = score_policy - score_base,
+      monetarized_diff_eur = score_diff / MARG_UTIL_MONEY
+    )
+
+  # Travel time per person
+  tt <- full_join(
+    base_trips_df %>% filter(person %in% person_ids) %>%
+      group_by(person) %>% summarise(tt_base_s = sum(trav_time_s, na.rm = TRUE), .groups = "drop"),
+    policy_trips_df %>% filter(person %in% person_ids) %>%
+      group_by(person) %>% summarise(tt_policy_s = sum(trav_time_s, na.rm = TRUE), .groups = "drop"),
+    by = "person"
+  ) %>%
+    mutate(
+      tt_base_s = replace_na(tt_base_s, 0),
+      tt_policy_s = replace_na(tt_policy_s, 0),
+      tt_diff_s = tt_policy_s - tt_base_s,
+      tt_diff_min = tt_diff_s / 60
+    )
+
+  # Money per person
+  money <- full_join(
+    base_money_df %>% filter(person %in% person_ids) %>%
+      group_by(person) %>% summarise(money_base = sum(amount, na.rm = TRUE), .groups = "drop"),
+    policy_money_df %>% filter(person %in% person_ids) %>%
+      group_by(person) %>% summarise(money_policy = sum(amount, na.rm = TRUE), .groups = "drop"),
+    by = "person"
+  ) %>%
+    mutate(
+      money_base = replace_na(money_base, 0),
+      money_policy = replace_na(money_policy, 0),
+      money_diff = money_policy - money_base
+    )
+
+  # Join all
+  result <- scores %>%
+    left_join(tt, by = "person") %>%
+    left_join(money, by = "person") %>%
+    left_join(
+      policy_persons_df %>%
+        filter(subpopulation == "person") %>%
+        select(person, income, hhIncome, home_x, home_y, age, sex),
+      by = "person"
+    )
+
+  result
+}
+```
+
+```{r load-data}
+# --- Trips ---
+base_trips <- fread(
+  file.path(base_dir, paste0(base_prefix, ".output_trips.csv.gz")),
+  sep = ";"
+) %>% as_tibble() %>% prep_trips()
+
+policy_trips <- fread(
+  file.path(policy_dir, paste0(policy_prefix, ".output_trips.csv.gz")),
+  sep = ";"
+) %>% as_tibble() %>% prep_trips()
+
+# --- Legs ---
+base_legs <- fread(
+  file.path(base_dir, paste0(base_prefix, ".output_legs.csv.gz")),
+  sep = ";"
+) %>% as_tibble() %>% prep_legs()
+
+policy_legs <- fread(
+  file.path(policy_dir, paste0(policy_prefix, ".output_legs.csv.gz")),
+  sep = ";"
+) %>% as_tibble() %>% prep_legs()
+
+# --- Persons ---
+base_persons <- fread(
+  file.path(base_dir, paste0(base_prefix, ".output_persons.csv.gz")),
+  sep = ";"
+) %>% as_tibble()
+
+policy_persons <- fread(
+  file.path(policy_dir, paste0(policy_prefix, ".output_persons.csv.gz")),
+  sep = ";"
+) %>% as_tibble()
+
+# --- Money Events ---
+base_money <- fread(
+  file.path(base_dir, paste0(base_prefix, ".output_personMoneyEvents.tsv.gz")),
+  sep = ";"
+) %>% as_tibble() %>% mutate(person = as.character(person))
+
+policy_money <- fread(
+  file.path(policy_dir, paste0(policy_prefix, ".output_personMoneyEvents.tsv.gz")),
+  sep = ";"
+) %>% as_tibble() %>% mutate(person = as.character(person))
+
+# --- Shapefile ---
+dresden_zone <- st_read(shp_path, quiet = TRUE) %>% st_transform(25832)
+
+# --- Policy Case 2 ---
+policy2_trips <- fread(
+  file.path(policy2_dir, paste0(policy2_prefix, ".output_trips.csv.gz")), sep = ";"
+) %>% as_tibble() %>% prep_trips()
+policy2_legs <- fread(
+  file.path(policy2_dir, paste0(policy2_prefix, ".output_legs.csv.gz")), sep = ";"
+) %>% as_tibble() %>% prep_legs()
+policy2_persons <- fread(
+  file.path(policy2_dir, paste0(policy2_prefix, ".output_persons.csv.gz")), sep = ";"
+) %>% as_tibble()
+policy2_money <- fread(
+  file.path(policy2_dir, paste0(policy2_prefix, ".output_personMoneyEvents.tsv.gz")), sep = ";"
+) %>% as_tibble() %>% mutate(person = as.character(person))
+```
+
+```{r data-overview, echo=FALSE}
+cat("Base:", base_prefix)
+cat("Policy 1:",policy_prefix)
+cat("Policy 2:",policy2_prefix)
+
+tibble(
+  Dataset           = c("Trips", "Legs", "Persons", "Money Events"),
+  `Base (1%)`       = c(nrow(base_trips),    nrow(base_legs),    nrow(base_persons),    nrow(base_money)),
+  `Policy 1 (1%)`   = c(nrow(policy_trips),  nrow(policy_legs),  nrow(policy_persons),  nrow(policy_money)),
+  `Policy 2 (1%)`   = c(nrow(policy2_trips), nrow(policy2_legs), nrow(policy2_persons), nrow(policy2_money)),
+  `Base (scaled)`   = c(nrow(base_trips),    nrow(base_legs),    nrow(base_persons),    nrow(base_money))    * SCALE_FACTOR,
+  `Policy 1 (scaled)` = c(nrow(policy_trips),  nrow(policy_legs),  nrow(policy_persons),  nrow(policy_money))  * SCALE_FACTOR,
+  `Policy 2 (scaled)` = c(nrow(policy2_trips), nrow(policy2_legs), nrow(policy2_persons), nrow(policy2_money)) * SCALE_FACTOR
+) %>%
+  kable(format.args = list(big.mark = ","),
+        caption = paste0("Loaded datasets overview (scale factor: ", SCALE_FACTOR, "x)")) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = FALSE)
+```
+
+---
+
+## 2. Define Agent Groups
+
+```{r define-groups}
+# --- Group 1: All agents (subpopulation == "person") ---
+all_person_ids <- base_persons %>%
+  filter(subpopulation == "person") %>%
+  pull(person)
+
+cat("Group 1 - All agents (persons):", comma(length(all_person_ids)),
+    "(scaled:", comma(length(all_person_ids) * SCALE_FACTOR), ")\n")
+
+# --- Group 2: Dresden city residents (home in shapefile) ---
+base_homes_sf <- base_persons %>%
+  filter(subpopulation == "person", !is.na(home_x), !is.na(home_y)) %>%
+  st_as_sf(coords = c("home_x", "home_y"), crs = 25832, remove = FALSE)
+
+dresden_person_ids <- base_homes_sf %>%
+  st_filter(dresden_zone, .predicate = st_within) %>%
+  pull(person)
+
+cat("Group 2 - Dresden city residents:", comma(length(dresden_person_ids)),
+    "(scaled:", comma(length(dresden_person_ids) * SCALE_FACTOR), ")\n")
+
+# --- Group 3: Agents within 500m of Campusbahn stations ---
+# Extract all unique CaBa stop positions from policy legs
+caba_access_stops <- policy_legs %>%
+  filter(transit_line %in% c("CaBaEW", "CaBaWE")) %>%
+  select(stop = access_stop_id, x = start_x, y = start_y) %>%
+  distinct(stop, .keep_all = TRUE)
+
+caba_egress_stops <- policy_legs %>%
+  filter(transit_line %in% c("CaBaEW", "CaBaWE")) %>%
+  select(stop = egress_stop_id, x = end_x, y = end_y) %>%
+  distinct(stop, .keep_all = TRUE)
+
+caba_all_stops <- bind_rows(caba_access_stops, caba_egress_stops) %>%
+  distinct(stop, .keep_all = TRUE)
+
+caba_stops_sf <- st_as_sf(caba_all_stops, coords = c("x", "y"), crs = 25832)
+
+# Create 500m buffer and union
+caba_buffer_500m <- caba_stops_sf %>%
+  st_buffer(500) %>%
+  st_union()
+
+buffer_person_ids <- base_homes_sf %>%
+  st_filter(caba_buffer_500m, .predicate = st_within) %>%
+  pull(person)
+
+cat("Group 3 - Within 500m of CaBa stations:", comma(length(buffer_person_ids)),
+    "(scaled:", comma(length(buffer_person_ids) * SCALE_FACTOR), ")\n")
+cat("  Number of unique CaBa stops:", nrow(caba_all_stops), "\n")
+
+# --- Group 4: CaBa users (directly impacted, Policy 1) ---
+caba_user_p1_ids <- policy_legs %>%
+  filter(transit_line %in% c("CaBaEW", "CaBaWE")) %>%
+  pull(person) %>%
+  unique()
+
+cat("Group 4 - CaBa users (Policy 1):", comma(length(caba_user_p1_ids)),
+    "(scaled:", comma(length(caba_user_p1_ids) * SCALE_FACTOR), ")\n")
+
+# --- Group 5: CaBa users (directly impacted, Policy 2) ---
+caba_user_p2_ids <- policy2_legs %>%
+  filter(transit_line %in% c("CaBaEW", "CaBaWE")) %>%
+  pull(person) %>%
+  unique()
+
+cat("Group 5 - CaBa users (Policy 2):", comma(length(caba_user_p2_ids)),
+    "(scaled:", comma(length(caba_user_p2_ids) * SCALE_FACTOR), ")\n")
+
+# --- Group 5: PT remainers (pt leg in base AND policy 1) ---
+base_pt_users <- base_legs %>%
+  filter(mode %in% PT_MODES) %>%
+  pull(person) %>%
+  unique() %>%
+  intersect(all_person_ids)
+
+policy_pt_users <- policy_legs %>%
+  filter(mode %in% PT_MODES) %>%
+  pull(person) %>%
+  unique() %>%
+  intersect(all_person_ids)
+
+policy2_pt_users <- policy2_legs %>%
+  filter(mode %in% PT_MODES) %>%
+  pull(person) %>%
+  unique() %>%
+  intersect(all_person_ids)
+
+pt_remain_p1_ids <- intersect(base_pt_users, policy_pt_users)
+pt_remain_p2_ids <- intersect(base_pt_users, policy2_pt_users)
+
+cat("Group 6 - PT remainers (pt leg in base + policy 1):", comma(length(pt_remain_p1_ids)),
+    "(scaled:", comma(length(pt_remain_p1_ids) * SCALE_FACTOR), ")\n")
+
+# --- Group 6: PT switchers (policy 1 pt leg, base non-pt) ---
+pt_switch_p1_ids <- setdiff(policy_pt_users, base_pt_users)
+
+cat("Group 7 - PT switchers (policy 1 pt leg only):", comma(length(pt_switch_p1_ids)),
+    "(scaled:", comma(length(pt_switch_p1_ids) * SCALE_FACTOR), ")\n")
+
+cat("Group 8 - PT remainers (pt leg in base + policy 2):", comma(length(pt_remain_p2_ids)),
+    "(scaled:", comma(length(pt_remain_p2_ids) * SCALE_FACTOR), ")\n")
+
+# --- Group 8: PT switchers (policy 2 pt leg, base non-pt) ---
+pt_switch_p2_ids <- setdiff(policy2_pt_users, base_pt_users)
+
+cat("Group 9 - PT switchers (policy 2 pt leg only):", comma(length(pt_switch_p2_ids)),
+    "(scaled:", comma(length(pt_switch_p2_ids) * SCALE_FACTOR), ")\n")
+```
+
+```{r group-summary-table}
+group_summary <- tibble(
+  Group = c("All Agents", "Dresden City (Shapefile)",
+            "500m CaBa Stations", "CaBa Users (Policy 1)", "CaBa Users (Policy 2)",
+            "PT Remainers (Base + Policy 1)",
+            "PT Switchers (Base + Policy 1)",
+            "PT Remainers (Base + Policy 2)",
+            "PT Switchers (Base + Policy 2)"),
+  `N (1%)` = c(length(all_person_ids), length(dresden_person_ids),
+               length(buffer_person_ids), length(caba_user_p1_ids), length(caba_user_p2_ids),
+               length(pt_remain_p1_ids), length(pt_switch_p1_ids),
+               length(pt_remain_p2_ids), length(pt_switch_p2_ids)),
+  `N (scaled)` = `N (1%)` * SCALE_FACTOR
+)
+
+kable(group_summary, format.args = list(big.mark = ","),
+      caption = "Agent groups for analysis") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+```
+
+```{r group-labels}
+caba_p1_label <- format_group_label("CaBa Users (Policy 1)", caba_user_p1_ids)
+caba_p2_label <- format_group_label("CaBa Users (Policy 2)", caba_user_p2_ids)
+pt_remain_p1_label <- format_group_label("PT Remainers (Base + Policy 1)", pt_remain_p1_ids)
+pt_switch_p1_label <- format_group_label("PT Switchers (Base + Policy 1)", pt_switch_p1_ids)
+pt_remain_p2_label <- format_group_label("PT Remainers (Base + Policy 2)", pt_remain_p2_ids)
+pt_switch_p2_label <- format_group_label("PT Switchers (Base + Policy 2)", pt_switch_p2_ids)
+```
+
+```{r group-map, fig.height=9, fig.cap="Agent group home locations and CaBa station 500m buffer"}
+ggplot() +
+  geom_sf(data = dresden_zone, fill = "gray90", color = "gray40", linewidth = 0.8) +
+  geom_sf(data = caba_buffer_500m, fill = "#f59e0b", alpha = 0.3, color = "#f59e0b", linewidth = 0.5) +
+  geom_sf(data = caba_stops_sf, color = "#ef4444", size = 3, shape = 17) +
+  geom_point(
+    data = base_persons %>% filter(person %in% caba_user_p1_ids, !is.na(home_x), !is.na(home_y)),
+    aes(x = home_x, y = home_y), color = "#22c55e", size = 1.5, alpha = 0.7
+  ) +
+  geom_point(
+    data = base_persons %>% filter(person %in% caba_user_p2_ids, !is.na(home_x), !is.na(home_y)),
+    aes(x = home_x, y = home_y), color = "#3b82f6", size = 1.5, alpha = 0.7
+  ) +
+  labs(
+    title = "CaBa Stations (red triangles), 500m Buffer (orange), Users (green=P1, blue=P2)",
+    subtitle = paste0("Dresden city boundary shown in gray | ",
+                      nrow(caba_all_stops), " CaBa stops"),
+    caption = "Zone: VVO Tarifzone 10"
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(plot.title = element_text(face = "bold", size = 14))
+```
+
+---
+
+## 3. Trips Analysis {.tabset .tabset-pills}
+
+```{r case overview3}
+cat("Base:", base_prefix)
+cat("Policy 1:",policy_prefix)
+cat("Policy 2:",policy2_prefix)
+```
+
+### All Agents
+
+```{r trips-all-modal-trips}
+ms_all_trips <- calc_trip_modal_split(base_trips, policy_trips, all_person_ids, policy2_trips)
+format_modal_split_table(ms_all_trips, "main_mode",
+                         "Modal Split by Trips (main_mode) -- All Agents (scaled)")
+```
+
+```{r trips-all-modal-trips-plot, fig.cap="Modal split by trips -- All Agents"}
+plot_modal_split(ms_all_trips, "Modal Split by Trips (main_mode) -- All Agents")
+```
+
+```{r trips-all-modal-legs}
+ms_all_legs <- calc_leg_modal_split(base_legs, policy_legs, all_person_ids, policy2_legs)
+format_modal_split_table(ms_all_legs, "mode",
+                         "Modal Split by Legs -- All Agents (scaled)")
+```
+
+```{r trips-all-modal-legs-plot, fig.cap="Modal split by legs -- All Agents"}
+plot_modal_split(ms_all_legs, "Modal Split by Legs -- All Agents", x_var = "mode")
+```
+
+```{r trips-all-stats}
+stats_all <- calc_mode_stats(base_trips, policy_trips, all_person_ids, policy2_trips)
+format_mode_stats_table(stats_all, "Average Distance, Time, Speed by Mode -- All Agents")
+```
+
+```{r trips-all-stats-plot, fig.height=9, fig.cap="Mode statistics comparison -- All Agents"}
+stats_all_long <- stats_all %>%
+  pivot_longer(cols = c(avg_dist_km, avg_time_min, avg_speed_kmh),
+               names_to = "metric", values_to = "value") %>%
+  mutate(metric = recode(metric,
+                         "avg_dist_km" = "Avg. Distance (km)",
+                         "avg_time_min" = "Avg. Travel Time (min)",
+                         "avg_speed_kmh" = "Avg. Speed (km/h)"
+  ))
+
+ggplot(stats_all_long, aes(x = reorder(main_mode, -value), y = value, fill = scenario)) +
+  geom_col(position = position_dodge(width = 0.85), width = 0.72) +
+  facet_wrap(~metric, scales = "free_y", ncol = 1) +
+  labs(title = "Mode Statistics -- All Agents", x = "Mode", y = NULL, fill = "Scenario") +
+  scale_fill_manual(values = SCENARIO_COLORS) +
+  theme_minimal(base_size = 13) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "top",
+    strip.text = element_text(face = "bold", size = 12)
+  )
+```
+
+### Dresden City (Shapefile)
+
+```{r trips-dd-modal-trips}
+ms_dd_trips <- calc_trip_modal_split(base_trips, policy_trips, dresden_person_ids, policy2_trips)
+format_modal_split_table(ms_dd_trips, "main_mode",
+                         "Modal Split by Trips (main_mode) -- Dresden City (scaled)")
+```
+
+```{r trips-dd-modal-trips-plot, fig.cap="Modal split by trips -- Dresden City"}
+plot_modal_split(ms_dd_trips, "Modal Split by Trips (main_mode) -- Dresden City")
+```
+
+```{r trips-dd-modal-legs}
+ms_dd_legs <- calc_leg_modal_split(base_legs, policy_legs, dresden_person_ids, policy2_legs)
+format_modal_split_table(ms_dd_legs, "mode",
+                         "Modal Split by Legs -- Dresden City (scaled)")
+```
+
+```{r trips-dd-modal-legs-plot, fig.cap="Modal split by legs -- Dresden City"}
+plot_modal_split(ms_dd_legs, "Modal Split by Legs -- Dresden City", x_var = "mode")
+```
+
+```{r trips-dd-stats}
+stats_dd <- calc_mode_stats(base_trips, policy_trips, dresden_person_ids, policy2_trips)
+format_mode_stats_table(stats_dd, "Average Distance, Time, Speed by Mode -- Dresden City")
+```
+
+```{r trips-dd-stats-plot, fig.height=9, fig.cap="Mode statistics comparison -- Dresden City"}
+stats_dd_long <- stats_dd %>%
+  pivot_longer(cols = c(avg_dist_km, avg_time_min, avg_speed_kmh),
+               names_to = "metric", values_to = "value") %>%
+  mutate(metric = recode(metric,
+                         "avg_dist_km" = "Avg. Distance (km)",
+                         "avg_time_min" = "Avg. Travel Time (min)",
+                         "avg_speed_kmh" = "Avg. Speed (km/h)"
+  ))
+
+ggplot(stats_dd_long, aes(x = reorder(main_mode, -value), y = value, fill = scenario)) +
+  geom_col(position = position_dodge(width = 0.85), width = 0.72) +
+  facet_wrap(~metric, scales = "free_y", ncol = 1) +
+  labs(title = "Mode Statistics -- Dresden City", x = "Mode", y = NULL, fill = "Scenario") +
+  scale_fill_manual(values = SCENARIO_COLORS) +
+  theme_minimal(base_size = 13) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "top",
+    strip.text = element_text(face = "bold", size = 12)
+  )
+```
+
+### 500m CaBa Stations
+
+```{r trips-buf-modal-trips}
+ms_buf_trips <- calc_trip_modal_split(base_trips, policy_trips, buffer_person_ids, policy2_trips)
+format_modal_split_table(ms_buf_trips, "main_mode",
+                         "Modal Split by Trips (main_mode) -- 500m CaBa Buffer (scaled)")
+```
+
+```{r trips-buf-modal-trips-plot, fig.cap="Modal split by trips -- 500m CaBa Buffer"}
+plot_modal_split(ms_buf_trips, "Modal Split by Trips (main_mode) -- 500m CaBa Buffer")
+```
+
+```{r trips-buf-modal-legs}
+ms_buf_legs <- calc_leg_modal_split(base_legs, policy_legs, buffer_person_ids, policy2_legs)
+format_modal_split_table(ms_buf_legs, "mode",
+                         "Modal Split by Legs -- 500m CaBa Buffer (scaled)")
+```
+
+```{r trips-buf-modal-legs-plot, fig.cap="Modal split by legs -- 500m CaBa Buffer"}
+plot_modal_split(ms_buf_legs, "Modal Split by Legs -- 500m CaBa Buffer", x_var = "mode")
+```
+
+```{r trips-buf-stats}
+stats_buf <- calc_mode_stats(base_trips, policy_trips, buffer_person_ids, policy2_trips)
+format_mode_stats_table(stats_buf, "Average Distance, Time, Speed by Mode -- 500m CaBa Buffer")
+```
+
+```{r trips-buf-stats-plot, fig.height=9, fig.cap="Mode statistics comparison -- 500m CaBa Buffer"}
+stats_buf_long <- stats_buf %>%
+  pivot_longer(cols = c(avg_dist_km, avg_time_min, avg_speed_kmh),
+               names_to = "metric", values_to = "value") %>%
+  mutate(metric = recode(metric,
+                         "avg_dist_km" = "Avg. Distance (km)",
+                         "avg_time_min" = "Avg. Travel Time (min)",
+                         "avg_speed_kmh" = "Avg. Speed (km/h)"
+  ))
+
+ggplot(stats_buf_long, aes(x = reorder(main_mode, -value), y = value, fill = scenario)) +
+  geom_col(position = position_dodge(width = 0.85), width = 0.72) +
+  facet_wrap(~metric, scales = "free_y", ncol = 1) +
+  labs(title = "Mode Statistics -- 500m CaBa Buffer", x = "Mode", y = NULL, fill = "Scenario") +
+  scale_fill_manual(values = SCENARIO_COLORS) +
+  theme_minimal(base_size = 13) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "top",
+    strip.text = element_text(face = "bold", size = 12)
+  )
+```
+
+### CaBa Users (Policy 1)
+
+```{r trips-caba-p1-modal-trips}
+ms_caba_p1_trips <- calc_trip_modal_split(base_trips, policy_trips, caba_user_p1_ids)
+format_modal_split_table(ms_caba_p1_trips, "main_mode",
+                         paste("Modal Split by Trips (main_mode) --", caba_p1_label))
+```
+
+```{r trips-caba-p1-modal-trips-plot, fig.cap="Modal split by trips -- CaBa Users (Policy 1)"}
+plot_modal_split(ms_caba_p1_trips, paste("Modal Split by Trips (main_mode) --", caba_p1_label))
+```
+
+```{r trips-caba-p1-modal-legs}
+ms_caba_p1_legs <- calc_leg_modal_split(base_legs, policy_legs, caba_user_p1_ids)
+format_modal_split_table(ms_caba_p1_legs, "mode",
+                         paste("Modal Split by Legs --", caba_p1_label))
+```
+
+```{r trips-caba-p1-modal-legs-plot, fig.cap="Modal split by legs -- CaBa Users (Policy 1)"}
+plot_modal_split(ms_caba_p1_legs, paste("Modal Split by Legs --", caba_p1_label), x_var = "mode")
+```
+
+```{r trips-caba-p1-stats}
+stats_caba_p1 <- calc_mode_stats(base_trips, policy_trips, caba_user_p1_ids)
+format_mode_stats_table(stats_caba_p1, paste("Average Distance, Time, Speed by Mode --", caba_p1_label))
+```
+
+```{r trips-caba-p1-stats-plot, fig.height=9, fig.cap="Mode statistics comparison -- CaBa Users (Policy 1)"}
+stats_caba_p1_long <- stats_caba_p1 %>%
+  pivot_longer(cols = c(avg_dist_km, avg_time_min, avg_speed_kmh),
+               names_to = "metric", values_to = "value") %>%
+  mutate(metric = recode(metric,
+                         "avg_dist_km" = "Avg. Distance (km)",
+                         "avg_time_min" = "Avg. Travel Time (min)",
+                         "avg_speed_kmh" = "Avg. Speed (km/h)"
+  ))
+
+ggplot(stats_caba_p1_long, aes(x = reorder(main_mode, -value), y = value, fill = scenario)) +
+  geom_col(position = position_dodge(width = 0.85), width = 0.72) +
+  facet_wrap(~metric, scales = "free_y", ncol = 1) +
+  labs(title = paste("Mode Statistics --", caba_p1_label), x = "Mode", y = NULL, fill = "Scenario") +
+  scale_fill_manual(values = SCENARIO_COLORS) +
+  theme_minimal(base_size = 13) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "top",
+    strip.text = element_text(face = "bold", size = 12)
+  )
+```
+
+### CaBa Users (Policy 2)
+
+```{r trips-caba-p2-modal-trips}
+ms_caba_p2_trips <- calc_trip_modal_split(
+  base_trips, policy2_trips, caba_user_p2_ids,
+  policy2_t = NULL, policy_label = "Policy Case 2"
+)
+format_modal_split_table(ms_caba_p2_trips, "main_mode",
+                         paste("Modal Split by Trips (main_mode) --", caba_p2_label))
+```
+
+```{r trips-caba-p2-modal-trips-plot, fig.cap="Modal split by trips -- CaBa Users (Policy 2)"}
+plot_modal_split(ms_caba_p2_trips, paste("Modal Split by Trips (main_mode) --", caba_p2_label))
+```
+
+```{r trips-caba-p2-modal-legs}
+ms_caba_p2_legs <- calc_leg_modal_split(
+  base_legs, policy2_legs, caba_user_p2_ids,
+  policy2_l = NULL, policy_label = "Policy Case 2"
+)
+format_modal_split_table(ms_caba_p2_legs, "mode",
+                         paste("Modal Split by Legs --", caba_p2_label))
+```
+
+```{r trips-caba-p2-modal-legs-plot, fig.cap="Modal split by legs -- CaBa Users (Policy 2)"}
+plot_modal_split(ms_caba_p2_legs, paste("Modal Split by Legs --", caba_p2_label), x_var = "mode")
+```
+
+```{r trips-caba-p2-stats}
+stats_caba_p2 <- calc_mode_stats(
+  base_trips, policy2_trips, caba_user_p2_ids,
+  policy2_t = NULL, policy_label = "Policy Case 2"
+)
+format_mode_stats_table(stats_caba_p2, paste("Average Distance, Time, Speed by Mode --", caba_p2_label))
+```
+
+```{r trips-caba-p2-stats-plot, fig.height=9, fig.cap="Mode statistics comparison -- CaBa Users (Policy 2)"}
+stats_caba_p2_long <- stats_caba_p2 %>%
+  pivot_longer(cols = c(avg_dist_km, avg_time_min, avg_speed_kmh),
+               names_to = "metric", values_to = "value") %>%
+  mutate(metric = recode(metric,
+                         "avg_dist_km" = "Avg. Distance (km)",
+                         "avg_time_min" = "Avg. Travel Time (min)",
+                         "avg_speed_kmh" = "Avg. Speed (km/h)"
+  ))
+
+ggplot(stats_caba_p2_long, aes(x = reorder(main_mode, -value), y = value, fill = scenario)) +
+  geom_col(position = position_dodge(width = 0.85), width = 0.72) +
+  facet_wrap(~metric, scales = "free_y", ncol = 1) +
+  labs(title = paste("Mode Statistics --", caba_p2_label), x = "Mode", y = NULL, fill = "Scenario") +
+  scale_fill_manual(values = SCENARIO_COLORS) +
+  theme_minimal(base_size = 13) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "top",
+    strip.text = element_text(face = "bold", size = 12)
+  )
+```
+
+### PT Remainers (Base + Policy 1)
+
+```{r trips-pt-remain-p1-modal-trips}
+ms_pt_remain_p1_trips <- calc_trip_modal_split(base_trips, policy_trips, pt_remain_p1_ids)
+format_modal_split_table(ms_pt_remain_p1_trips, "main_mode",
+                         paste("Modal Split by Trips (main_mode) --", pt_remain_p1_label))
+```
+
+```{r trips-pt-remain-p1-modal-trips-plot, fig.cap="Modal split by trips -- PT Remainers (Base + Policy 1)"}
+plot_modal_split(ms_pt_remain_p1_trips, paste("Modal Split by Trips (main_mode) --", pt_remain_p1_label))
+```
+
+```{r trips-pt-remain-p1-modal-legs}
+ms_pt_remain_p1_legs <- calc_leg_modal_split(base_legs, policy_legs, pt_remain_p1_ids)
+format_modal_split_table(ms_pt_remain_p1_legs, "mode",
+                         paste("Modal Split by Legs --", pt_remain_p1_label))
+```
+
+```{r trips-pt-remain-p1-modal-legs-plot, fig.cap="Modal split by legs -- PT Remainers (Base + Policy 1)"}
+plot_modal_split(ms_pt_remain_p1_legs, paste("Modal Split by Legs --", pt_remain_p1_label), x_var = "mode")
+```
+
+```{r trips-pt-remain-p1-stats}
+stats_pt_remain_p1 <- calc_mode_stats(base_trips, policy_trips, pt_remain_p1_ids)
+format_mode_stats_table(stats_pt_remain_p1, paste("Average Distance, Time, Speed by Mode --", pt_remain_p1_label))
+```
+
+```{r trips-pt-remain-p1-stats-plot, fig.height=9, fig.cap="Mode statistics comparison -- PT Remainers (Base + Policy 1)"}
+stats_pt_remain_p1_long <- stats_pt_remain_p1 %>%
+  pivot_longer(cols = c(avg_dist_km, avg_time_min, avg_speed_kmh),
+               names_to = "metric", values_to = "value") %>%
+  mutate(metric = recode(metric,
+                         "avg_dist_km" = "Avg. Distance (km)",
+                         "avg_time_min" = "Avg. Travel Time (min)",
+                         "avg_speed_kmh" = "Avg. Speed (km/h)"
+  ))
+
+ggplot(stats_pt_remain_p1_long, aes(x = reorder(main_mode, -value), y = value, fill = scenario)) +
+  geom_col(position = position_dodge(width = 0.85), width = 0.72) +
+  facet_wrap(~metric, scales = "free_y", ncol = 1) +
+  labs(title = paste("Mode Statistics --", pt_remain_p1_label), x = "Mode", y = NULL, fill = "Scenario") +
+  scale_fill_manual(values = SCENARIO_COLORS) +
+  theme_minimal(base_size = 13) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "top",
+    strip.text = element_text(face = "bold", size = 12)
+  )
+```
+
+### PT Switchers (Base + Policy 1)
+
+```{r trips-pt-switch-p1-modal-trips}
+ms_pt_switch_p1_trips <- calc_trip_modal_split(base_trips, policy_trips, pt_switch_p1_ids)
+format_modal_split_table(ms_pt_switch_p1_trips, "main_mode",
+                         paste("Modal Split by Trips (main_mode) --", pt_switch_p1_label))
+```
+
+```{r trips-pt-switch-p1-modal-trips-plot, fig.cap="Modal split by trips -- PT Switchers (Base + Policy 1)"}
+plot_modal_split(ms_pt_switch_p1_trips, paste("Modal Split by Trips (main_mode) --", pt_switch_p1_label))
+```
+
+```{r trips-pt-switch-p1-modal-legs}
+ms_pt_switch_p1_legs <- calc_leg_modal_split(base_legs, policy_legs, pt_switch_p1_ids)
+format_modal_split_table(ms_pt_switch_p1_legs, "mode",
+                         paste("Modal Split by Legs --", pt_switch_p1_label))
+```
+
+```{r trips-pt-switch-p1-modal-legs-plot, fig.cap="Modal split by legs -- PT Switchers (Base + Policy 1)"}
+plot_modal_split(ms_pt_switch_p1_legs, paste("Modal Split by Legs --", pt_switch_p1_label), x_var = "mode")
+```
+
+```{r trips-pt-switch-p1-stats}
+stats_pt_switch_p1 <- calc_mode_stats(base_trips, policy_trips, pt_switch_p1_ids)
+format_mode_stats_table(stats_pt_switch_p1, paste("Average Distance, Time, Speed by Mode --", pt_switch_p1_label))
+```
+
+```{r trips-pt-switch-p1-stats-plot, fig.height=9, fig.cap="Mode statistics comparison -- PT Switchers (Base + Policy 1)"}
+stats_pt_switch_p1_long <- stats_pt_switch_p1 %>%
+  pivot_longer(cols = c(avg_dist_km, avg_time_min, avg_speed_kmh),
+               names_to = "metric", values_to = "value") %>%
+  mutate(metric = recode(metric,
+                         "avg_dist_km" = "Avg. Distance (km)",
+                         "avg_time_min" = "Avg. Travel Time (min)",
+                         "avg_speed_kmh" = "Avg. Speed (km/h)"
+  ))
+
+ggplot(stats_pt_switch_p1_long, aes(x = reorder(main_mode, -value), y = value, fill = scenario)) +
+  geom_col(position = position_dodge(width = 0.85), width = 0.72) +
+  facet_wrap(~metric, scales = "free_y", ncol = 1) +
+  labs(title = paste("Mode Statistics --", pt_switch_p1_label), x = "Mode", y = NULL, fill = "Scenario") +
+  scale_fill_manual(values = SCENARIO_COLORS) +
+  theme_minimal(base_size = 13) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "top",
+    strip.text = element_text(face = "bold", size = 12)
+  )
+```
+
+### PT Remainers (Base + Policy 2)
+
+```{r trips-pt-remain-p2-modal-trips}
+ms_pt_remain_p2_trips <- calc_trip_modal_split(
+  base_trips, policy2_trips, pt_remain_p2_ids,
+  policy2_t = NULL, policy_label = "Policy Case 2"
+)
+format_modal_split_table(ms_pt_remain_p2_trips, "main_mode",
+                         paste("Modal Split by Trips (main_mode) --", pt_remain_p2_label))
+```
+
+```{r trips-pt-remain-p2-modal-trips-plot, fig.cap="Modal split by trips -- PT Remainers (Base + Policy 2)"}
+plot_modal_split(ms_pt_remain_p2_trips, paste("Modal Split by Trips (main_mode) --", pt_remain_p2_label))
+```
+
+```{r trips-pt-remain-p2-modal-legs}
+ms_pt_remain_p2_legs <- calc_leg_modal_split(
+  base_legs, policy2_legs, pt_remain_p2_ids,
+  policy2_l = NULL, policy_label = "Policy Case 2"
+)
+format_modal_split_table(ms_pt_remain_p2_legs, "mode",
+                         paste("Modal Split by Legs --", pt_remain_p2_label))
+```
+
+```{r trips-pt-remain-p2-modal-legs-plot, fig.cap="Modal split by legs -- PT Remainers (Base + Policy 2)"}
+plot_modal_split(ms_pt_remain_p2_legs, paste("Modal Split by Legs --", pt_remain_p2_label), x_var = "mode")
+```
+
+```{r trips-pt-remain-p2-stats}
+stats_pt_remain_p2 <- calc_mode_stats(
+  base_trips, policy2_trips, pt_remain_p2_ids,
+  policy2_t = NULL, policy_label = "Policy Case 2"
+)
+format_mode_stats_table(stats_pt_remain_p2, paste("Average Distance, Time, Speed by Mode --", pt_remain_p2_label))
+```
+
+```{r trips-pt-remain-p2-stats-plot, fig.height=9, fig.cap="Mode statistics comparison -- PT Remainers (Base + Policy 2)"}
+stats_pt_remain_p2_long <- stats_pt_remain_p2 %>%
+  pivot_longer(cols = c(avg_dist_km, avg_time_min, avg_speed_kmh),
+               names_to = "metric", values_to = "value") %>%
+  mutate(metric = recode(metric,
+                         "avg_dist_km" = "Avg. Distance (km)",
+                         "avg_time_min" = "Avg. Travel Time (min)",
+                         "avg_speed_kmh" = "Avg. Speed (km/h)"
+  ))
+
+ggplot(stats_pt_remain_p2_long, aes(x = reorder(main_mode, -value), y = value, fill = scenario)) +
+  geom_col(position = position_dodge(width = 0.85), width = 0.72) +
+  facet_wrap(~metric, scales = "free_y", ncol = 1) +
+  labs(title = paste("Mode Statistics --", pt_remain_p2_label), x = "Mode", y = NULL, fill = "Scenario") +
+  scale_fill_manual(values = SCENARIO_COLORS) +
+  theme_minimal(base_size = 13) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "top",
+    strip.text = element_text(face = "bold", size = 12)
+  )
+```
+
+### PT Switchers (Base + Policy 2)
+
+```{r trips-pt-switch-p2-modal-trips}
+ms_pt_switch_p2_trips <- calc_trip_modal_split(
+  base_trips, policy2_trips, pt_switch_p2_ids,
+  policy2_t = NULL, policy_label = "Policy Case 2"
+)
+format_modal_split_table(ms_pt_switch_p2_trips, "main_mode",
+                         paste("Modal Split by Trips (main_mode) --", pt_switch_p2_label))
+```
+
+```{r trips-pt-switch-p2-modal-trips-plot, fig.cap="Modal split by trips -- PT Switchers (Base + Policy 2)"}
+plot_modal_split(ms_pt_switch_p2_trips, paste("Modal Split by Trips (main_mode) --", pt_switch_p2_label))
+```
+
+```{r trips-pt-switch-p2-modal-legs}
+ms_pt_switch_p2_legs <- calc_leg_modal_split(
+  base_legs, policy2_legs, pt_switch_p2_ids,
+  policy2_l = NULL, policy_label = "Policy Case 2"
+)
+format_modal_split_table(ms_pt_switch_p2_legs, "mode",
+                         paste("Modal Split by Legs --", pt_switch_p2_label))
+```
+
+```{r trips-pt-switch-p2-modal-legs-plot, fig.cap="Modal split by legs -- PT Switchers (Base + Policy 2)"}
+plot_modal_split(ms_pt_switch_p2_legs, paste("Modal Split by Legs --", pt_switch_p2_label), x_var = "mode")
+```
+
+```{r trips-pt-switch-p2-stats}
+stats_pt_switch_p2 <- calc_mode_stats(
+  base_trips, policy2_trips, pt_switch_p2_ids,
+  policy2_t = NULL, policy_label = "Policy Case 2"
+)
+format_mode_stats_table(stats_pt_switch_p2, paste("Average Distance, Time, Speed by Mode --", pt_switch_p2_label))
+```
+
+```{r trips-pt-switch-p2-stats-plot, fig.height=9, fig.cap="Mode statistics comparison -- PT Switchers (Base + Policy 2)"}
+stats_pt_switch_p2_long <- stats_pt_switch_p2 %>%
+  pivot_longer(cols = c(avg_dist_km, avg_time_min, avg_speed_kmh),
+               names_to = "metric", values_to = "value") %>%
+  mutate(metric = recode(metric,
+                         "avg_dist_km" = "Avg. Distance (km)",
+                         "avg_time_min" = "Avg. Travel Time (min)",
+                         "avg_speed_kmh" = "Avg. Speed (km/h)"
+  ))
+
+ggplot(stats_pt_switch_p2_long, aes(x = reorder(main_mode, -value), y = value, fill = scenario)) +
+  geom_col(position = position_dodge(width = 0.85), width = 0.72) +
+  facet_wrap(~metric, scales = "free_y", ncol = 1) +
+  labs(title = paste("Mode Statistics --", pt_switch_p2_label), x = "Mode", y = NULL, fill = "Scenario") +
+  scale_fill_manual(values = SCENARIO_COLORS) +
+  theme_minimal(base_size = 13) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "top",
+    strip.text = element_text(face = "bold", size = 12)
+  )
+```
+
+## {-}
+
+---
+
+## 4. Persons Analysis {.tabset .tabset-pills}
+
+```{r case overview}
+cat("Base:", base_prefix)
+cat("Policy 1:",policy_prefix)
+cat("Policy 2:",policy2_prefix)
+```
+
+```{r persons-compute-all-groups}
+# Pre-compute persons analysis data for all 8 groups
+pa_all  <- calc_persons_data(all_person_ids,      base_persons, policy_persons,
+                             base_trips, policy_trips, base_money, policy_money)
+pa_dd   <- calc_persons_data(dresden_person_ids,  base_persons, policy_persons,
+                             base_trips, policy_trips, base_money, policy_money)
+pa_buf  <- calc_persons_data(buffer_person_ids,   base_persons, policy_persons,
+                             base_trips, policy_trips, base_money, policy_money)
+pa_caba_p1 <- calc_persons_data(caba_user_p1_ids,  base_persons, policy_persons,
+                                base_trips, policy_trips, base_money, policy_money)
+pa_caba_p2 <- calc_persons_data(caba_user_p2_ids,  base_persons, policy_persons,
+                                base_trips, policy_trips, base_money, policy_money)
+pa_pt_remain_p1 <- calc_persons_data(pt_remain_p1_ids, base_persons, policy_persons,
+                                     base_trips, policy_trips, base_money, policy_money)
+pa_pt_switch_p1 <- calc_persons_data(pt_switch_p1_ids, base_persons, policy_persons,
+                                     base_trips, policy_trips, base_money, policy_money)
+pa_pt_remain_p2 <- calc_persons_data(pt_remain_p2_ids, base_persons, policy_persons,
+                                     base_trips, policy_trips, base_money, policy_money)
+pa_pt_switch_p2 <- calc_persons_data(pt_switch_p2_ids, base_persons, policy_persons,
+                                     base_trips, policy_trips, base_money, policy_money)
+
+# --- Policy Case 2 persons data ---
+pa2_all  <- calc_persons_data(all_person_ids,      base_persons, policy2_persons,
+                              base_trips, policy2_trips, base_money, policy2_money)
+pa2_dd   <- calc_persons_data(dresden_person_ids,  base_persons, policy2_persons,
+                              base_trips, policy2_trips, base_money, policy2_money)
+pa2_buf  <- calc_persons_data(buffer_person_ids,   base_persons, policy2_persons,
+                              base_trips, policy2_trips, base_money, policy2_money)
+pa2_caba_p1 <- calc_persons_data(caba_user_p1_ids,  base_persons, policy2_persons,
+                                 base_trips, policy2_trips, base_money, policy2_money)
+pa2_caba_p2 <- calc_persons_data(caba_user_p2_ids,  base_persons, policy2_persons,
+                                 base_trips, policy2_trips, base_money, policy2_money)
+pa2_pt_remain_p1 <- calc_persons_data(pt_remain_p1_ids, base_persons, policy2_persons,
+                                      base_trips, policy2_trips, base_money, policy2_money)
+pa2_pt_switch_p1 <- calc_persons_data(pt_switch_p1_ids, base_persons, policy2_persons,
+                                      base_trips, policy2_trips, base_money, policy2_money)
+pa2_pt_remain_p2 <- calc_persons_data(pt_remain_p2_ids, base_persons, policy2_persons,
+                                      base_trips, policy2_trips, base_money, policy2_money)
+pa2_pt_switch_p2 <- calc_persons_data(pt_switch_p2_ids, base_persons, policy2_persons,
+                                      base_trips, policy2_trips, base_money, policy2_money)
+
+# --- Reusable rendering functions for persons analysis ---
+
+render_persons_summary <- function(pa, group_name,
+                                   policy_label  = "Policy Case",
+                                   pa_policy2    = NULL,
+                                   policy2_label = "Policy Case 2") {
+  # Helper formatters
+  fmt     <- function(x, d = 3) ifelse(is.na(x), "\u2014", as.character(round(x, d)))
+  fmt_big <- function(x, d = 1) ifelse(is.na(x), "\u2014", comma(round(x, d)))
+
+  # --- Base aggregates ---
+  s_base <- pa %>% summarise(
+    n_scaled    = n() * SCALE_FACTOR,
+    mean_score  = mean(score_base,    na.rm = TRUE),
+    total_score = sum(score_base,     na.rm = TRUE) * SCALE_FACTOR,
+    mean_tt_min = mean(tt_base_s / 60, na.rm = TRUE),
+    total_tt_h  = sum(tt_base_s,      na.rm = TRUE) / 3600 * SCALE_FACTOR,
+    mean_money  = mean(money_base,    na.rm = TRUE),
+    total_money = sum(money_base,     na.rm = TRUE) * SCALE_FACTOR
+  )
+
+  # --- Policy 1 aggregates ---
+  s_pol <- pa %>% summarise(
+    n_scaled    = n() * SCALE_FACTOR,
+    mean_score  = mean(score_policy,    na.rm = TRUE),
+    total_score = sum(score_policy,     na.rm = TRUE) * SCALE_FACTOR,
+    mean_tt_min = mean(tt_policy_s / 60, na.rm = TRUE),
+    total_tt_h  = sum(tt_policy_s,      na.rm = TRUE) / 3600 * SCALE_FACTOR,
+    mean_money  = mean(money_policy,    na.rm = TRUE),
+    total_money = sum(money_policy,     na.rm = TRUE) * SCALE_FACTOR
+  )
+
+  # --- Diff: Policy 1 vs Base ---
+  s_diff <- pa %>% summarise(
+    mean_score_d  = mean(score_diff,    na.rm = TRUE),
+    total_score_d = sum(score_diff,     na.rm = TRUE) * SCALE_FACTOR,
+    mean_tt_d     = mean(tt_diff_min,   na.rm = TRUE),
+    total_tt_d    = sum(tt_diff_s,      na.rm = TRUE) / 3600 * SCALE_FACTOR,
+    mean_money_d  = mean(money_diff,    na.rm = TRUE),
+    total_money_d = sum(money_diff,     na.rm = TRUE) * SCALE_FACTOR,
+    pct_improved  = sum(score_diff > 0, na.rm = TRUE) / n() * 100,
+    pct_worsened  = sum(score_diff < 0, na.rm = TRUE) / n() * 100,
+    pct_unchanged = sum(score_diff == 0, na.rm = TRUE) / n() * 100
+  )
+
+  # --- Build table ---
+  metrics <- c(
+    "Agents (scaled)",
+    "Mean utility score", "Total utility score (scaled)",
+    "Mean travel time (min)", "Total travel time (h, scaled)",
+    "Mean money spent (EUR)", "Total money spent (EUR, scaled)",
+    "Improved (%)", "Worsened (%)", "Unchanged (%)"
+  )
+
+  col_base <- c(
+    fmt_big(s_base$n_scaled, 0),
+    fmt(s_base$mean_score),  fmt_big(s_base$total_score),
+    fmt(s_base$mean_tt_min, 2), fmt_big(s_base$total_tt_h),
+    fmt(s_base$mean_money),  fmt_big(s_base$total_money),
+    "\u2014", "\u2014", "\u2014"
+  )
+  col_pol <- c(
+    fmt_big(s_pol$n_scaled, 0),
+    fmt(s_pol$mean_score),  fmt_big(s_pol$total_score),
+    fmt(s_pol$mean_tt_min, 2), fmt_big(s_pol$total_tt_h),
+    fmt(s_pol$mean_money),  fmt_big(s_pol$total_money),
+    "\u2014", "\u2014", "\u2014"
+  )
+  col_diff <- c(
+    "\u2014",
+    fmt(s_diff$mean_score_d),  fmt_big(s_diff$total_score_d),
+    fmt(s_diff$mean_tt_d, 2),  fmt_big(s_diff$total_tt_d),
+    fmt(s_diff$mean_money_d),  fmt_big(s_diff$total_money_d),
+    fmt(s_diff$pct_improved, 1), fmt(s_diff$pct_worsened, 1), fmt(s_diff$pct_unchanged, 1)
+  )
+
+  tbl <- tibble(Metric = metrics, Base = col_base,
+                !!policy_label := col_pol, Diff = col_diff)
+
+  # --- Optional: Policy Case 2 columns ---
+  if (!is.null(pa_policy2)) {
+    s_pol2 <- pa_policy2 %>% summarise(
+      n_scaled    = n() * SCALE_FACTOR,
+      mean_score  = mean(score_policy,    na.rm = TRUE),
+      total_score = sum(score_policy,     na.rm = TRUE) * SCALE_FACTOR,
+      mean_tt_min = mean(tt_policy_s / 60, na.rm = TRUE),
+      total_tt_h  = sum(tt_policy_s,      na.rm = TRUE) / 3600 * SCALE_FACTOR,
+      mean_money  = mean(money_policy,    na.rm = TRUE),
+      total_money = sum(money_policy,     na.rm = TRUE) * SCALE_FACTOR
+    )
+    s_diff2 <- pa_policy2 %>% summarise(
+      mean_score_d  = mean(score_diff,    na.rm = TRUE),
+      total_score_d = sum(score_diff,     na.rm = TRUE) * SCALE_FACTOR,
+      mean_tt_d     = mean(tt_diff_min,   na.rm = TRUE),
+      total_tt_d    = sum(tt_diff_s,      na.rm = TRUE) / 3600 * SCALE_FACTOR,
+      mean_money_d  = mean(money_diff,    na.rm = TRUE),
+      total_money_d = sum(money_diff,     na.rm = TRUE) * SCALE_FACTOR,
+      pct_improved  = sum(score_diff > 0, na.rm = TRUE) / n() * 100,
+      pct_worsened  = sum(score_diff < 0, na.rm = TRUE) / n() * 100,
+      pct_unchanged = sum(score_diff == 0, na.rm = TRUE) / n() * 100
+    )
+
+    tbl[[policy2_label]] <- c(
+      fmt_big(s_pol2$n_scaled, 0),
+      fmt(s_pol2$mean_score),  fmt_big(s_pol2$total_score),
+      fmt(s_pol2$mean_tt_min, 2), fmt_big(s_pol2$total_tt_h),
+      fmt(s_pol2$mean_money),  fmt_big(s_pol2$total_money),
+      "\u2014", "\u2014", "\u2014"
+    )
+    tbl[["Diff 2"]] <- c(
+      "\u2014",
+      fmt(s_diff2$mean_score_d),  fmt_big(s_diff2$total_score_d),
+      fmt(s_diff2$mean_tt_d, 2),  fmt_big(s_diff2$total_tt_d),
+      fmt(s_diff2$mean_money_d),  fmt_big(s_diff2$total_money_d),
+      fmt(s_diff2$pct_improved, 1), fmt(s_diff2$pct_worsened, 1), fmt(s_diff2$pct_unchanged, 1)
+    )
+  }
+
+  kable(tbl, caption = paste("Persons Analysis Summary --", group_name)) %>%
+    kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+}
+
+render_top_bottom <- function(pa, group_name) {
+  top10 <- pa %>% arrange(desc(score_diff)) %>% head(10) %>%
+    select(person, score_base, score_policy, score_diff, monetarized_diff_eur,
+           tt_diff_min, money_diff, income, age, sex)
+
+  bottom10 <- pa %>% arrange(score_diff) %>% head(10) %>%
+    select(person, score_base, score_policy, score_diff, monetarized_diff_eur,
+           tt_diff_min, money_diff, income, age, sex)
+
+  cat("\n\n**Top 10 Beneficiaries:**\n\n")
+  print(kable(
+    top10, digits = 2,
+    col.names = c("Person", "Base Score", "Policy Score", "Score Diff",
+                  "Monet. (EUR)", "TT Diff (min)", "Money Diff (EUR)",
+                  "Income", "Age", "Sex"),
+    caption = paste("Top 10 beneficiaries --", group_name)
+  ) %>%
+          kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE) %>%
+          column_spec(4, color = "#22c55e", bold = TRUE))
+
+  cat("\n\n**Bottom 10 (Least Benefit / Biggest Losers):**\n\n")
+  print(kable(
+    bottom10, digits = 2,
+    col.names = c("Person", "Base Score", "Policy Score", "Score Diff",
+                  "Monet. (EUR)", "TT Diff (min)", "Money Diff (EUR)",
+                  "Income", "Age", "Sex"),
+    caption = paste("Bottom 10 --", group_name)
+  ) %>%
+          kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE) %>%
+          column_spec(4, color = "#ef4444", bold = TRUE))
+}
+
+render_score_distribution <- function(pa, group_name,
+                                      pa2 = NULL, policy2_label = "Policy Case 2") {
+  if (!is.null(pa2)) {
+    combined <- bind_rows(
+      pa  %>% select(score_diff) %>% mutate(scenario = "Policy Case"),
+      pa2 %>% select(score_diff) %>% mutate(scenario = policy2_label)
+    )
+    p1 <- ggplot(combined, aes(x = score_diff, fill = scenario)) +
+      geom_histogram(bins = 50, alpha = 0.7, position = "identity") +
+      geom_vline(xintercept = 0, linetype = "dashed", color = "gray30") +
+      labs(
+        title = paste("Score Change Distribution --", group_name),
+        subtitle = "Positive = agent benefits from the policy",
+        x = "Score Diff (Policy - Base)", y = "Count", fill = NULL
+      ) +
+      scale_fill_manual(values = setNames(c("#22c55e", "#f97316"), c("Policy Case", policy2_label))) +
+      theme_minimal(base_size = 13) +
+      theme(plot.title = element_text(face = "bold", size = 15), legend.position = "top")
+  } else {
+    p1 <- ggplot(pa, aes(x = score_diff,
+                         fill = ifelse(score_diff >= 0, "Improved", "Worsened"))) +
+      geom_histogram(bins = 50, alpha = 0.8) +
+      geom_vline(xintercept = 0, linetype = "dashed", color = "gray30") +
+      labs(
+        title = paste("Score Change Distribution --", group_name),
+        subtitle = "Positive = agent benefits from the policy",
+        x = "Score Diff (Policy - Base)", y = "Count", fill = NULL
+      ) +
+      scale_fill_manual(values = c("Improved" = "#22c55e", "Worsened" = "#ef4444")) +
+      theme_minimal(base_size = 13) +
+      theme(plot.title = element_text(face = "bold", size = 15), legend.position = "top")
+  }
+  print(p1)
+}
+
+render_waterfall <- function(pa, group_name,
+                             pa2 = NULL, policy2_label = "Policy Case 2") {
+  if (!is.null(pa2)) {
+    combined <- bind_rows(
+      pa  %>% select(score_diff) %>% arrange(score_diff) %>%
+        mutate(rank = row_number() / n(), scenario = "Policy Case"),
+      pa2 %>% select(score_diff) %>% arrange(score_diff) %>%
+        mutate(rank = row_number() / n(), scenario = policy2_label)
+    )
+    p <- ggplot(combined, aes(x = rank, y = score_diff, color = scenario)) +
+      geom_line(linewidth = 0.8, alpha = 0.9) +
+      geom_hline(yintercept = 0, linewidth = 0.8) +
+      labs(
+        title = paste("Score Change per Agent --", group_name),
+        subtitle = "Agents ranked by score diff (percentile)",
+        x = "Agent percentile", y = "Score Diff", color = NULL
+      ) +
+      scale_color_manual(values = setNames(c("#22c55e", "#f97316"), c("Policy Case", policy2_label))) +
+      theme_minimal(base_size = 13) +
+      theme(plot.title = element_text(face = "bold", size = 15), legend.position = "top")
+  } else {
+    pa_sorted <- pa %>% arrange(score_diff) %>% mutate(rank = row_number())
+    p <- ggplot(pa_sorted, aes(x = rank, y = score_diff,
+                               fill = ifelse(score_diff >= 0, "Improved", "Worsened"))) +
+      geom_col(width = 1) +
+      geom_hline(yintercept = 0, linewidth = 0.8) +
+      labs(
+        title = paste("Score Change per Agent --", group_name),
+        subtitle = paste0(sum(pa_sorted$score_diff > 0), " improved | ",
+                          sum(pa_sorted$score_diff < 0), " worsened | ",
+                          sum(pa_sorted$score_diff == 0), " unchanged"),
+        x = "Agent (ranked)", y = "Score Diff", fill = NULL
+      ) +
+      scale_fill_manual(values = c("Improved" = "#22c55e", "Worsened" = "#ef4444")) +
+      theme_minimal(base_size = 13) +
+      theme(plot.title = element_text(face = "bold", size = 15), legend.position = "top")
+  }
+  print(p)
+}
+
+render_travel_time_plot <- function(pa, group_name,
+                                    pa2 = NULL, policy2_label = "Policy Case 2") {
+  if (!is.null(pa2)) {
+    combined <- bind_rows(
+      pa  %>% filter(!is.na(tt_diff_min)) %>% select(tt_diff_min) %>% mutate(scenario = "Policy Case"),
+      pa2 %>% filter(!is.na(tt_diff_min)) %>% select(tt_diff_min) %>% mutate(scenario = policy2_label)
+    )
+    p <- ggplot(combined, aes(x = tt_diff_min, fill = scenario)) +
+      geom_histogram(bins = 50, alpha = 0.7, position = "identity") +
+      geom_vline(xintercept = 0, linetype = "dashed") +
+      labs(
+        title = paste("Travel Time Change Distribution --", group_name),
+        subtitle = "Negative = time saved (beneficial)",
+        x = "Travel Time Diff (min)", y = "Count", fill = NULL
+      ) +
+      scale_fill_manual(values = setNames(c("#22c55e", "#f97316"), c("Policy Case", policy2_label))) +
+      theme_minimal(base_size = 13) +
+      theme(plot.title = element_text(face = "bold", size = 15), legend.position = "top")
+  } else {
+    pa_valid <- pa %>% filter(!is.na(tt_diff_min))
+    p <- ggplot(pa_valid, aes(x = tt_diff_min,
+                              fill = ifelse(tt_diff_min <= 0, "Saved Time", "Lost Time"))) +
+      geom_histogram(bins = 50, alpha = 0.8) +
+      geom_vline(xintercept = 0, linetype = "dashed") +
+      labs(
+        title = paste("Travel Time Change Distribution --", group_name),
+        subtitle = "Negative = time saved (beneficial)",
+        x = "Travel Time Diff (min)", y = "Count", fill = NULL
+      ) +
+      scale_fill_manual(values = c("Saved Time" = "#22c55e", "Lost Time" = "#ef4444")) +
+      theme_minimal(base_size = 13) +
+      theme(plot.title = element_text(face = "bold", size = 15), legend.position = "top")
+  }
+  print(p)
+}
+
+render_money_plot <- function(pa, group_name,
+                              pa2 = NULL, policy2_label = "Policy Case 2") {
+  if (!is.null(pa2)) {
+    combined <- bind_rows(
+      pa  %>% filter(!is.na(money_diff) & money_diff != 0) %>%
+        select(money_diff) %>% mutate(scenario = "Policy Case"),
+      pa2 %>% filter(!is.na(money_diff) & money_diff != 0) %>%
+        select(money_diff) %>% mutate(scenario = policy2_label)
+    )
+    if (nrow(combined) > 0) {
+      p <- ggplot(combined, aes(x = money_diff, fill = scenario)) +
+        geom_histogram(bins = 30, alpha = 0.7, position = "identity") +
+        geom_vline(xintercept = 0, linetype = "dashed") +
+        labs(
+          title = paste("Money Spent Change --", group_name),
+          subtitle = "Negative = spending decreased | Based on PT fare events",
+          x = "Money Diff (EUR)", y = "Count", fill = NULL
+        ) +
+        scale_fill_manual(values = setNames(c("#22c55e", "#f97316"), c("Policy Case", policy2_label))) +
+        theme_minimal(base_size = 13) +
+        theme(plot.title = element_text(face = "bold", size = 15), legend.position = "top")
+      print(p)
+    } else { cat("No money events found for this group.\n") }
+  } else {
+    pa_with_money <- pa %>% filter(!is.na(money_diff) & money_diff != 0)
+    if (nrow(pa_with_money) > 0) {
+      p <- ggplot(pa_with_money, aes(x = money_diff)) +
+        geom_histogram(bins = 30, fill = "#3b82f6", alpha = 0.8) +
+        geom_vline(xintercept = 0, linetype = "dashed") +
+        labs(
+          title = paste("Money Spent Change --", group_name),
+          subtitle = "Negative = spending decreased | Based on PT fare events",
+          x = "Money Diff (EUR)", y = "Count"
+        ) +
+        theme_minimal(base_size = 13) +
+        theme(plot.title = element_text(face = "bold", size = 15))
+      print(p)
+    } else { cat("No money events found for this group.\n") }
+  }
+}
+
+render_income_analysis <- function(pa, group_name) {
+  pa_classified <- pa %>%
+    mutate(
+      group = case_when(
+        score_diff > 0  ~ "Winners",
+        score_diff == 0 ~ "Unchanged",
+        score_diff < 0  ~ "Losers"
+      ),
+      group = factor(group, levels = c("Winners", "Unchanged", "Losers"))
+    )
+
+  income_tbl <- pa_classified %>%
+    group_by(group) %>%
+    summarise(
+      n = n(),
+      n_scaled = n() * SCALE_FACTOR,
+      mean_income = mean(income, na.rm = TRUE),
+      median_income = median(income, na.rm = TRUE),
+      mean_score_diff = mean(score_diff, na.rm = TRUE),
+      .groups = "drop"
+    )
+
+  print(kable(
+    income_tbl, digits = c(0, 0, 0, 0, 0, 2),
+    col.names = c("Group", "N (1%)", "N (scaled)", "Mean Income", "Median Income", "Mean Score Diff"),
+    caption = paste("Income by Winner/Loser --", group_name),
+    format.args = list(big.mark = ",")
+  ) %>%
+          kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE))
+
+  p <- ggplot(pa_classified %>% filter(!is.na(income)),
+              aes(x = group, y = income, fill = group)) +
+    geom_boxplot(width = 0.5, outlier.alpha = 0.3) +
+    labs(
+      title = paste("Income by Winner/Loser Group --", group_name),
+      x = NULL, y = "Monthly Income (EUR)"
+    ) +
+    scale_y_continuous(labels = comma) +
+    scale_fill_manual(values = c("Winners" = "#22c55e", "Unchanged" = "#94a3b8", "Losers" = "#ef4444")) +
+    theme_minimal(base_size = 13) +
+    theme(plot.title = element_text(face = "bold", size = 15), legend.position = "none")
+
+  print(p)
+
+  p2 <- ggplot(pa_classified %>% filter(!is.na(income)),
+               aes(x = income, y = score_diff, color = group)) +
+    geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
+    geom_point(size = 2, alpha = 0.7) +
+    labs(
+      title = paste("Score Change vs. Income --", group_name),
+      x = "Monthly Income (EUR)", y = "Score Diff", color = NULL
+    ) +
+    scale_x_continuous(labels = comma) +
+    scale_color_manual(values = c("Winners" = "#22c55e", "Unchanged" = "#94a3b8", "Losers" = "#ef4444")) +
+    theme_minimal(base_size = 13) +
+    theme(plot.title = element_text(face = "bold", size = 15), legend.position = "top")
+
+  print(p2)
+}
+
+render_home_map <- function(pa, group_name, zone_sf) {
+  pa_sf <- pa %>%
+    filter(!is.na(home_x) & !is.na(home_y)) %>%
+    st_as_sf(coords = c("home_x", "home_y"), crs = 25832)
+
+  p <- ggplot() +
+    geom_sf(data = zone_sf, fill = "gray90", color = "gray40", linewidth = 0.8) +
+    geom_sf(data = pa_sf, aes(color = score_diff), size = 2, alpha = 0.7) +
+    scale_color_gradient2(
+      low = "#ef4444", mid = "gray80", high = "#22c55e", midpoint = 0,
+      name = "Score Diff"
+    ) +
+    labs(
+      title = paste("Home Locations --", group_name),
+      subtitle = "Colour = score change (green = improved, red = worsened)",
+      caption = "Zone: VVO Tarifzone 10"
+    ) +
+    theme_minimal(base_size = 13) +
+    theme(plot.title = element_text(face = "bold", size = 15), legend.position = "right")
+
+  print(p)
+}
+```
+
+### All Agents
+
+```{r persons-all-summary, results='asis'}
+render_persons_summary(pa_all, "All Agents", pa_policy2 = pa2_all)
+```
+
+```{r persons-all-topbottom, results='asis'}
+render_top_bottom(pa_all, "All Agents")
+```
+
+```{r persons-all-score-dist, fig.cap="Score change distribution -- All Agents"}
+render_score_distribution(pa_all, "All Agents", pa2 = pa2_all)
+```
+
+```{r persons-all-waterfall, fig.height=8, fig.cap="Score change per agent -- All Agents"}
+render_waterfall(pa_all, "All Agents", pa2 = pa2_all)
+```
+
+```{r persons-all-tt, fig.cap="Travel time change -- All Agents"}
+render_travel_time_plot(pa_all, "All Agents", pa2 = pa2_all)
+```
+
+```{r persons-all-money, fig.cap="Money spent change -- All Agents"}
+render_money_plot(pa_all, "All Agents", pa2 = pa2_all)
+```
+
+```{r persons-all-income, fig.height=10, results='asis'}
+render_income_analysis(pa_all, "All Agents")
+```
+
+```{r persons-all-map, fig.height=9, fig.cap="Home locations -- All Agents"}
+render_home_map(pa_all, "All Agents", dresden_zone)
+```
+
+### Dresden City (Shapefile)
+
+```{r persons-dd-summary, results='asis'}
+render_persons_summary(pa_dd, "Dresden City", pa_policy2 = pa2_dd)
+```
+
+```{r persons-dd-topbottom, results='asis'}
+render_top_bottom(pa_dd, "Dresden City")
+```
+
+```{r persons-dd-score-dist, fig.cap="Score change distribution -- Dresden City"}
+render_score_distribution(pa_dd, "Dresden City", pa2 = pa2_dd)
+```
+
+```{r persons-dd-waterfall, fig.height=8, fig.cap="Score change per agent -- Dresden City"}
+render_waterfall(pa_dd, "Dresden City", pa2 = pa2_dd)
+```
+
+```{r persons-dd-tt, fig.cap="Travel time change -- Dresden City"}
+render_travel_time_plot(pa_dd, "Dresden City", pa2 = pa2_dd)
+```
+
+```{r persons-dd-money, fig.cap="Money spent change -- Dresden City"}
+render_money_plot(pa_dd, "Dresden City", pa2 = pa2_dd)
+```
+
+```{r persons-dd-income, fig.height=10, results='asis'}
+render_income_analysis(pa_dd, "Dresden City")
+```
+
+```{r persons-dd-map, fig.height=9, fig.cap="Home locations -- Dresden City"}
+render_home_map(pa_dd, "Dresden City", dresden_zone)
+```
+
+### 500m CaBa Stations
+
+```{r persons-buf-summary, results='asis'}
+render_persons_summary(pa_buf, "500m CaBa Buffer", pa_policy2 = pa2_buf)
+```
+
+```{r persons-buf-topbottom, results='asis'}
+render_top_bottom(pa_buf, "500m CaBa Buffer")
+```
+
+```{r persons-buf-score-dist, fig.cap="Score change distribution -- 500m CaBa Buffer"}
+render_score_distribution(pa_buf, "500m CaBa Buffer", pa2 = pa2_buf)
+```
+
+```{r persons-buf-waterfall, fig.height=8, fig.cap="Score change per agent -- 500m CaBa Buffer"}
+render_waterfall(pa_buf, "500m CaBa Buffer", pa2 = pa2_buf)
+```
+
+```{r persons-buf-tt, fig.cap="Travel time change -- 500m CaBa Buffer"}
+render_travel_time_plot(pa_buf, "500m CaBa Buffer", pa2 = pa2_buf)
+```
+
+```{r persons-buf-money, fig.cap="Money spent change -- 500m CaBa Buffer"}
+render_money_plot(pa_buf, "500m CaBa Buffer", pa2 = pa2_buf)
+```
+
+```{r persons-buf-income, fig.height=10, results='asis'}
+render_income_analysis(pa_buf, "500m CaBa Buffer")
+```
+
+```{r persons-buf-map, fig.height=9, fig.cap="Home locations -- 500m CaBa Buffer"}
+render_home_map(pa_buf, "500m CaBa Buffer", dresden_zone)
+```
+
+### CaBa Users (Policy 1)
+
+```{r persons-caba-p1-summary, results='asis'}
+render_persons_summary(pa_caba_p1, caba_p1_label)
+```
+
+```{r persons-caba-p1-topbottom, results='asis'}
+render_top_bottom(pa_caba_p1, caba_p1_label)
+```
+
+```{r persons-caba-p1-score-dist, fig.cap="Score change distribution -- CaBa Users (Policy 1)"}
+render_score_distribution(pa_caba_p1, caba_p1_label)
+```
+
+```{r persons-caba-p1-waterfall, fig.height=8, fig.cap="Score change per agent -- CaBa Users (Policy 1)"}
+render_waterfall(pa_caba_p1, caba_p1_label)
+```
+
+```{r persons-caba-p1-tt, fig.cap="Travel time change -- CaBa Users (Policy 1)"}
+render_travel_time_plot(pa_caba_p1, caba_p1_label)
+```
+
+```{r persons-caba-p1-money, fig.cap="Money spent change -- CaBa Users (Policy 1)"}
+render_money_plot(pa_caba_p1, caba_p1_label)
+```
+
+```{r persons-caba-p1-income, fig.height=10, results='asis'}
+render_income_analysis(pa_caba_p1, caba_p1_label)
+```
+
+```{r persons-caba-p1-map, fig.height=9, fig.cap="Home locations -- CaBa Users (Policy 1)"}
+render_home_map(pa_caba_p1, caba_p1_label, dresden_zone)
+```
+
+### CaBa Users (Policy 2)
+
+```{r persons-caba-p2-summary, results='asis'}
+render_persons_summary(pa2_caba_p2, caba_p2_label, policy_label = "Policy Case 2")
+```
+
+```{r persons-caba-p2-topbottom, results='asis'}
+render_top_bottom(pa2_caba_p2, caba_p2_label)
+```
+
+```{r persons-caba-p2-score-dist, fig.cap="Score change distribution -- CaBa Users (Policy 2)"}
+render_score_distribution(pa2_caba_p2, caba_p2_label)
+```
+
+```{r persons-caba-p2-waterfall, fig.height=8, fig.cap="Score change per agent -- CaBa Users (Policy 2)"}
+render_waterfall(pa2_caba_p2, caba_p2_label)
+```
+
+```{r persons-caba-p2-tt, fig.cap="Travel time change -- CaBa Users (Policy 2)"}
+render_travel_time_plot(pa2_caba_p2, caba_p2_label)
+```
+
+```{r persons-caba-p2-money, fig.cap="Money spent change -- CaBa Users (Policy 2)"}
+render_money_plot(pa2_caba_p2, caba_p2_label)
+```
+
+```{r persons-caba-p2-income, fig.height=10, results='asis'}
+render_income_analysis(pa2_caba_p2, caba_p2_label)
+```
+
+```{r persons-caba-p2-map, fig.height=9, fig.cap="Home locations -- CaBa Users (Policy 2)"}
+render_home_map(pa2_caba_p2, caba_p2_label, dresden_zone)
+```
+
+### PT Remainers (Base + Policy 1)
+
+```{r persons-pt-remain-p1-summary, results='asis'}
+render_persons_summary(pa_pt_remain_p1, pt_remain_p1_label)
+```
+
+```{r persons-pt-remain-p1-topbottom, results='asis'}
+render_top_bottom(pa_pt_remain_p1, pt_remain_p1_label)
+```
+
+```{r persons-pt-remain-p1-score-dist, fig.cap="Score change distribution -- PT Remainers (Base + Policy 1)"}
+render_score_distribution(pa_pt_remain_p1, pt_remain_p1_label)
+```
+
+```{r persons-pt-remain-p1-waterfall, fig.height=8, fig.cap="Score change per agent -- PT Remainers (Base + Policy 1)"}
+render_waterfall(pa_pt_remain_p1, pt_remain_p1_label)
+```
+
+```{r persons-pt-remain-p1-tt, fig.cap="Travel time change -- PT Remainers (Base + Policy 1)"}
+render_travel_time_plot(pa_pt_remain_p1, pt_remain_p1_label)
+```
+
+```{r persons-pt-remain-p1-money, fig.cap="Money spent change -- PT Remainers (Base + Policy 1)"}
+render_money_plot(pa_pt_remain_p1, pt_remain_p1_label)
+```
+
+```{r persons-pt-remain-p1-income, fig.height=10, results='asis'}
+render_income_analysis(pa_pt_remain_p1, pt_remain_p1_label)
+```
+
+```{r persons-pt-remain-p1-map, fig.height=9, fig.cap="Home locations -- PT Remainers (Base + Policy 1)"}
+render_home_map(pa_pt_remain_p1, pt_remain_p1_label, dresden_zone)
+```
+
+### PT Switchers (Base + Policy 1)
+
+```{r persons-pt-switch-p1-summary, results='asis'}
+render_persons_summary(pa_pt_switch_p1, pt_switch_p1_label)
+```
+
+```{r persons-pt-switch-p1-topbottom, results='asis'}
+render_top_bottom(pa_pt_switch_p1, pt_switch_p1_label)
+```
+
+```{r persons-pt-switch-p1-score-dist, fig.cap="Score change distribution -- PT Switchers (Base + Policy 1)"}
+render_score_distribution(pa_pt_switch_p1, pt_switch_p1_label)
+```
+
+```{r persons-pt-switch-p1-waterfall, fig.height=8, fig.cap="Score change per agent -- PT Switchers (Base + Policy 1)"}
+render_waterfall(pa_pt_switch_p1, pt_switch_p1_label)
+```
+
+```{r persons-pt-switch-p1-tt, fig.cap="Travel time change -- PT Switchers (Base + Policy 1)"}
+render_travel_time_plot(pa_pt_switch_p1, pt_switch_p1_label)
+```
+
+```{r persons-pt-switch-p1-money, fig.cap="Money spent change -- PT Switchers (Base + Policy 1)"}
+render_money_plot(pa_pt_switch_p1, pt_switch_p1_label)
+```
+
+```{r persons-pt-switch-p1-income, fig.height=10, results='asis'}
+render_income_analysis(pa_pt_switch_p1, pt_switch_p1_label)
+```
+
+```{r persons-pt-switch-p1-map, fig.height=9, fig.cap="Home locations -- PT Switchers (Base + Policy 1)"}
+render_home_map(pa_pt_switch_p1, pt_switch_p1_label, dresden_zone)
+```
+
+### PT Remainers (Base + Policy 2)
+
+```{r persons-pt-remain-p2-summary, results='asis'}
+render_persons_summary(pa2_pt_remain_p2, pt_remain_p2_label, policy_label = "Policy Case 2")
+```
+
+```{r persons-pt-remain-p2-topbottom, results='asis'}
+render_top_bottom(pa2_pt_remain_p2, pt_remain_p2_label)
+```
+
+```{r persons-pt-remain-p2-score-dist, fig.cap="Score change distribution -- PT Remainers (Base + Policy 2)"}
+render_score_distribution(pa2_pt_remain_p2, pt_remain_p2_label)
+```
+
+```{r persons-pt-remain-p2-waterfall, fig.height=8, fig.cap="Score change per agent -- PT Remainers (Base + Policy 2)"}
+render_waterfall(pa2_pt_remain_p2, pt_remain_p2_label)
+```
+
+```{r persons-pt-remain-p2-tt, fig.cap="Travel time change -- PT Remainers (Base + Policy 2)"}
+render_travel_time_plot(pa2_pt_remain_p2, pt_remain_p2_label)
+```
+
+```{r persons-pt-remain-p2-money, fig.cap="Money spent change -- PT Remainers (Base + Policy 2)"}
+render_money_plot(pa2_pt_remain_p2, pt_remain_p2_label)
+```
+
+```{r persons-pt-remain-p2-income, fig.height=10, results='asis'}
+render_income_analysis(pa2_pt_remain_p2, pt_remain_p2_label)
+```
+
+```{r persons-pt-remain-p2-map, fig.height=9, fig.cap="Home locations -- PT Remainers (Base + Policy 2)"}
+render_home_map(pa2_pt_remain_p2, pt_remain_p2_label, dresden_zone)
+```
+
+### PT Switchers (Base + Policy 2)
+
+```{r persons-pt-switch-p2-summary, results='asis'}
+render_persons_summary(pa2_pt_switch_p2, pt_switch_p2_label, policy_label = "Policy Case 2")
+```
+
+```{r persons-pt-switch-p2-topbottom, results='asis'}
+render_top_bottom(pa2_pt_switch_p2, pt_switch_p2_label)
+```
+
+```{r persons-pt-switch-p2-score-dist, fig.cap="Score change distribution -- PT Switchers (Base + Policy 2)"}
+render_score_distribution(pa2_pt_switch_p2, pt_switch_p2_label)
+```
+
+```{r persons-pt-switch-p2-waterfall, fig.height=8, fig.cap="Score change per agent -- PT Switchers (Base + Policy 2)"}
+render_waterfall(pa2_pt_switch_p2, pt_switch_p2_label)
+```
+
+```{r persons-pt-switch-p2-tt, fig.cap="Travel time change -- PT Switchers (Base + Policy 2)"}
+render_travel_time_plot(pa2_pt_switch_p2, pt_switch_p2_label)
+```
+
+```{r persons-pt-switch-p2-money, fig.cap="Money spent change -- PT Switchers (Base + Policy 2)"}
+render_money_plot(pa2_pt_switch_p2, pt_switch_p2_label)
+```
+
+```{r persons-pt-switch-p2-income, fig.height=10, results='asis'}
+render_income_analysis(pa2_pt_switch_p2, pt_switch_p2_label)
+```
+
+```{r persons-pt-switch-p2-map, fig.height=9, fig.cap="Home locations -- PT Switchers (Base + Policy 2)"}
+render_home_map(pa2_pt_switch_p2, pt_switch_p2_label, dresden_zone)
+```
+
+## {-}
+
+---
+
+## 5. Rule of Half (PT Remainers/Switchers)
+
+```{r case overview2}
+cat("Base:", base_prefix)
+cat("Policy 1:",policy_prefix)
+cat("Policy 2:",policy2_prefix)
+```
+
+```{r rule-of-half}
+roh_group <- function(pa, scenario_label, group_label, weight) {
+  n <- nrow(pa)
+  mean_diff <- mean(pa$monetarized_diff_eur, na.rm = TRUE)
+  total_diff <- sum(pa$monetarized_diff_eur, na.rm = TRUE) * SCALE_FACTOR
+  tibble(
+    Scenario = scenario_label,
+    Group = group_label,
+    `N (1%)` = n,
+    `N (scaled)` = n * SCALE_FACTOR,
+    `Mean Change (EUR)` = mean_diff,
+    `Total Change (EUR, scaled)` = total_diff,
+    `RoH weight` = weight,
+    `RoH Change (EUR, scaled)` = total_diff * weight
+  )
+}
+
+roh_table <- bind_rows(
+  roh_group(pa_pt_remain_p1, "Policy Case", pt_remain_p1_label, 1.0),
+  roh_group(pa_pt_switch_p1, "Policy Case", pt_switch_p1_label, 0.5),
+  roh_group(pa2_pt_remain_p2, "Policy Case 2", pt_remain_p2_label, 1.0),
+  roh_group(pa2_pt_switch_p2, "Policy Case 2", pt_switch_p2_label, 0.5)
+)
+
+roh_summary <- roh_table %>%
+  group_by(Scenario) %>%
+  summarise(
+    `RoH Change (EUR, scaled)` = sum(`RoH Change (EUR, scaled)`, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+kable(roh_table,
+      digits = c(0, 0, 0, 0, 2, 1, 1, 1),
+      caption = "Rule of Half inputs (PT remainers full change, PT switchers half change)",
+      format.args = list(big.mark = ",")) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+
+kable(roh_summary,
+      digits = c(0, 1),
+      caption = "Rule of Half total welfare change (scaled)",
+      format.args = list(big.mark = ",")) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+```
+
+---
+
+## 6. Mode Shift Sankey Diagram (CaBa Users - Policy 1)
+
+```{r sankey-data}
+caba_trips_base <- base_trips %>%
+  filter(person %in% caba_user_p1_ids) %>%
+  select(person, trip_number, mode_base = main_mode)
+
+caba_trips_policy <- policy_trips %>%
+  filter(person %in% caba_user_p1_ids) %>%
+  select(person, trip_number, mode_policy = main_mode)
+
+mode_shifts <- inner_join(caba_trips_base, caba_trips_policy,
+                          by = c("person", "trip_number"))
+
+cat("--- Policy Case 1 ---\n")
+cat("Matched trips for CaBa users:", comma(nrow(mode_shifts)), "\n")
+cat("Trips with mode change:", sum(mode_shifts$mode_base != mode_shifts$mode_policy), "\n")
+cat("Trips unchanged:", sum(mode_shifts$mode_base == mode_shifts$mode_policy), "\n")
+```
+
+```{r sankey-table}
+shift_flows <- mode_shifts %>%
+  count(mode_base, mode_policy, name = "n_trips_1pct") %>%
+  mutate(n_trips_scaled = n_trips_1pct * SCALE_FACTOR,
+         changed = mode_base != mode_policy) %>%
+  arrange(desc(n_trips_1pct))
+
+cat("**Policy Case 1 -- Mode Shift Flows:**\n")
+kable(
+  shift_flows %>% select(-changed),
+  col.names = c("Base Mode", "Policy 1 Mode", "Trips (1%)", "Trips (scaled)"),
+  caption = paste("Policy Case 1: Mode shift flows (trip-level) --", caba_p1_label),
+  format.args = list(big.mark = ",")
+) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE) %>%
+  row_spec(which(shift_flows$changed), background = "#fef3c7")
+```
+
+```{r sankey-plot, fig.height=8, fig.width=12, fig.cap="Mode shift Sankey: CaBa Users (Base -> Policy)"}
+sankey_data <- mode_shifts %>%
+  count(mode_base, mode_policy, name = "freq") %>%
+  mutate(freq_scaled = freq * SCALE_FACTOR)
+
+ggplot(sankey_data,
+       aes(axis1 = mode_base, axis2 = mode_policy, y = freq_scaled)) +
+  geom_alluvium(aes(fill = mode_base), width = 1/5, alpha = 0.7, curve_type = "sigmoid") +
+  geom_stratum(width = 1/5, fill = "gray30", color = "white") +
+  geom_text(stat = "stratum", aes(label = after_stat(stratum)),
+            size = 3.5, color = "white", fontface = "bold") +
+  scale_x_discrete(limits = c("Base Case", "Policy Case"), expand = c(0.15, 0.05)) +
+  scale_fill_brewer(palette = "Set2", name = "Base Mode") +
+  labs(
+    title = paste("Mode Shift Sankey --", caba_p1_label),
+    subtitle = paste0("Trips matched by person + trip number | ",
+                      comma(sum(sankey_data$freq_scaled)), " trips (scaled)"),
+    y = "Number of Trips"
+  ) +
+  scale_y_continuous(labels = comma) +
+  theme_minimal(base_size = 13) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    legend.position = "bottom",
+    axis.text.y = element_blank(),
+    axis.ticks = element_blank(),
+    panel.grid = element_blank()
+  )
+```
+
+```{r sankey-changes-only, fig.height=7, fig.width=12, fig.cap="Policy 1: Mode shifts only (changed trips)"}
+sankey_changed <- sankey_data %>% filter(mode_base != mode_policy)
+
+if (nrow(sankey_changed) > 0) {
+  ggplot(sankey_changed,
+         aes(axis1 = mode_base, axis2 = mode_policy, y = freq_scaled)) +
+    geom_alluvium(aes(fill = mode_base), width = 1/5, alpha = 0.7, curve_type = "sigmoid") +
+    geom_stratum(width = 1/5, fill = "gray30", color = "white") +
+    geom_text(stat = "stratum", aes(label = after_stat(stratum)),
+              size = 3.5, color = "white", fontface = "bold") +
+    scale_x_discrete(limits = c("Base Case", "Policy Case"), expand = c(0.15, 0.05)) +
+    scale_fill_brewer(palette = "Set2", name = "Base Mode") +
+    labs(
+      title = paste("Policy Case 1: Mode Shifts Only --", caba_p1_label),
+      subtitle = paste0(comma(sum(sankey_changed$freq_scaled)), " trips changed mode (scaled)"),
+      y = "Number of Trips"
+    ) +
+    scale_y_continuous(labels = comma) +
+    theme_minimal(base_size = 13) +
+    theme(
+      plot.title = element_text(face = "bold", size = 16),
+      legend.position = "bottom",
+      axis.text.y = element_blank(),
+      axis.ticks = element_blank(),
+      panel.grid = element_blank()
+    )
+} else {
+  cat("No mode changes observed among CaBa users (Policy 1).\n")
+}
+```
+
+---
+
+## 6b. Mode Shift Sankey Diagram (CaBa Users - Policy 2)
+
+```{r sankey-data-p2grp}
+caba_trips_base_p2 <- base_trips %>%
+  filter(person %in% caba_user_p2_ids) %>%
+  select(person, trip_number, mode_base = main_mode)
+
+caba_trips_policy2_p2 <- policy2_trips %>%
+  filter(person %in% caba_user_p2_ids) %>%
+  select(person, trip_number, mode_policy2 = main_mode)
+
+mode_shifts2_p2 <- inner_join(caba_trips_base_p2, caba_trips_policy2_p2,
+                              by = c("person", "trip_number"))
+
+cat("--- Policy Case 2 (Policy 2 User Set) ---\n")
+cat("Matched trips for CaBa users:", comma(nrow(mode_shifts2_p2)), "\n")
+cat("Trips with mode change:", sum(mode_shifts2_p2$mode_base != mode_shifts2_p2$mode_policy2), "\n")
+cat("Trips unchanged:", sum(mode_shifts2_p2$mode_base == mode_shifts2_p2$mode_policy2), "\n")
+```
+
+```{r sankey-table-p2grp}
+shift_flows2_p2 <- mode_shifts2_p2 %>%
+  count(mode_base, mode_policy2, name = "n_trips_1pct") %>%
+  mutate(n_trips_scaled = n_trips_1pct * SCALE_FACTOR,
+         changed = mode_base != mode_policy2) %>%
+  arrange(desc(n_trips_1pct))
+
+cat("**Policy Case 2 -- Mode Shift Flows (Policy 2 User Set):**\n")
+kable(
+  shift_flows2_p2 %>% select(-changed),
+  col.names = c("Base Mode", "Policy 2 Mode", "Trips (1%)", "Trips (scaled)"),
+  caption = paste("Policy Case 2: Mode shift flows (Policy 2 user set) --", caba_p2_label),
+  format.args = list(big.mark = ",")
+) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE) %>%
+  row_spec(which(shift_flows2_p2$changed), background = "#fef3c7")
+```
+
+```{r sankey-policy2-p2grp, fig.height=8, fig.width=12, fig.cap="Policy Case 2: Mode shift Sankey (Policy 2 user set, Base -> Policy 2)"}
+sankey_data2_p2 <- mode_shifts2_p2 %>%
+  count(mode_base, mode_policy2, name = "freq") %>%
+  mutate(freq_scaled = freq * SCALE_FACTOR)
+
+ggplot(sankey_data2_p2,
+       aes(axis1 = mode_base, axis2 = mode_policy2, y = freq_scaled)) +
+  geom_alluvium(aes(fill = mode_base), width = 1/5, alpha = 0.7, curve_type = "sigmoid") +
+  geom_stratum(width = 1/5, fill = "gray30", color = "white") +
+  geom_text(stat = "stratum", aes(label = after_stat(stratum)),
+            size = 3.5, color = "white", fontface = "bold") +
+  scale_x_discrete(limits = c("Base Case", "Policy Case 2"), expand = c(0.15, 0.05)) +
+  scale_fill_brewer(palette = "Set2", name = "Base Mode") +
+  labs(
+    title = paste("Mode Shift Sankey --", caba_p2_label),
+    subtitle = paste0("Trips matched by person + trip number | ",
+                      comma(sum(sankey_data2_p2$freq_scaled)), " trips (scaled)"),
+    y = "Number of Trips"
+  ) +
+  scale_y_continuous(labels = comma) +
+  theme_minimal(base_size = 13) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    legend.position = "bottom",
+    axis.text.y = element_blank(),
+    axis.ticks = element_blank(),
+    panel.grid = element_blank()
+  )
+```
+
+```{r sankey-policy2-changes-only-p2grp, fig.height=7, fig.width=12, fig.cap="Policy 2: Mode shifts only (Policy 2 user set)"}
+sankey_changed2_p2 <- sankey_data2_p2 %>% filter(mode_base != mode_policy2)
+
+if (nrow(sankey_changed2_p2) > 0) {
+  ggplot(sankey_changed2_p2,
+         aes(axis1 = mode_base, axis2 = mode_policy2, y = freq_scaled)) +
+    geom_alluvium(aes(fill = mode_base), width = 1/5, alpha = 0.7, curve_type = "sigmoid") +
+    geom_stratum(width = 1/5, fill = "gray30", color = "white") +
+    geom_text(stat = "stratum", aes(label = after_stat(stratum)),
+              size = 3.5, color = "white", fontface = "bold") +
+    scale_x_discrete(limits = c("Base Case", "Policy Case 2"), expand = c(0.15, 0.05)) +
+    scale_fill_brewer(palette = "Set2", name = "Base Mode") +
+    labs(
+      title = paste("Policy Case 2: Mode Shifts Only --", caba_p2_label),
+      subtitle = paste0(comma(sum(sankey_changed2_p2$freq_scaled)), " trips changed mode (scaled)"),
+      y = "Number of Trips"
+    ) +
+    scale_y_continuous(labels = comma) +
+    theme_minimal(base_size = 13) +
+    theme(
+      plot.title = element_text(face = "bold", size = 16),
+      legend.position = "bottom",
+      axis.text.y = element_blank(),
+      axis.ticks = element_blank(),
+      panel.grid = element_blank()
+    )
+} else {
+  cat("No mode changes observed among CaBa users (Policy 2, Policy 2 user set).\n")
+}
+```
+
+---
+
+## 7. Cross-Group Comparison
+
+```{r cross-group-scores, fig.cap="Mean score change across all agent groups"}
+summarise_group <- function(pa, label, scenario) {
+  pa %>% summarise(
+    group    = label,
+    scenario = scenario,
+    n        = n(),
+    mean_diff        = mean(score_diff,  na.rm = TRUE),
+    total_diff_scaled = sum(score_diff,  na.rm = TRUE) * SCALE_FACTOR,
+    mean_tt_diff     = mean(tt_diff_min, na.rm = TRUE),
+    mean_money_diff  = mean(money_diff,  na.rm = TRUE),
+    mean_income      = mean(income,      na.rm = TRUE)
+  )
+}
+
+cross_group <- bind_rows(
+  summarise_group(pa_all,   "All Agents",      "Policy Case"),
+  summarise_group(pa_dd,    "Dresden City",    "Policy Case"),
+  summarise_group(pa_buf,   "500m CaBa Buffer","Policy Case"),
+  summarise_group(pa_caba_p1,  "CaBa Users (Policy 1)",      "Policy Case"),
+  summarise_group(pa_pt_remain_p1, "PT Remainers (Base + Policy 1)", "Policy Case"),
+  summarise_group(pa_pt_switch_p1, "PT Switchers (Base + Policy 1)", "Policy Case"),
+  summarise_group(pa2_all,  "All Agents",      "Policy Case 2"),
+  summarise_group(pa2_dd,   "Dresden City",    "Policy Case 2"),
+  summarise_group(pa2_buf,  "500m CaBa Buffer","Policy Case 2"),
+  summarise_group(pa2_caba_p2, "CaBa Users (Policy 2)",      "Policy Case 2"),
+  summarise_group(pa2_pt_remain_p2, "PT Remainers (Base + Policy 2)", "Policy Case 2"),
+  summarise_group(pa2_pt_switch_p2, "PT Switchers (Base + Policy 2)", "Policy Case 2")
+) %>% mutate(n_scaled = n * SCALE_FACTOR)
+
+kable(
+  cross_group,
+  digits = c(0, 0, 0, 3, 1, 2, 3, 0, 0),
+  col.names = c("Group", "Scenario", "N (1%)", "Mean Score Diff",
+                "Total Score Diff (scaled)", "Mean TT Diff (min)",
+                "Mean Money Diff (EUR)", "Mean Income", "N (scaled)"),
+  caption = "Cross-group comparison of key metrics -- Policy 1 vs Policy 2",
+  format.args = list(big.mark = ",")
+) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+```
+
+```{r cross-group-plot, fig.height=10, fig.cap="Key metrics comparison across agent groups and scenarios"}
+cross_long <- cross_group %>%
+  select(group, scenario, mean_diff, mean_tt_diff, mean_money_diff) %>%
+  pivot_longer(c(mean_diff, mean_tt_diff, mean_money_diff),
+               names_to = "metric", values_to = "value") %>%
+  mutate(
+    metric = recode(metric,
+                    "mean_diff"       = "Mean Score Diff",
+                    "mean_tt_diff"    = "Mean TT Diff (min)",
+                    "mean_money_diff" = "Mean Money Diff (EUR)"
+    ),
+    group = factor(group, levels = c("All Agents", "Dresden City",
+                                     "500m CaBa Buffer",
+                                     "CaBa Users (Policy 1)", "CaBa Users (Policy 2)",
+                                     "PT Remainers (Base + Policy 1)",
+                                     "PT Switchers (Base + Policy 1)",
+                                     "PT Remainers (Base + Policy 2)",
+                                     "PT Switchers (Base + Policy 2)"))
+  )
+
+ggplot(cross_long, aes(x = group, y = value, fill = scenario)) +
+  geom_col(position = position_dodge(width = 0.75), width = 0.65) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  facet_wrap(~metric, scales = "free_y", ncol = 1) +
+  labs(
+    title = "Key Metrics Across Agent Groups -- Policy 1 vs Policy 2",
+    x = NULL, y = NULL, fill = "Scenario"
+  ) +
+  scale_fill_manual(values = c("Policy Case" = "#22c55e", "Policy Case 2" = "#f97316")) +
+  theme_minimal(base_size = 13) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    axis.text.x = element_text(angle = 30, hjust = 1),
+    legend.position = "top",
+    strip.text = element_text(face = "bold", size = 12)
+  )
+```
+
+---
