@@ -112,7 +112,7 @@ public class DresdenModel extends MATSimApplication {
 		simWrapper.defaultParams().setMapCenter("14.5,51.53");
 		simWrapper.defaultParams().setMapZoomLevel(6.8);
 //		the tarifzone shp file basically is a dresden shp file with fare prices as additional information
-		simWrapper.defaultParams().setShp(String.format("vvo_tarifzone_10_dresden/%s_vvo_tarifzone_10_dresden_utm32n.shp", VERSION));
+		simWrapper.defaultParams().setShp(String.format("input/%s/vvo_tarifzone_10_dresden/%s_vvo_tarifzone_10_dresden_utm32n.shp", VERSION, VERSION));
 
 		/*
 		 *  To me this is somewhat awkward. In line 88 we intialize this class with the 10-pct config. However, with some automagic from
@@ -204,7 +204,7 @@ public class DresdenModel extends MATSimApplication {
 		vvo10.setTransactionPartner("VVO Tarifzone 10 Dresden");
 		vvo10.setDescription("VVO Tarifzone 10 Dresden");
 		vvo10.setOrder(1);
-		vvo10.setFareZoneShp(String.format("./vvo_tarifzone_10_dresden/%s_vvo_tarifzone_10_dresden_utm32n.shp", VERSION));
+		vvo10.setFareZoneShp(String.format("input/%s/vvo_tarifzone_10_dresden/%s_vvo_tarifzone_10_dresden_utm32n.shp", VERSION, VERSION));
 
 		DistanceBasedPtFareParams germany = DistanceBasedPtFareParams.GERMAN_WIDE_FARE_2024;
 		germany.setTransactionPartner("Deutschlandtarif");
