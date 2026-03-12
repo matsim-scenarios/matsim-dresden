@@ -19,8 +19,8 @@ import static org.matsim.utils.DresdenUtils.getFreightModes;
  */
 public class FixNetwork {
 	public static void main(String[] args) {
-		String output = args.length > 0 ? args[0] : "/Users/luchengqi/Documents/MATSimScenarios/Dresden/dresden-scenario/dresden-v1.1-network-with-pt.xml.gz";
-		Network network = NetworkUtils.readNetwork("https://svn.vsp.tu-berlin.de/repos/public-svn/matsim/scenarios/countries/de/dresden/dresden-v1.0/input/dresden-v1.0-network-with-pt.xml.gz");
+		String output = args.length > 0 ? args[0] : "/Users/luchengqi/Documents/MATSimScenarios/Dresden/dresden-scenario/dresden-v1.1.1-network-with-pt.xml.gz";
+		Network network = NetworkUtils.readNetwork("/Users/luchengqi/Documents/MATSimScenarios/Dresden/dresden-scenario/dresden-v1.1-network-with-pt.xml.gz");
 
 		// shut down Augustus bridge for car and freight
 		List<Link> augustusBridgeLinks = new ArrayList<>();
