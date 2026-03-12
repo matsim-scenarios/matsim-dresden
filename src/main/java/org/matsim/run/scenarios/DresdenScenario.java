@@ -7,9 +7,12 @@ import jakarta.annotation.Nullable;
 import org.matsim.analysis.CheckAndSummarizeLongDistanceFreightPopulation;
 import org.matsim.analysis.CheckStayHomeAgents;
 import org.matsim.analysis.personMoney.PersonMoneyEventsAnalysisModule;
+import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.Scenario;
 import org.matsim.api.core.v01.TransportMode;
 import org.matsim.api.core.v01.network.Link;
+import org.matsim.api.core.v01.network.Network;
+import org.matsim.api.core.v01.population.*;
 import org.matsim.application.MATSimApplication;
 import org.matsim.application.analysis.CheckPopulation;
 import org.matsim.application.analysis.traffic.LinkStats;
@@ -37,6 +40,7 @@ import org.matsim.core.controler.AbstractModule;
 import org.matsim.core.controler.Controler;
 import org.matsim.core.network.NetworkUtils;
 import org.matsim.core.network.turnRestrictions.DisallowedNextLinks;
+import org.matsim.core.population.routes.NetworkRoute;
 import org.matsim.core.replanning.annealing.ReplanningAnnealerConfigGroup;
 import org.matsim.core.replanning.strategies.DefaultPlanStrategiesModule;
 import org.matsim.core.scoring.functions.ScoringParametersForPerson;
@@ -78,7 +82,8 @@ public class DresdenScenario extends MATSimApplication {
 	DresdenUtils.FunctionalityHandling emissions;
 	@CommandLine.Option(names = "--explicit-walk-intermodality", defaultValue = "ENABLED", description = "Define if explicit walk intermodality parameter to/from pt should be set or not (use default).")
 	static DresdenUtils.FunctionalityHandling explicitWalkIntermodality;
-
+	@CommandLine.Option(names = "--close-carola-bridge", defaultValue = "DISABLED", description = "Close down the Carola bridge (by default is false)")
+	static DresdenUtils.FunctionalityHandling closeCarolaBridge;
 
 	public DresdenScenario(@Nullable Config config) {
 		super(config);
@@ -201,6 +206,16 @@ public class DresdenScenario extends MATSimApplication {
 //		set hbefa input files for emission analysis
 			setEmissionsConfigs(config);
 		}
+
+		// TODO switch network and transit files
+//		if (closeCarolaBridge == FunctionalityHandling.ENABLED){
+			// use network with new pt links (i.e., after the collapse of the bridge)
+//			config.network().setInputFile("");
+			// use new transit file
+//			config.transit().setTransitScheduleFile("");
+//			config.transit().setVehiclesFile("");
+//		}
+
 		return config;
 	}
 
@@ -227,6 +242,35 @@ public class DresdenScenario extends MATSimApplication {
 			PrepareNetwork.prepareEmissionsAttributes(scenario.getNetwork());
 //			prepare vehicle types for emission analysis
 			prepareVehicleTypesForEmissionAnalysis(scenario);
+		}
+
+		if (closeCarolaBridge == FunctionalityHandling.ENABLED){
+			// link ids for the Carola bridge
+			Id<Link> carolaBridgeLinkId1 = Id.createLinkId("901959078");
+			Id<Link> carolaBridgeLinkId2 = Id.createLinkId("4214231");
+
+			// reduce the free speed to a very small value
+			Network network = scenario.getNetwork();
+			network.getLinks().get(carolaBridgeLinkId1).setFreespeed(0.00001);
+			network.getLinks().get(carolaBridgeLinkId2).setFreespeed(0.00001);
+
+			// remove the route in the plan, if the route covers carola bridge (i.e., they need to re-route at the first iteration already).
+			for (Person person : scenario.getPopulation().getPersons().values()) {
+				for (Plan plan : person.getPlans()) {
+					for (PlanElement planElement : plan.getPlanElements()) {
+						if (planElement instanceof Leg leg){
+							Route route = leg.getRoute();
+							if (route instanceof NetworkRoute networkRoute){
+								boolean routeIsImpacted = networkRoute.getLinkIds().contains(carolaBridgeLinkId1) ||
+									networkRoute.getLinkIds().contains(carolaBridgeLinkId2);
+								if (routeIsImpacted){
+									CleanPopulation.removeRouteFromLeg(leg);
+								}
+							}
+						}
+					}
+				}
+			}
 		}
 	}
 
