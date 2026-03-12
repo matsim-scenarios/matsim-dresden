@@ -65,7 +65,7 @@ import static org.matsim.utils.DresdenUtils.*;
 		CleanNetwork.class, PrepareNetwork.class, SplitActivityTypesDuration.class, CreateCountsFromBAStData.class,
 		CutOutDresdenPopulation.class, CreateDataDistributionOfStructureData.class, GenerateSmallScaleCommercialTrafficDemand.class,
 		PreparePopulation.class, CreateFacilitiesFromPopulation.class, CreateSingleTransportModePopulation.class, RemoveVehicleInformationFromPopulation.class,
-		DummyPopulationProcess.class
+		DummyPopulationProcess.class, ScaleDigitalTwinWithSnzData.class
 })
 @MATSimApplication.Analysis({
 		LinkStats.class, CheckPopulation.class, CheckAndSummarizeLongDistanceFreightPopulation.class, CheckStayHomeAgents.class
