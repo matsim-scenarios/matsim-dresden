@@ -18,8 +18,6 @@ Changes in version v1.1
 - Marienbrücke -> reduce the capacity to make it consistent with other bridges
 - Carolabrücke -> reduce the capacity to make it consistent with other bridges; reduce capacity to match the actual situation before the collapse (i.e., 1 lane per direction, due to the closure of the other direction)
 
-
 4. The Augustus bridge is closed for car and freight. Bike is still allowed. PT is not impacted as it use a seperate network. 
-
 After 1 + 2, the network version is v1.1
 After 1 + 2 + 3 + 4, the network version is v1.1.1
