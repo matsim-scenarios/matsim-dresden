@@ -17,7 +17,12 @@ import static org.matsim.utils.DresdenUtils.getFreightModes;
 /**
  * This is a simple script, fixing the known problem in the input network.
  */
-public class FixNetwork {
+public final class FixNetwork {
+
+	private FixNetwork(){
+		// prevent instantiation
+	}
+
 	public static void main(String[] args) {
 		String output = args.length > 0 ? args[0] : "/Users/luchengqi/Documents/MATSimScenarios/Dresden/dresden-scenario/dresden-v1.1.1-network-with-pt.xml.gz";
 		Network network = NetworkUtils.readNetwork("/Users/luchengqi/Documents/MATSimScenarios/Dresden/dresden-scenario/dresden-v1.1-network-with-pt.xml.gz");
