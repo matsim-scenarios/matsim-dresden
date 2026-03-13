@@ -8,6 +8,7 @@ import java.util.stream.StreamSupport;
 
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
+import org.apache.commons.math3.stat.Frequency;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.matsim.api.core.v01.Coord;
@@ -40,15 +41,15 @@ public class ScaleDigitalTwinWithSnzData implements MATSimAppCommand {
 	@CommandLine.Option(names = "--outputpath", description = "outputpath", required = true)
 	private String outputpath;
 
-	@CommandLine.Option(names = "--personsstats", description = "the snz personstats-file", required = false)
+	@CommandLine.Option(names = "--personstats", description = "the snz personstats-file", required = false)
 	private String mobilityPersonStats;
 
 	private static final String CONFIG = "config.xml";
-	private static final String POPULATIONFILE = "population.xml.gz";
+	static final String POPULATIONFILE = "population.xml.gz";
 
-	private static final String ALL = "ALL";
+	static final String ALL = "ALL";
 	private static final String PLZ = "PLZ";
-	private static final String MOBILE = "mobile";
+	static final String MOBILE = "mobile";
 	private static final String HOME_X = "home_x";
 	private static final String HOME_Y = "home_y";
 	private static final String HOME = "home";
@@ -62,8 +63,7 @@ public class ScaleDigitalTwinWithSnzData implements MATSimAppCommand {
 
 	@Override
 	public Integer call() throws Exception {
-		String senozonDataFile = null;
-		Map<String, Double> mobilityRate = loadPersonStatsPerPLZ(senozonDataFile);
+		Map<String, Double> mobilityRate = loadPersonStatsPerPLZ(mobilityPersonStats);
 
 		Scenario scenario = loadScenario();
 		applyMobilityRate(mobilityRate, scenario);
@@ -79,6 +79,7 @@ public class ScaleDigitalTwinWithSnzData implements MATSimAppCommand {
 	 */
 	private void applyMobilityRate(Map<String, Double> mobilityRateMap, Scenario scenario) {
 		Random rng = MatsimRandom.getLocalInstance(System.currentTimeMillis());
+		Frequency stats = new Frequency();
 		for (Person person : scenario.getPopulation().getPersons().values()) {
 			boolean mobile = false;
 			if (person.getSelectedPlan().getPlanElements().size() > 1) {
@@ -95,8 +96,11 @@ public class ScaleDigitalTwinWithSnzData implements MATSimAppCommand {
 					person.setSelectedPlan(plan);
 				}
 			}
+			stats.addValue(Boolean.toString(mobile));
 			person.getAttributes().putAttribute(MOBILE, mobile);
 		}
+		
+		log.info("stats:\t"+stats.toString());
 	}
 
 	/**
@@ -129,7 +133,7 @@ public class ScaleDigitalTwinWithSnzData implements MATSimAppCommand {
 		return scenario;
 	}
 
-	private static Map<String, Double> loadPersonStatsPerPLZ(String personStatsFile) {
+	static Map<String, Double> loadPersonStatsPerPLZ(String personStatsFile) {
 		try {
 			Map<String, Double> mobilityRate = new HashMap<String, Double>();
 
@@ -138,7 +142,7 @@ public class ScaleDigitalTwinWithSnzData implements MATSimAppCommand {
 			if (personStatsFile != null) {
 				log.info("parsing personstats from: " + personStatsFile);
 				CSVParser records = CSVFormat.Builder.create().setAllowMissingColumnNames(true)
-						.setDelimiter(',').setHeader().get()
+						.setDelimiter(',').setSkipHeaderRecord(true).setHeader().get()
 						.parse(IOUtils.getBufferedReader(personStatsFile));
 				StreamSupport.stream(records.spliterator(), false).forEach(r -> {
 					String plz = r.get(ZIP_CODE);
@@ -151,7 +155,7 @@ public class ScaleDigitalTwinWithSnzData implements MATSimAppCommand {
 
 					// if there are no persons in the plz we assume the
 					// mobility-rate is unchanged, i.e. 1
-					mobilityRate.put(plz, nPersons > 0 ? (nMobilePersons / nMobilePersons) : 1);
+					mobilityRate.put(plz, nPersons > 0 ? (nMobilePersons / nPersons) : 1);
 				});
 				log.info("done (parsing personstats from: " + personStatsFile + ").");
 
