@@ -1,6 +1,6 @@
 
 N := dresden
-V := v1.0
+V := v1.1
 CRS := EPSG:25832
 
 ifndef SUMO_HOME
@@ -8,18 +8,16 @@ ifndef SUMO_HOME
 endif
 
 #define some important paths
-# osmosis and sumo paths need to be in " because of blank space in path...
+# osmosis path needs to be in " because of blank space in path...
 osmosis := "C:/Program Files/osmosis-0.49.2//bin/osmosis.bat"
-germany := $(CURDIR)/../../shared-svn/projects/matsim-germany
-shared := $(CURDIR)/../../shared-svn/projects/agimo
+germany := $(CURDIR)/../../shared-svn/raw/europe/de/de
+shared := $(CURDIR)/../../shared-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/before-calibration
 sharedOberlausitzDresden := $(CURDIR)/../../shared-svn/projects/matsim-oberlausitz-dresden
-sharedLausitz := $(CURDIR)/../../shared-svn/projects/DiTriMo # TODO; mv to matsim-germany
 dresden := $(CURDIR)/../../public-svn/matsim/scenarios/countries/de/dresden/dresden-$V/input/
 
-MEMORY ?= 30G
+MEMORY ?= 50G
 #JAR := matsim-$(N)-*.jar
-JAR := matsim-dresden-1.0-f9eab41.jar
-NETWORK := $(germany)/maps/germany-250127.osm.pbf
+JAR := matsim-dresden-1.1-v1.0.2-58-dirty.jar
 
 # Scenario creation tool
 sc := java -Xms$(MEMORY) -Xmx$(MEMORY) -jar $(JAR)
@@ -36,9 +34,14 @@ $(JAR):
 
 # Required files
 #this step is only necessary once. The downloaded network is uploaded to shared-svn/projects/matsim-germany/maps
-#input/network.osm.pbf:
-#	curl https://download.geofabrik.de/europe/germany-250127.osm.pbf\
-#	  -o ../../shared-svn/projects/matsim-germany/maps/germany-250127.osm.pbf
+#when not wanting to download osm data for the current year (2026), there is only one dataset per year available.
+#We are sticking to 2024 as we want to depict the status (shortly) before Carola bridge collapsed (sep24).
+#we need to manually svn copy the above to shared-svn/raw/europe/de/de/osm because we do not want to state our svn credentials here
+../../shared-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/before-calibration/output/network.osm.pbf:
+	curl https://download.geofabrik.de/europe/germany-240101.osm.pbf \
+	-o $@
+
+NETWORK := $(shared)/output/network.osm.pbf
 
 #retrieve detailed network (see param highway) from OSM
 # the .poly files contain point coords. The coordinates should be in EPSG:4326.
@@ -48,38 +51,41 @@ $(JAR):
 # 3) ad x/y coords as feature attributes: Vector - Geometry Tools - Add Geometry Attributes.
 # 4) Export as csv and copy content of csv without the id column to a .poly file.
 # see https://wiki.openstreetmap.org/wiki/Osmosis/Polygon_Filter_File_Format for .poly structure
-#input/network-detailed.osm.pbf: $(NETWORK)
-#	$(osmosis) --rb file=$<\
-#	 --tf accept-ways bicycle=yes highway=motorway,motorway_link,trunk,trunk_link,primary,primary_link,secondary_link,secondary,tertiary,motorway_junction,residential,unclassified,living_street\
-#	 --bounding-polygon file="$(sharedOberlausitzDresden)/data/dresden.poly"\
-#	 --used-node --wb $@
+../../shared-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/before-calibration/output/network-detailed.osm.pbf: $(NETWORK)
+	$(osmosis) --rb file=$<\
+	 --tf accept-ways bicycle=yes highway=motorway,motorway_link,trunk,trunk_link,primary,primary_link,secondary_link,secondary,tertiary,motorway_junction,residential,unclassified,living_street\
+	 --bounding-polygon file="$(shared)/shp-for-regional-trains_points.poly"\
+	 --used-node --wb $@
 
+#update: we want to use a more detailed feeder pt in saxony, so we also need a more detailed car/bike network in saxony.
+#Hence, the coarse network step is not needed anymore, we just a bigger shp file shp-for-regional-trains_points.poly for the detailed network.
+#the shp file is the same as for the bus feeders + regional trains in the gtfs extraction (below). -sm0426
 #	retrieve coarse network (see param highway) from OSM
-#input/network-coarse.osm.pbf: $(NETWORK)
+#../../shared-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/before-calibration/output/network-coarse.osm.pbf: $(NETWORK)
 #	$(osmosis) --rb file=$<\
 #	 --tf accept-ways highway=motorway,motorway_link,trunk,trunk_link,primary,primary_link,secondary_link,secondary,tertiary,motorway_junction\
-#	 --bounding-polygon file="$(shared)/data/dresden-model/dresden-extended.poly"\
+#	 --bounding-polygon file="$(shared)/shp-for-regional-trains_points.poly"\
 #	 --used-node --wb $@
 
 #	retrieve germany wide network (see param highway) from OSM
-#input/network-germany.osm.pbf: $(NETWORK)
-#	$(osmosis) --rb file=$<\
-# 	 --tf accept-ways highway=motorway,motorway_link,motorway_junction,trunk,trunk_link,primary,primary_link\
-# 	 --used-node --wb $@
+../../shared-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/before-calibration/output/network-germany.osm.pbf: $(NETWORK)
+	$(osmosis) --rb file=$<\
+ 	 --tf accept-ways highway=motorway,motorway_link,motorway_junction,trunk,trunk_link,primary,primary_link\
+ 	 --used-node --wb $@
 
-#input/network.osm: input/network-germany.osm.pbf input/network-coarse.osm.pbf input/network-detailed.osm.pbf
-#	$(osmosis) --rb file=$< --rb file=$(word 2,$^) --rb file=$(word 3,$^)\
-#  	 --merge --merge\
-#  	 --tag-transform file=input/remove-railway.xml\
-#  	 --wx $@
+../../shared-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/before-calibration/output/network.osm: ../../shared-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/before-calibration/output/network-germany.osm.pbf ../../shared-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/before-calibration/output/network-detailed.osm.pbf
+	$(osmosis) --rb file=$< --rb file=$(word 2,$^)\
+  	 --merge\
+  	 --tag-transform file=$(shared)/remove-railway.xml\
+  	 --wx $@
 
 # !! See comment above on commented-out material.  !!
 
 #	roadTypes are taken either from the general file "osmNetconvert.typ.xml"
 #	or from the german one "osmNetconvertUrbanDe.ty.xml"
-input/sumo.net.xml: ./input/network.osm
-	$(SUMO_HOME)/bin/netconvert --geometry.remove --ramps.guess --ramps.no-split\
-	 --type-files $(SUMO_HOME)/data/typemap/osmNetconvert.typ.xml,$(SUMO_HOME)/data/typemap/osmNetconvertUrbanDe.typ.xml\
+../../shared-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/before-calibration/output/sumo.net.xml: ../../shared-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/before-calibration/output/network.osm
+	"$(SUMO_HOME)/bin/netconvert" --geometry.remove --ramps.guess --ramps.no-split\
+	 --type-files "$(SUMO_HOME)/data/typemap/osmNetconvert.typ.xml","$(SUMO_HOME)/data/typemap/osmNetconvertUrbanDe.typ.xml"\
 	 --tls.guess-signals true --tls.discard-simple --tls.join --tls.default-type actuated\
 	 --junctions.join --junctions.corner-detail 5\
 	 --roundabouts.guess --remove-edges.isolated\
@@ -93,8 +99,8 @@ input/sumo.net.xml: ./input/network.osm
 # free-speed-factor 0.7 (standard is 0.9): see VSP WP 24-08 Figure 2. Dresden is most similar to metropolitan.
 #--remove-turn-restrictions used instead of new TurnRestrictionCleaner,
 # the cleaner needs more testing, as it destroys the bike network e.g.
-input/v1.0/dresden-v1.0-network.xml.gz: input/sumo.net.xml
-	echo input/$V/$N-$V-network.xml.gz
+#if you change the underlying osm file, you also have to check/change the augustus bridge links in PrepareNetwork.fixAugustusBridgeAllowedModes
+../../shared-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/before-calibration/output/dresden-v1.1-network.xml.gz: ../../shared-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/before-calibration/output/sumo.net.xml
 	$(sc) prepare network-from-sumo $< --output $@ --free-speed-factor 0.7 --turn-restrictions IGNORE_TURN_RESTRICTIONS
 	$(sc) prepare clean-network $@ --output $@ --modes car --modes bike --modes ride --remove-turn-restrictions
 #	delete truck as allowed mode (not used), add longDistanceFreight as allowed mode, prepare network for emissions analysis
@@ -104,20 +110,27 @@ input/v1.0/dresden-v1.0-network.xml.gz: input/sumo.net.xml
 
 # gtfs data from 20230113 used because it has way more pt lines in lausitz area than more recent one in shared-svn/matsim-oberlausitz-dresden
 # this might not be relevant anymore for this specific model (dresden only), but out of convenience it wont be altered. -sm0925
-input/v1.0/dresden-v1.0-network-with-pt.xml.gz: input/$V/$N-$V-network.xml.gz
+#--merge-stops mergeToParentAndRouteTypes merges all tracks at a station to one stop according to GL. This avoids agents waiting at track 1 while there is a suitable connection at track 2 e.g.
+#the following date is a wednesday
+../../shared-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/before-calibration/output/dresden-v1.1-network-with-pt.xml.gz: ../../shared-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/before-calibration/output/dresden-v1.1-network.xml.gz
 	$(sc) prepare transit-from-gtfs --network $<\
-	 --output=input/$V\
+	 --output="../../shared-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/before-calibration/output/"\
 	 --name $N-$V --date "2023-01-11" --target-crs $(CRS) \
-	 $(sharedLausitz)/data/gtfs/20230113_regio.zip\
-	 $(sharedLausitz)/data/gtfs/20230113_train_short.zip\
-	 $(sharedLausitz)/data/gtfs/20230113_train_long.zip\
+	 $(germany)/gtfs/20230113_regio.zip\
+	 $(germany)/gtfs/20230113_train_short.zip\
+	 $(germany)/gtfs/20230113_train_long.zip\
 	 --prefix regio_,short_,long_\
-	 --shp $(shared)/data/dresden-model/shp/dresden-pt-area-utm32n.shp\
-	 --shp $(shared)/data/dresden-model/shp/dresden-pt-area-utm32n.shp\
+	 --shp $(shared)/shp-for-regional-trains-utm32n.shp\
+	 --shp $(shared)/shp-for-regional-trains-utm32n.shp\
 	 --shp $(germany)/shp/germany-area.shp\
+	 --merge-stops mergeToParentAndRouteTypes
 
+#TODO: continue here
 # create matsim counts file
 # count to link assignments have been checked manually, they look correct.
+# TODO update counts data to 2023
+#https://www.bast.de/DE/Themen/Digitales/HF_1/Massnahmen/verkehrszaehlung/Stundenwerte.html?nn=414410
+#https://www.bast.de/DE/Themen/Digitales/HF_1/Massnahmen/verkehrszaehlung/Daten/2023_1/Jawe2023.html?nn=414410 for JaWe file
 input/v1.0/dresden-v1.0-counts-bast.xml.gz: input/$V/$N-$V-network-with-pt.xml.gz
 	$(sc) prepare counts-from-bast\
 		--network $<\
@@ -218,6 +231,8 @@ input/v1.0/prepare-100pct.plans.xml.gz:
 	 --landuse $(germany)/landuse/landuse.shp\
 	 --output $@
 
+#TODO: use cutout class from CR.
+#TODO: does CR cutout class also cut out small scale commercial traffic? If not keep using own cutout class for small scale commercial traffic.
 # the population from snz was delivered for oberlausitz-dresden, so we have to cut out the dresden population.
 input/v1.0/prepare-cutout-100pct.plans.xml.gz: input/v1.0/prepare-100pct.plans.xml.gz input/$V/$N-$V-network.xml.gz
 	$(sc) prepare cutout\

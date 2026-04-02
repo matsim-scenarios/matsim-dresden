@@ -65,7 +65,7 @@ import static org.matsim.run.scenarios.DresdenUtils.*;
 })
 public class DresdenModel extends MATSimApplication {
 
-	public static final String VERSION = "v1.0";
+	public static final String VERSION = "v1.1";
 
 	@CommandLine.Option(names = "--emissions",
 		description = "Define if emission analysis should be performed or not" )
