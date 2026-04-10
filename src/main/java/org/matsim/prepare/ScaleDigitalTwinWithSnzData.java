@@ -1,9 +1,11 @@
 package org.matsim.prepare;
 
 import java.io.File;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
+import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
 import org.apache.commons.csv.CSVFormat;
@@ -56,6 +58,7 @@ public class ScaleDigitalTwinWithSnzData implements MATSimAppCommand {
 	private static final String N_MOBILE_PERSONS = "nMobilePersons";
 	private static final String N_PERSONS = "nPersons";
 	private static final String ZIP_CODE = "zipCode";
+	private static final String SUBPOPULATION_PERSON = "person";
 
 	public static void main(String[] args) {
 		new ScaleDigitalTwinWithSnzData().execute(args);
@@ -80,7 +83,9 @@ public class ScaleDigitalTwinWithSnzData implements MATSimAppCommand {
 	private void applyMobilityRate(Map<String, Double> mobilityRateMap, Scenario scenario) {
 		Random rng = MatsimRandom.getLocalInstance(System.currentTimeMillis());
 		Frequency stats = new Frequency();
-		for (Person person : scenario.getPopulation().getPersons().values()) {
+		Collection<? extends Person> persons = scenario.getPopulation().getPersons().values().parallelStream()
+			.filter(p -> PopulationUtils.getSubpopulation(person).equals(SUBPOPULATION_PERSON)).collect(Collectors.toSet());
+		for (Person person : persons) {
 			boolean mobile = false;
 			if (person.getSelectedPlan().getPlanElements().size() > 1) {
 				mobile = true;
@@ -88,7 +93,7 @@ public class ScaleDigitalTwinWithSnzData implements MATSimAppCommand {
 				double mobilityRate = mobilityRateMap.get(plz);
 				if (rng.nextDouble() > mobilityRate) {
 					mobile = false;
-					Activity firstActOrHome = getFirstActOrHome(person);
+					Activity firstActOrHome = getHome(person);
 					person.getPlans().clear();
 					Plan plan = PopulationUtils.createPlan(person);
 					plan.addActivity(firstActOrHome);
@@ -99,7 +104,6 @@ public class ScaleDigitalTwinWithSnzData implements MATSimAppCommand {
 			stats.addValue(Boolean.toString(mobile));
 			person.getAttributes().putAttribute(MOBILE, mobile);
 		}
-		
 		log.info("stats:\t"+stats.toString());
 	}
 
@@ -107,14 +111,14 @@ public class ScaleDigitalTwinWithSnzData implements MATSimAppCommand {
 	 * @param person
 	 * @return
 	 */
-	private Activity getFirstActOrHome(Person person) {
+	private Activity getHome(Person person) {
 		Object homeX = person.getAttributes().getAttribute(HOME_X);
 		Object homeY = person.getAttributes().getAttribute(HOME_Y);
 		if (homeX != null && homeY != null) {
 			return PopulationUtils.createActivityFromCoord(HOME,
 					new Coord((Double) homeX, (Double) homeY));
 		} else {
-			return (Activity) person.getSelectedPlan().getPlanElements().get(0);
+			throw new RuntimeException("found a person without home-coord. This must not happen.");
 		}
 	}
 
