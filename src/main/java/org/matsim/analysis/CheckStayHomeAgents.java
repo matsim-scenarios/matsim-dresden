@@ -49,6 +49,9 @@ public class CheckStayHomeAgents implements MATSimAppCommand {
 				}
 			}
 		}
+		log.info("####################################");
+		log.info("PersonIds of stay home agents:");
+		stayHomeAgents.forEach(log::info);
 
 		log.info("####################################");
 
@@ -58,9 +61,6 @@ public class CheckStayHomeAgents implements MATSimAppCommand {
 		}
 
 		log.info("Out of {} agents, {} are stay home agents. ({})", population.getPersons().size(), stayHomeAgents.size(), share);
-		log.info("####################################");
-		log.info("PersonIds of stay home agents:");
-		stayHomeAgents.forEach(log::info);
 
 		return 0;
 	}
