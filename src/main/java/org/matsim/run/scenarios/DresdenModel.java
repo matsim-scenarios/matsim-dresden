@@ -20,6 +20,7 @@ import org.matsim.application.prepare.network.CleanNetwork;
 import org.matsim.application.prepare.network.CreateNetworkFromSumo;
 import org.matsim.application.prepare.population.*;
 import org.matsim.application.prepare.pt.CreateTransitScheduleFromGtfs;
+import org.matsim.application.prepare.scenario.CreateScenarioCutOut;
 import org.matsim.contrib.vsp.pt.fare.DistanceBasedPtFareParams;
 import org.matsim.contrib.vsp.pt.fare.FareZoneBasedPtFareParams;
 import org.matsim.contrib.vsp.pt.fare.PtFareConfigGroup;
@@ -58,7 +59,8 @@ import static org.matsim.run.scenarios.DresdenUtils.*;
 		CreateLandUseShp.class, ResolveGridCoordinates.class, FixSubtourModes.class, AdjustActivityToLinkDistances.class, XYToLinks.class,
 		CleanNetwork.class, PrepareNetwork.class, SplitActivityTypesDuration.class, CreateCountsFromBAStData.class,
 		CutOutDresdenPopulation.class, CreateDataDistributionOfStructureData.class, GenerateSmallScaleCommercialTrafficDemand.class,
-		PreparePopulation.class, CreateFacilitiesFromPopulation.class, CreateSingleTransportModePopulation.class, RemoveVehicleInformationFromPopulation.class
+		PreparePopulation.class, CreateFacilitiesFromPopulation.class, CreateSingleTransportModePopulation.class, RemoveVehicleInformationFromPopulation.class,
+		CreateScenarioCutOut.class
 })
 @MATSimApplication.Analysis({
 		LinkStats.class, CheckPopulation.class, CheckAndSummarizeLongDistanceFreightPopulation.class, CheckStayHomeAgents.class
