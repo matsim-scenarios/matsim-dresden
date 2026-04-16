@@ -18,7 +18,7 @@ dresdenRaw := $(CURDIR)/../../shared-svn/raw/europe/de/dresden
 
 MEMORY ?= 50G
 #JAR := matsim-$(N)-*.jar
-JAR := matsim-dresden-1.1-v1.0.2-58-dirty.jar
+JAR := matsim-dresden-1.1-v1.0.2-60.jar
 
 # Scenario creation tool
 sc := java -Xms$(MEMORY) -Xmx$(MEMORY) -jar $(JAR)
@@ -143,6 +143,7 @@ NETWORK := $(shared)/before-calibration/output/network.osm.pbf
 
 ########################### population creation ######################################################################################
 
+#TODO: repeat this tep with fix from RE. see element chat for PR number
 # extract dresden long haul freight traffic trips from german wide file
 ../../shared-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/before-calibration/output/plans-longHaulFreight.xml.gz: $(germanWideFreight)/german_freight.100pct.plans.xml.gz $(germanWideFreight)/germany-europe-network.xml.gz
 	$(sc) prepare extract-freight-trips $<\
@@ -231,9 +232,9 @@ NETWORK := $(shared)/before-calibration/output/network.osm.pbf
 	 --landuse $(germany)/landuse/landuse.shp\
 	 --output $@
 
-#TODO: use cutout class from CR.
-#TODO: does CR cutout class also cut out small scale commercial traffic? If not keep using own cutout class for small scale commercial traffic.
 # the population from snz was delivered for oberlausitz-dresden, so we have to cut out the dresden population.
+#this uses the scenario cutout class from CR, which is able to produce a cutout network, network change events and facilities.
+#here, we just want to use it to cut out the population. Everything else is not used. --output-network is a required option, so we delete the network afterwards.
 ../../shared-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/before-calibration/output/prepare-cutout-100pct.plans.xml.gz: $(shared)/before-calibration/output/prepare-100pct.plans.xml.gz $(shared)/before-calibration/output/$N-$V-network.xml.gz
 	$(sc) prepare scenario-cutout\
 	 --population $<\
@@ -245,19 +246,27 @@ NETWORK := $(shared)/before-calibration/output/network.osm.pbf
 	 --shp-crs $(CRS)\
 	 --buffer 10000\
 	 --check-beeline
-	 rm $(shared)/before-calibration/output/$N-$V-network-cutout-to-be-deleted.xml.gz
+
+#this class checks if and how many stay home agents the population has.
+#please check the log. If there are no stay home agents DO NOT CONTINUE THE SCENARIO GENERATION PROCESS.
+input/dummyFile.csv: $(shared)/before-calibration/output/prepare-cutout-100pct.plans.xml.gz
+	$(sc) analysis stay-home-agents $<
 
 # same goes for small scale commercial traffic.
-input/v1.0/dresden-small-scale-commercialTraffic-v1.0-100pct.xml.gz: input/$V/oberlausitz-dresden-small-scale-commercialTraffic-$V-100pct.xml.gz input/$V/$N-$V-network.xml.gz
-	$(sc) prepare cutout\
+../../shared-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/before-calibration/output/dresden-small-scale-commercialTraffic-v1.1-100pct.xml.gz: $(shared)/before-calibration/commercial_traffic/output/oberlausitz-dresden-small-scale-commercialTraffic-v1.0-100pct.xml.gz $(shared)/before-calibration/output/$N-$V-network.xml.gz
+	 $(sc) prepare scenario-cutout\
 	 --population $<\
 	 --network $(word 2,$^)\
 	 --output-population $@\
+	 --output-network $(shared)/before-calibration/output/$N-$V-commercial-network-cutout-to-be-deleted.xml.gz\
 	 --input-crs $(CRS)\
-	 --shp $(shared)/data/dresden-model/shp/dresden-pt-area-utm32n.shp\
-	 --shp-crs $(CRS)
+	 --shp $(shared)/shp/v1.1_vvo_tarifzone_10_dresden_utm32n.shp\
+	 --shp-crs $(CRS)\
+	 --buffer 10000\
+	 --check-beeline
 
-input/v1.0/prepare-cutout-fixed-subtours-100pct.plans.xml.gz: input/$V/prepare-cutout-100pct.plans.xml.gz
+#TODO: continue here
+../../shared-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/before-calibration/output/prepare-cutout-fixed-subtours-100pct.plans.xml.gz: $(shared)/before-calibration/output/prepare-cutout-100pct.plans.xml.gz
 # change modes in subtours with chain based AND non-chain based by choosing mode for subtour randomly
 	$(sc) prepare fix-subtour-modes --coord-dist 100 --input $< --output $@
 # set car availability for agents below 18 to false, standardize some person attrs, set home coords, set person income
@@ -266,13 +275,13 @@ input/v1.0/prepare-cutout-fixed-subtours-100pct.plans.xml.gz: input/$V/prepare-c
 # this step is necessary to process the plans for a 0it test. the 0it test is used to generate trips and persons tables
 # for the calculation of a number of short distance trips to add (compared to reference data).
 # the calculation is done in python script extract_ref_data.py
-input/v1.0/prepare-100pct-with-trips-split-merged.plans_FOR_0IT_TEST.xml.gz: input/v1.0/prepare-cutout-fixed-subtours-100pct.plans.xml.gz
+../../shared-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/before-calibration/output/prepare-100pct-with-trips-split-merged.plans_FOR_0IT_TEST.xml.gz: $(shared)/before-calibration/output/prepare-cutout-fixed-subtours-100pct.plans.xml.gz
 	$(sc) prepare split-activity-types-duration\
 		--input $<\
 		--exclude commercial_start,commercial_end,freight_start,freight_end,service\
 		--output $@
 
-input/v1.0/prepare-100pct-with-trips-split-merged.plans.xml.gz: input/plans-longHaulFreight.xml.gz input/v1.0/prepare-cutout-fixed-subtours-100pct.plans.xml.gz input/$V/$N-small-scale-commercialTraffic-$V-100pct.xml.gz
+../../shared-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/before-calibration/output/prepare-100pct-with-trips-split-merged.plans.xml.gz: $(shared)/before-calibration/output/plans-longHaulFreight.xml.gz $(shared)/before-calibration/output/prepare-cutout-fixed-subtours-100pct.plans.xml.gz $(shared)/before-calibration/output/$N-small-scale-commercialTraffic-$V-100pct.xml.gz
 # generate some short distance trips, which in senozon data generally are missing
 # 1) we have to calculate the number of trips to add with python script create_ref.py
 # for that it might be necessary to run split-activity-types-duration (see below) separately.
