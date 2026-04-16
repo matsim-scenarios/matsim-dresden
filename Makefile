@@ -143,7 +143,6 @@ NETWORK := $(shared)/before-calibration/output/network.osm.pbf
 
 ########################### population creation ######################################################################################
 
-#TODO: repeat this tep with fix from RE. see element chat for PR number
 # extract dresden long haul freight traffic trips from german wide file
 ../../shared-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/before-calibration/output/plans-longHaulFreight.xml.gz: $(germanWideFreight)/german_freight.100pct.plans.xml.gz $(germanWideFreight)/germany-europe-network.xml.gz
 	$(sc) prepare extract-freight-trips $<\
