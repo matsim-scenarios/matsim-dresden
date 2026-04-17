@@ -1,10 +1,7 @@
 package org.matsim.prepare;
 
 import java.io.File;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Random;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
@@ -49,7 +46,7 @@ public class ScaleDigitalTwinWithSnzData implements MATSimAppCommand {
 	private static final String CONFIG = "config.xml";
 	static final String POPULATIONFILE = "population.xml.gz";
 
-	static final String ALL = "ALL";
+	static final String ALL = "==ALL==";
 	private static final String PLZ = "PLZ";
 	static final String MOBILE = "mobile";
 	private static final String HOME_X = "home_x";
@@ -66,45 +63,77 @@ public class ScaleDigitalTwinWithSnzData implements MATSimAppCommand {
 
 	@Override
 	public Integer call() throws Exception {
-		Map<String, Double> mobilityRate = loadPersonStatsPerPLZ(mobilityPersonStats);
-
 		Scenario scenario = loadScenario();
-		applyMobilityRate(mobilityRate, scenario);
-
-		dumpResults(scenario);
-
+		double originalOutOfHomeRate = dropNonMobilePersonAgentsAndCalcOutOfHomeRate(scenario);
+		Map<String, Double> mobilityRate = loadPersonStatsPerPLZ(mobilityPersonStats, originalOutOfHomeRate);
+		scaleNonPersonAgents(scenario, originalOutOfHomeRate);
+		applyOutOfHomeRateForPersonAgents(mobilityRate, scenario);
+		dumpResults(scenario, originalOutOfHomeRate);
 		return 0;
+	}
+
+	/**
+	 * use the originalOutOfHomeRate to scale all non person-agents
+	 *
+	 * @param scenario
+	 * @param originalOutOfHomeRate
+	 */
+	private void scaleNonPersonAgents(Scenario scenario, double originalOutOfHomeRate) {
+		Collection<? extends Person> notPersonAgents = scenario.getPopulation().getPersons().values().parallelStream()
+				.filter(p -> !PopulationUtils.getSubpopulation(p).equals(SUBPOPULATION_PERSON)).collect(Collectors.toSet());
+		
+		Random rng = MatsimRandom.getLocalInstance();
+		notPersonAgents.stream().filter(p -> rng.nextDouble() > originalOutOfHomeRate).forEach(p -> scenario.getPopulation().removePerson(p.getId()));
+	}
+
+	/**
+	 * drop all non mobile person-agents and return the original mobility-rate
+	 *
+	 * @param scenario
+	 * @return the original outOfHomeRate
+	 */
+	private double dropNonMobilePersonAgentsAndCalcOutOfHomeRate(Scenario scenario) {
+		Collection<? extends Person> persons = scenario.getPopulation().getPersons().values().parallelStream()
+			.filter(p -> PopulationUtils.getSubpopulation(p).equals(SUBPOPULATION_PERSON)).collect(Collectors.toSet());
+
+		Set<? extends Person> stayHomePersons = persons.parallelStream()
+			.filter(p -> p.getSelectedPlan().getPlanElements().size() == 1).collect(Collectors.toSet());
+
+		stayHomePersons.forEach(p -> scenario.getPopulation().removePerson(p.getId()));
+
+		double outOfHomeRate = 1 - 1. * stayHomePersons.size() / persons.size();
+		log.info("original out of home rate of person-agents: {}", outOfHomeRate);
+		return outOfHomeRate;
 	}
 
 	/**
 	 * @param mobilityRateMap
 	 * @param scenario
 	 */
-	private void applyMobilityRate(Map<String, Double> mobilityRateMap, Scenario scenario) {
-		Random rng = MatsimRandom.getLocalInstance(System.currentTimeMillis());
+	private void applyOutOfHomeRateForPersonAgents(Map<String, Double> mobilityRateMap, Scenario scenario) {
+		Random rng = MatsimRandom.getLocalInstance();
 		Frequency stats = new Frequency();
 		Collection<? extends Person> persons = scenario.getPopulation().getPersons().values().parallelStream()
-			.filter(p -> PopulationUtils.getSubpopulation(person).equals(SUBPOPULATION_PERSON)).collect(Collectors.toSet());
+			.filter(p -> PopulationUtils.getSubpopulation(p).equals(SUBPOPULATION_PERSON)).collect(Collectors.toSet());
 		for (Person person : persons) {
-			boolean mobile = false;
-			if (person.getSelectedPlan().getPlanElements().size() > 1) {
-				mobile = true;
-				String plz = person.getAttributes().getAsMap().getOrDefault(PLZ, ALL).toString();
-				double mobilityRate = mobilityRateMap.get(plz);
-				if (rng.nextDouble() > mobilityRate) {
-					mobile = false;
-					Activity firstActOrHome = getHome(person);
-					person.getPlans().clear();
-					Plan plan = PopulationUtils.createPlan(person);
-					plan.addActivity(firstActOrHome);
-					person.addPlan(plan);
-					person.setSelectedPlan(plan);
-				}
+			boolean mobile = true;
+			
+			String plz = person.getAttributes().getAsMap().getOrDefault(PLZ, ALL).toString();
+			double mobilityRate = mobilityRateMap.get(plz);
+			
+			if (rng.nextDouble() > mobilityRate) {
+				mobile = false;
+				Activity firstActOrHome = getHome(person);
+				person.getPlans().clear();
+				Plan plan = PopulationUtils.createPlan(person);
+				plan.addActivity(firstActOrHome);
+				person.addPlan(plan);
+				person.setSelectedPlan(plan);
 			}
 			stats.addValue(Boolean.toString(mobile));
 			person.getAttributes().putAttribute(MOBILE, mobile);
 		}
-		log.info("stats:\t"+stats.toString());
+		log.info("stats:\t" + stats.toString());
 	}
 
 	/**
@@ -115,19 +144,28 @@ public class ScaleDigitalTwinWithSnzData implements MATSimAppCommand {
 		Object homeX = person.getAttributes().getAttribute(HOME_X);
 		Object homeY = person.getAttributes().getAttribute(HOME_Y);
 		if (homeX != null && homeY != null) {
-			return PopulationUtils.createActivityFromCoord(HOME,
-					new Coord((Double) homeX, (Double) homeY));
+			return PopulationUtils.createActivityFromCoord(HOME, new Coord((Double) homeX, (Double) homeY));
 		} else {
 			throw new RuntimeException("found a person without home-coord. This must not happen.");
 		}
 	}
 
-	private void dumpResults(Scenario scenario) {
+	/**
+	 * 
+	 * @param scenario
+	 * @param originalOutOfHomeRate
+	 */
+	private void dumpResults(Scenario scenario, double originalOutOfHomeRate) {
 		String outputplans = new File(outputpath, POPULATIONFILE).getAbsolutePath();
 		new PopulationWriter(scenario.getPopulation()).write(outputplans);
 
 		scenario.getConfig().plans().setInputFile(outputplans);
 		String outputconfig = new File(outputpath, CONFIG).getAbsolutePath();
+		
+		scenario.getConfig().qsim().setFlowCapFactor(scenario.getConfig().qsim().getFlowCapFactor() * originalOutOfHomeRate);
+		scenario.getConfig().qsim().setStorageCapFactor(scenario.getConfig().qsim().getStorageCapFactor() * originalOutOfHomeRate);
+		scenario.getConfig().counts().setCountsScaleFactor(scenario.getConfig().counts().getCountsScaleFactor() / originalOutOfHomeRate);
+		
 		new ConfigWriter(scenario.getConfig()).write(outputconfig);
 	}
 
@@ -137,7 +175,13 @@ public class ScaleDigitalTwinWithSnzData implements MATSimAppCommand {
 		return scenario;
 	}
 
-	static Map<String, Double> loadPersonStatsPerPLZ(String personStatsFile) {
+	/**
+	 * load the mobility-rate from file
+	 *
+	 * @param personStatsFile
+	 * @return
+	 */
+	static Map<String, Double> loadPersonStatsPerPLZ(String personStatsFile, double defaultMobilityRate) {
 		try {
 			Map<String, Double> mobilityRate = new HashMap<String, Double>();
 
@@ -145,9 +189,7 @@ public class ScaleDigitalTwinWithSnzData implements MATSimAppCommand {
 			AtomicDouble nMobilePersonsTotal = new AtomicDouble(0.);
 			if (personStatsFile != null) {
 				log.info("parsing personstats from: " + personStatsFile);
-				CSVParser records = CSVFormat.Builder.create().setAllowMissingColumnNames(true)
-						.setDelimiter(',').setSkipHeaderRecord(true).setHeader().get()
-						.parse(IOUtils.getBufferedReader(personStatsFile));
+				CSVParser records = CSVFormat.Builder.create().setAllowMissingColumnNames(true).setDelimiter(',').setSkipHeaderRecord(true).setHeader().get().parse(IOUtils.getBufferedReader(personStatsFile));
 				StreamSupport.stream(records.spliterator(), false).forEach(r -> {
 					String plz = r.get(ZIP_CODE);
 
@@ -164,9 +206,6 @@ public class ScaleDigitalTwinWithSnzData implements MATSimAppCommand {
 				log.info("done (parsing personstats from: " + personStatsFile + ").");
 
 			}
-			double defaultMobilityRate = nPersonsTotal.get() > 0
-					? nMobilePersonsTotal.get() / nPersonsTotal.get()
-					: 1;
 			log.info("default mobilityRate is: " + defaultMobilityRate);
 			mobilityRate.put(ALL, defaultMobilityRate);
 			return mobilityRate;
