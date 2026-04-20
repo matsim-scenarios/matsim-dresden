@@ -1,10 +1,12 @@
 package org.matsim.run.scenarios;
 
 import org.jetbrains.annotations.Nullable;
+import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.Scenario;
 import org.matsim.application.MATSimApplication;
 import org.matsim.core.config.Config;
 import org.matsim.core.controler.Controler;
+import org.matsim.core.mobsim.qsim.qnetsimengine.QVehicle;
 import org.matsim.vehicles.VehicleType;
 
 
@@ -29,7 +31,9 @@ public class DresdenScenarioWithIncreasedBikeSpeed extends DresdenScenario {
 	protected void prepareScenario(Scenario scenario) {
 		super.prepareScenario(scenario);
 		// increase bike speed by factor 2
-		VehicleType bike = scenario.getVehicles().getVehicleTypes().get("bike");
+		VehicleType bike = scenario.getVehicles()
+			.getVehicleTypes()
+			.get(Id.create("bike", VehicleType.class));
 		bike.setMaximumVelocity(bike.getMaximumVelocity() * 2);
 	}
 
