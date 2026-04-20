@@ -165,7 +165,7 @@ public final class DresdenSimWrapperRunner implements MATSimAppCommand {
 			try {
 				sw.generate(runDirectory, true);
 				sw.run(runDirectory);
-			} catch (IOException _) {
+			} catch (IOException e) {
 				throw new InterruptedIOException();
 			}
 

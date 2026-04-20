@@ -18,7 +18,7 @@ dresdenRaw := $(CURDIR)/../../shared-svn/raw/europe/de/dresden
 
 MEMORY ?= 50G
 #JAR := matsim-$(N)-*.jar
-JAR := matsim-dresden-1.1-v1.0.2-64-dirty.jar
+JAR := matsim-dresden-1.1-v1.0.2-68.jar
 
 # Scenario creation tool
 sc := java -Xms$(MEMORY) -Xmx$(MEMORY) -jar $(JAR)
