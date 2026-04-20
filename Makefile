@@ -18,7 +18,7 @@ dresdenRaw := $(CURDIR)/../../shared-svn/raw/europe/de/dresden
 
 MEMORY ?= 50G
 #JAR := matsim-$(N)-*.jar
-JAR := matsim-dresden-1.1-v1.0.2-60.jar
+JAR := matsim-dresden-1.1-v1.0.2-64-dirty.jar
 
 # Scenario creation tool
 sc := java -Xms$(MEMORY) -Xmx$(MEMORY) -jar $(JAR)
@@ -156,13 +156,6 @@ NETWORK := $(shared)/before-calibration/output/network.osm.pbf
 	 --subpopulation "longDistanceFreight"\
 	 --output $@
 
-# this step is needed because some transit trips of long distance freight traffic have acts without coords.
-# RE is fixing this in core. Until then: Manually find affected agents in above pop and comment them out if not too many.
-# Currently, 36 agents are affected. With the following we can check the pop for more malfunctions and create the summary tsv
-# which cannot be created with malfunctioned agents. -sm0426
-../../shared-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/before-calibration/output/plans-longHaulFreight-locations-summary.tsv: ../../shared-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/before-calibration/output/plans-longHaulFreight.xml.gz
-	$(sc) analysis check-summarize-freight $<
-
 # create facilities for commercial traffic
 # the following 2 steps are typically run on the math cluster by Ricardo Ewert. the steps are here for documentation.
 # the necessary small scale commercial traffic plans file is copied from the cluster into the local directory for further use.
@@ -246,11 +239,6 @@ NETWORK := $(shared)/before-calibration/output/network.osm.pbf
 	 --buffer 10000\
 	 --check-beeline
 
-#this class checks if and how many stay home agents the population has.
-#please check the log. If there are no stay home agents DO NOT CONTINUE THE SCENARIO GENERATION PROCESS.
-input/dummyFile.csv: $(shared)/before-calibration/output/prepare-cutout-100pct.plans.xml.gz
-	$(sc) analysis stay-home-agents $<
-
 # same goes for small scale commercial traffic.
 ../../shared-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/before-calibration/output/dresden-small-scale-commercialTraffic-v1.1-100pct.xml.gz: $(shared)/before-calibration/commercial_traffic/output/oberlausitz-dresden-small-scale-commercialTraffic-v1.0-100pct.xml.gz $(shared)/before-calibration/output/$N-$V-network.xml.gz
 	 $(sc) prepare scenario-cutout\
@@ -264,7 +252,6 @@ input/dummyFile.csv: $(shared)/before-calibration/output/prepare-cutout-100pct.p
 	 --buffer 10000\
 	 --check-beeline
 
-#TODO: continue here
 ../../shared-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/before-calibration/output/prepare-cutout-fixed-subtours-100pct.plans.xml.gz: $(shared)/before-calibration/output/prepare-cutout-100pct.plans.xml.gz
 # change modes in subtours with chain based AND non-chain based by choosing mode for subtour randomly
 	$(sc) prepare fix-subtour-modes --coord-dist 100 --input $< --output $@
@@ -274,9 +261,12 @@ input/dummyFile.csv: $(shared)/before-calibration/output/prepare-cutout-100pct.p
 # this step is necessary to process the plans for a 0it test. the 0it test is used to generate trips and persons tables
 # for the calculation of a number of short distance trips to add (compared to reference data).
 # the calculation is done in python script extract_ref_data.py
+#some plans apparently have a sum of act_duration >> 86400. This is some issue in the input data, we decided to ignore that for dresden v1.1.
+#To fix the above issue, we set --overlong-plans-factor 1.5
 ../../shared-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/before-calibration/output/prepare-100pct-with-trips-split-merged.plans_FOR_0IT_TEST.xml.gz: $(shared)/before-calibration/output/prepare-cutout-fixed-subtours-100pct.plans.xml.gz
 	$(sc) prepare split-activity-types-duration\
 		--input $<\
+		--overlong-plans-factor 1.5\
 		--exclude commercial_start,commercial_end,freight_start,freight_end,service\
 		--output $@
 
@@ -293,15 +283,18 @@ input/dummyFile.csv: $(shared)/before-calibration/output/prepare-cutout-100pct.p
 	$(sc) prepare generate-short-distance-trips\
    	 --population $(word 2,$^)\
    	 --input-crs $(CRS)\
-  	 --shp $(shared)/data/dresden-model/shp/v1.0_vvo_tarifzone_10_dresden_utm32n.shp --shp-crs $(CRS)\
+  	 --shp $(shared)/shp/v1.1_vvo_tarifzone_10_dresden_utm32n.shp --shp-crs $(CRS)\
   	 --range 700\
     --num-trips 43524\
     --output $@
 #   this step *has to* be done after the generation of short distance trips.
 #	split activity types to type_duration for the scoring to take into account the typical duration
+#some plans apparently have a sum of act_duration >> 86400. This is some issue in the input data, we decided to ignore that for dresden v1.1.
+#To fix the above issue, we set --overlong-plans-factor 1.5
 #	TODO: usage of --end-time-to-duration does not remove all end times of activities below 1800s (default value)
 	$(sc) prepare split-activity-types-duration\
 		--input $@\
+		--overlong-plans-factor 1.5\
 		--exclude commercial_start,commercial_end,freight_start,freight_end,service\
 		--output $@
 #	merge person and freight pops
@@ -309,12 +302,12 @@ input/dummyFile.csv: $(shared)/before-calibration/output/prepare-cutout-100pct.p
 
 # there should be more detailed algorithms to create activity facilities than the below class. it creates one facility per activity coord.
 # see https://github.com/matsim-scenarios/matsim-hannover/issues/1
-input/v1.0/dresden-v1.0-100pct.plans-initial.xml.gz: input/$V/prepare-100pct-with-trips-split-merged.plans.xml.gz input/$V/$N-$V-network-with-pt.xml.gz
+../../shared-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/before-calibration/output/dresden-v1.1-100pct.plans-initial.xml.gz: $(shared)/before-calibration/output/prepare-100pct-with-trips-split-merged.plans.xml.gz $(shared)/before-calibration/output/$N-$V-network-with-pt.xml.gz
 	$(sc) prepare facilities\
     		--input-population $<\
             --network $(word 2,$^)\
             --output-population $@\
-            --output-facilities input/$V/$N-$V-activity-facilities.xml.gz
+            --output-facilities $(shared)/before-calibration/output/$N-$V-activity-facilities.xml.gz
 # for small scale commercial traffic generation some vehicle types (truck8t, truck18t and truck40t) are named differently than in this scenario.
 # this causes a crash of simulation. We delete them here and they will be auto generated when starting the sim. For car the veh types are named equally.
 	$(sc) prepare remove-vehicles\
@@ -327,13 +320,12 @@ input/v1.0/dresden-v1.0-100pct.plans-initial.xml.gz: input/$V/prepare-100pct-wit
     	 --sample-size 1\
     	 --samples 0.25 0.1 0.01 0.001\
 
-# output of check-population was compared to initial output in matsim-oberlausitz-dresden scenario documentation, they align -sm0225
-# I also compared the dresden only plans to the oberlausitz-dresden plans and the snz modellsteckbrief. see internal documentation. -sm1025
-check: input/$V/$N-$V-100pct.plans-initial.xml.gz
+# output of check population seems to be ok. -sm0426
+check: $(shared)/before-calibration/output/$N-$V-100pct.plans-initial.xml.gz
 	$(sc) analysis check-population $<\
  	 --input-crs $(CRS)\
-	 --shp $(shared)/data/dresden-model/shp/v1.0_vvo_tarifzone_10_dresden_utm32n.shp --shp-crs $(CRS)
+	 --shp $(shared)/shp/v1.1_vvo_tarifzone_10_dresden_utm32n.shp --shp-crs $(CRS)
 
 # Aggregated target
-prepare: input/$V/$N-$V-100pct.plans-initial.xml.gz input/$V/$N-$V-network-with-pt.xml.gz
+prepare: $(shared)/before-calibration/output/$N-$V-100pct.plans-initial.xml.gz $(shared)/before-calibration/output/$N-$V-network-with-pt.xml.gz
 	echo "Done"
