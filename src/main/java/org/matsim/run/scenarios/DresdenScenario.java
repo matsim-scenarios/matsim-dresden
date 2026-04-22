@@ -85,7 +85,7 @@ public class DresdenScenario extends MATSimApplication {
 	}
 
 	public DresdenScenario() {
-		super(String.format("input/%s/dresden-%s-10pct.config.xml", VERSION, VERSION));
+		super();
 	}
 
 	public static void main(String[] args) {
