@@ -72,8 +72,6 @@ public class DresdenScenario extends MATSimApplication {
 
 	public static final String VERSION = "v1.0";
 
-	@CommandLine.Mixin
-	private final SampleOptions sample = new SampleOptions(100, 25, 10, 1);
 	@CommandLine.Option(names = "--emissions", defaultValue = "ENABLED", description = "Define if emission analysis should be performed or not.")
 	DresdenUtils.FunctionalityHandling emissions;
 	@CommandLine.Option(names = "--explicit-walk-intermodality", defaultValue = "ENABLED", description = "Define if explicit walk intermodality parameter to/from pt should be set or not (use default).")
@@ -107,17 +105,6 @@ public class DresdenScenario extends MATSimApplication {
 		simWrapper.defaultParams().setMapZoomLevel(6.8);
 //		the tarifzone shp file basically is a dresden shp file with fare prices as additional information
 		simWrapper.defaultParams().setShp(String.format("vvo_tarifzone_10_dresden/%s_vvo_tarifzone_10_dresden_utm32n.shp", VERSION));
-
-		if (sample.isSet()){
-			config.controller().setOutputDirectory(sample.adjustName(config.controller().getOutputDirectory()));
-			config.plans().setInputFile(sample.adjustName(config.plans().getInputFile()));
-			config.controller().setRunId(sample.adjustName(config.controller().getRunId()));
-
-			config.qsim().setFlowCapFactor(sample.getSample());
-			config.qsim().setStorageCapFactor(sample.getSample());
-			config.counts().setCountsScaleFactor(sample.getSample());
-			simWrapper.setSampleSize(sample.getSample());
-		}
 
 		config.vspExperimental().setVspDefaultsCheckingLevel(VspExperimentalConfigGroup.VspDefaultsCheckingLevel.abort);
 
