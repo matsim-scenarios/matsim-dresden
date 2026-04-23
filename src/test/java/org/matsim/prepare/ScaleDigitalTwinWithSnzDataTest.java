@@ -6,36 +6,32 @@ import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
-import org.matsim.api.core.v01.population.Population;
-import org.matsim.core.population.PopulationUtils;
-import org.matsim.core.utils.io.IOUtils;
-import org.matsim.examples.ExamplesUtils;
 import org.matsim.testcases.MatsimTestUtils;
 
 /**
  * @author d-roeder (vsp)
  */
 class ScaleDigitalTwinWithSnzDataTest {
-	
+
 	@RegisterExtension
 	private MatsimTestUtils utils = new MatsimTestUtils();
 
 	@Test
 	void testParseData() {
 		String personStats = utils.getClassInputDirectory() + "/testdata.csv";
-		Map<String, Double> personStatsPerPLZ = ScaleDigitalTwinWithSnzData.loadPersonStatsPerPLZ(personStats, 1.);
+		Map<String, Double> personStatsPerPLZ = ScaleDigitalTwinWithSnzData.loadOohStatsPerPLZ(personStats);
 		assertEquals(0.6905697445972495, personStatsPerPLZ.get("01067"), MatsimTestUtils.EPSILON);
 		assertEquals(0.6767335199004975, personStatsPerPLZ.get("01069"), MatsimTestUtils.EPSILON);
-		assertEquals(1, personStatsPerPLZ.get(ScaleDigitalTwinWithSnzData.ALL), MatsimTestUtils.EPSILON);
+		assertEquals(0.6811880666244992, personStatsPerPLZ.get(ScaleDigitalTwinWithSnzData.GLOBAL), MatsimTestUtils.EPSILON);
 	}
-	
+
 //	@Test
 //	void testModifyPopulation() {
 //		String[] args = new String[] {
 //				"--outputpath", utils.getOutputDirectory(),
 //				"--inputconfig", IOUtils.extendUrl(ExamplesUtils.getTestScenarioURL("equil"), "config.xml").toString(),
 //				"--personstats", utils.getClassInputDirectory() + "/testdata.csv"
-//				
+//
 //		};
 //		ScaleDigitalTwinWithSnzData.main(args);
 //		Population population = PopulationUtils.readPopulation(utils.getOutputDirectory() + "/" + ScaleDigitalTwinWithSnzData.POPULATIONFILE);
@@ -43,7 +39,7 @@ class ScaleDigitalTwinWithSnzDataTest {
 //		assertEquals(mobile, 66);
 //		assertEquals(population.getPersons().size(), 100);
 //	}
-	
+
 //	@Test
 //	void testOriginalPopulation() {
 //		String[] args = new String[] {
