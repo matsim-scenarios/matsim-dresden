@@ -29,6 +29,9 @@ public class AssignPersonAttributeFromShapefile implements MATSimAppCommand {
 	@CommandLine.Option(names = "--inputconfig", description = "Path to input config", required = true)
 	private String inputconfig;
 
+	@CommandLine.Option(names = "--population-crs", description = "crs of the population", required = true)
+	private String populationCrs;
+
 	@CommandLine.Option(names = "--output", description = "outputpath", required = true)
 	private Path output;
 
@@ -53,7 +56,7 @@ public class AssignPersonAttributeFromShapefile implements MATSimAppCommand {
 		}
 		output.toFile().mkdirs();
 
-		ShpOptions.Index index = shp.createIndex(shp.getShapeCrs(), shpAttribute);
+		ShpOptions.Index index = shp.createIndex(populationCrs, shpAttribute);
 
 		Config config = ConfigUtils.loadConfig(inputconfig);
 		Scenario scenario = ScenarioUtils.loadScenario(config);

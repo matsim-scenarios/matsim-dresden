@@ -233,8 +233,7 @@ public class ScaleDigitalTwinWithSnzData implements MATSimAppCommand {
 			});
 			double defaultMobilityRate = nPersonsGlobal.get() > 0 ? (1.* nMobilePersonsGlobal.get() / nPersonsGlobal.get()) : 0;
 			mobilityRate.put(GLOBAL, defaultMobilityRate);
-			log.info("done parsing personstats from: {}", personStatsFile);
-			log.info("default mobilityRate is: {}", defaultMobilityRate);
+			log.info("done parsing personstats from: {}, global out-of-home-rate is {}", personStatsFile, defaultMobilityRate);
 
 			return mobilityRate;
 		} catch (Exception e) {
