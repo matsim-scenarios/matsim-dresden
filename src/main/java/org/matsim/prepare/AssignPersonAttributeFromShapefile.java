@@ -3,17 +3,19 @@ package org.matsim.prepare;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.matsim.api.core.v01.Coord;
-import org.matsim.api.core.v01.population.Activity;
+import org.matsim.api.core.v01.Scenario;
 import org.matsim.api.core.v01.population.Person;
 import org.matsim.api.core.v01.population.Population;
+import org.matsim.api.core.v01.population.PopulationWriter;
 import org.matsim.application.MATSimAppCommand;
-import org.matsim.application.options.CrsOptions;
 import org.matsim.application.options.ShpOptions;
-import org.matsim.core.population.PopulationUtils;
-import org.matsim.core.router.TripStructureUtils;
+import org.matsim.core.config.Config;
+import org.matsim.core.config.ConfigUtils;
+import org.matsim.core.config.ConfigWriter;
+import org.matsim.core.scenario.ScenarioUtils;
 import picocli.CommandLine;
 
-import java.nio.file.Files;
+import java.io.File;
 import java.nio.file.Path;
 
 @CommandLine.Command(
@@ -24,8 +26,8 @@ public class AssignPersonAttributeFromShapefile implements MATSimAppCommand {
 
 	private static final Logger log = LogManager.getLogger(AssignPersonAttributeFromShapefile.class);
 
-	@CommandLine.Parameters(arity = "1", paramLabel = "INPUT", description = "Path to input population")
-	private Path input;
+	@CommandLine.Option(names = "--inputconfig", description = "Path to input config", required = true)
+	private String inputconfig;
 
 	@CommandLine.Option(names = "--output", description = "outputpath", required = true)
 	private Path output;
@@ -45,14 +47,17 @@ public class AssignPersonAttributeFromShapefile implements MATSimAppCommand {
 
 	@Override
 	public Integer call() throws Exception {
-		if (!Files.exists(input)) {
-			log.error("Input population does not exist: {}", input);
+		if (!new File(inputconfig).exists()) {
+			log.error("Input config does not exist: {}", inputconfig);
 			return 2;
 		}
+		output.toFile().mkdirs();
 
 		ShpOptions.Index index = shp.createIndex(shp.getShapeCrs(), shpAttribute);
 
-		Population population = PopulationUtils.readPopulation(input.toString());
+		Config config = ConfigUtils.loadConfig(inputconfig);
+		Scenario scenario = ScenarioUtils.loadScenario(config);
+		Population population = scenario.getPopulation();
 
 		int assigned = 0;
 		int notFound = 0;
@@ -74,7 +79,14 @@ public class AssignPersonAttributeFromShapefile implements MATSimAppCommand {
 		}
 
 		log.info("Assigned '{}' to {} persons; {} persons had no matching shapefile feature", attributeName, assigned, notFound);
-		PopulationUtils.writePopulation(population, output.toString());
+
+		String outputplans = new File(output.toString(), ScaleDigitalTwinWithSnzData.POPULATIONFILE).getAbsolutePath();
+		new PopulationWriter(scenario.getPopulation()).write(outputplans);
+
+		scenario.getConfig().plans().setInputFile(outputplans);
+		String outputconfig = new File(output.toString(), ScaleDigitalTwinWithSnzData.CONFIG).getAbsolutePath();
+		new ConfigWriter(scenario.getConfig()).write(outputconfig);
+
 		return 0;
 	}
 

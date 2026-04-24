@@ -44,7 +44,7 @@ public class ScaleDigitalTwinWithSnzData implements MATSimAppCommand {
 	@CommandLine.Option(names = "--personstats", description = "the snz personstats-file for the actual day", required = true)
 	private String mobilityPersonStats;
 
-	private static final String CONFIG = "config.xml";
+	static final String CONFIG = "config.xml";
 	static final String POPULATIONFILE = "population.xml.gz";
 
 	static final String GLOBAL = "==GLOBAL==";
