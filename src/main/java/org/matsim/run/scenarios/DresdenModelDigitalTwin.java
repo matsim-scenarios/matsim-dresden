@@ -21,7 +21,7 @@ import org.matsim.smallScaleCommercialTrafficGeneration.prepare.CreateDataDistri
 
 import java.util.Set;
 @MATSimApplication.Prepare({
-	ScaleDigitalTwinWithSnzData.class, DummyPopulationProcess.class
+	ScaleDigitalTwinWithSnzData.class, AssignPersonAttributeFromShapefile.class, DummyPopulationProcess.class
 })
 public final class DresdenModelDigitalTwin extends DresdenModel {
 
