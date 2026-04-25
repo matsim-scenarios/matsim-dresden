@@ -10,22 +10,42 @@ public class BridgeCrossingAnalysisUtils {
 	static final String FLUEGELWEG_BRIDGE = "Flügelwegbrücke";
 	static final String MARIEN_BRIDGE = "Marienbrücke";
 	static final String AUGUSTUS_BRIDGE = "Augustusbrücke";
-	static final String WSB ="Waldschlößchenbrücke";
+	static final String WSB = "Waldschlößchenbrücke";
 	static final String BLAUES_WUNDER_BRIDGE = "Blaues Wunder";
+
 	static final String ELBE_BRIDGE_A4 = "Elbebrücke";
+	static final String TRAIN_MARIEN_BRIDGE = "Trains (Marienbrücke)";
 
 	// relevant stops
 	static final String SYNAGOGE = "Dresden Synagoge";
 	static final String CAROLAPLATZ = "Dresden Carolaplatz";
 	static final String PIRNAISCHER_PLATZ = "Dresden Pirnaischer Platz";
 	static final String ALBERTPLATZ = "Dresden Albertplatz";
+
 	static final String THEATHER_PLATZ = "Dresden Theaterplatz";
 	static final String NEU_STAEDTER_MARKT = "Dresden Neustädter Markt";
 
+	static final String KONGRESSZENTRUM = "DD Kongresszentrum/H d Presse";
+	static final String ANTON_STRASSE_LEIPZIGER_STRASSE = "Dresden Anton-/Leipziger Str.";
+
+	static final String FLUEGELWEG = "Dresden Flügelweg";
+	static final String WERFTSTRASSE = "Dresden Werftstraße";
+
+	static final String SACHSENALLEE = "Dresden Sachsenallee";
+	static final String ROSA_LUXEMBURG_PLATZ = "Dresden Rosa-Luxemburg-Platz";
+
+	static final String KAETHE_KOLLWITZ_UFER = "Dresden Käthe-Kollwitz-Ufer";
+	static final String WALDSCHLOSSCHEN = "Dresden Waldschlößchen";
+
+	static final String SCHILLERPLATZ = "Dresden Schillerplatz";
+	static final String KOERNERPLATZ = "Dresden Körnerplatz";
+
+	static final String BAHNHOF_MITTE = "Dresden Mitte";
+	static final String BAHNHOF_NEUSTADT = "Dresden-Neustadt";
 
 	static final String OTHER_STOP = "other";
 
-	static Set<String> getRelevantStops(){
+	static Set<String> getRelevantStops() {
 		Set<String> relevantStops = new HashSet<>();
 		relevantStops.add(SYNAGOGE);
 		relevantStops.add(CAROLAPLATZ);
@@ -33,8 +53,21 @@ public class BridgeCrossingAnalysisUtils {
 		relevantStops.add(ALBERTPLATZ);
 		relevantStops.add(THEATHER_PLATZ);
 		relevantStops.add(NEU_STAEDTER_MARKT);
+		relevantStops.add(KONGRESSZENTRUM);
+		relevantStops.add(ANTON_STRASSE_LEIPZIGER_STRASSE);
+		relevantStops.add(FLUEGELWEG);
+		relevantStops.add(WERFTSTRASSE);
+		relevantStops.add(SACHSENALLEE);
+		relevantStops.add(ROSA_LUXEMBURG_PLATZ);
+		relevantStops.add(KAETHE_KOLLWITZ_UFER);
+		relevantStops.add(WALDSCHLOSSCHEN);
+		relevantStops.add(SCHILLERPLATZ);
+		relevantStops.add(KOERNERPLATZ);
+
+		relevantStops.add(BAHNHOF_MITTE);
+		relevantStops.add(BAHNHOF_NEUSTADT);
 		return relevantStops;
-	};
+	}
 
 	// checking relevant connections
 	// ### Carola bridge
@@ -44,7 +77,7 @@ public class BridgeCrossingAnalysisUtils {
 
 	static boolean isCarolaBridgeSouthToNorth(String fromStop, String toStop) {
 		// tram 3 + 7
-		if (fromStop.equals(SYNAGOGE) && toStop.equals(CAROLAPLATZ)){
+		if (fromStop.equals(SYNAGOGE) && toStop.equals(CAROLAPLATZ)) {
 			return true;
 		}
 		// bus 261
@@ -53,7 +86,7 @@ public class BridgeCrossingAnalysisUtils {
 
 	static boolean isCarolaBridgeNorthToSouth(String fromStop, String toStop) {
 		// tram 3 + 7
-		if (fromStop.equals(CAROLAPLATZ) && toStop.equals(SYNAGOGE)){
+		if (fromStop.equals(CAROLAPLATZ) && toStop.equals(SYNAGOGE)) {
 			return true;
 		}
 		// bus 261
@@ -65,37 +98,96 @@ public class BridgeCrossingAnalysisUtils {
 		return isAugustusBridgeSouthToNorth(fromStop, toStop) || isAugustusBridgeNorthToSouth(fromStop, toStop);
 	}
 
-	static boolean isAugustusBridgeSouthToNorth (String fromStop, String toStop) {
+	static boolean isAugustusBridgeSouthToNorth(String fromStop, String toStop) {
 		return fromStop.equals(THEATHER_PLATZ) && toStop.equals(NEU_STAEDTER_MARKT);
 	}
 
-	static boolean isAugustusBridgeNorthToSouth (String fromStop, String toStop) {
+	static boolean isAugustusBridgeNorthToSouth(String fromStop, String toStop) {
 		return fromStop.equals(NEU_STAEDTER_MARKT) && toStop.equals(THEATHER_PLATZ);
+	}
+
+	// ### Marien bridge
+	// tram 6 + 11
+	static boolean isMarienBridge(String fromStop, String toStop) {
+		return isMarienBridgeSouthToNorth(fromStop, toStop) || isMarienBridgeNorthToSouth(fromStop, toStop);
+	}
+
+	static boolean isMarienBridgeSouthToNorth(String fromStop, String toStop) {
+		return fromStop.equals(KONGRESSZENTRUM) && toStop.equals(ANTON_STRASSE_LEIPZIGER_STRASSE);
+	}
+
+	static boolean isMarienBridgeNorthToSouth(String fromStop, String toStop) {
+		return fromStop.equals(ANTON_STRASSE_LEIPZIGER_STRASSE) && toStop.equals(KONGRESSZENTRUM);
+	}
+
+	// ### Flügelweg bridge
+	// bus 70 + 80
+	static boolean isFluegelwegBridge(String fromStop, String toStop) {
+		return isFluegelwegBridgeSouthToNorth(fromStop, toStop) || isFluegelwegBridgeNorthToSouth(fromStop, toStop);
+	}
+
+	static boolean isFluegelwegBridgeSouthToNorth(String fromStop, String toStop) {
+		return fromStop.equals(FLUEGELWEG) && toStop.equals(WERFTSTRASSE);
+	}
+
+	static boolean isFluegelwegBridgeNorthToSouth(String fromStop, String toStop) {
+		return fromStop.equals(WERFTSTRASSE) && toStop.equals(FLUEGELWEG);
 	}
 
 	// ### Albert bridge
 	// tram 6 + 13
+	static boolean isAlbertBridge(String fromStop, String toStop) {
+		return isAlbertBridgeSouthToNorth(fromStop, toStop) || isAlbertBridgeNorthToSouth(fromStop, toStop);
+	}
 
+	static boolean isAlbertBridgeSouthToNorth(String fromStop, String toStop) {
+		return fromStop.equals(SACHSENALLEE) && toStop.equals(ROSA_LUXEMBURG_PLATZ);
+	}
+
+	static boolean isAlbertBridgeNorthToSouth(String fromStop, String toStop) {
+		return fromStop.equals(ROSA_LUXEMBURG_PLATZ) && toStop.equals(SACHSENALLEE);
+	}
 
 	// ### WSB
-	// bus 64 + 520 (?)
+	// bus 64 + 520
+	static boolean isWsbBridge(String fromStop, String toStop) {
+		return isWsbBridgeSouthToNorth(fromStop, toStop) || isWsbBridgeNorthToSouth(fromStop, toStop);
+	}
 
+	static boolean isWsbBridgeSouthToNorth(String fromStop, String toStop) {
+		return fromStop.equals(KAETHE_KOLLWITZ_UFER) && toStop.equals(WALDSCHLOSSCHEN);
+	}
+
+	static boolean isWsbBridgeNorthToSouth(String fromStop, String toStop) {
+		return fromStop.equals(WALDSCHLOSSCHEN) && toStop.equals(KAETHE_KOLLWITZ_UFER);
+	}
 
 	// ### Blaues Wunder bridge
 	// bus 61 + 63 + 84 + 521
+	static boolean isBlauesWunderBridge(String fromStop, String toStop) {
+		return isBlauesWunderBridgeSouthToNorth(fromStop, toStop) || isBlauesWunderBridgeNorthToSouth(fromStop, toStop);
+	}
 
-	// ### Augustus bridge
+	static boolean isBlauesWunderBridgeSouthToNorth(String fromStop, String toStop){
+		return fromStop.equals(SCHILLERPLATZ) && toStop.equals(KOERNERPLATZ);
+	}
 
-
-	// ### Marien bridge
-	// tram 6 + 11
-
-
-	// ### Flügelweg bridge
-	// bus 70 + 80
-
+	static boolean isBlauesWunderBridgeNorthToSouth(String fromStop, String toStop){
+		return fromStop.equals(KOERNERPLATZ) && toStop.equals(SCHILLERPLATZ);
+	}
 
 	// ### Regional trains
+	static boolean isTrainMarienBridge(String fromStop, String toStop) {
+		return isTrainMarienBridgeNorthToSouth(fromStop, toStop) || isTrainMarienBridgeSouthToNorth(fromStop, toStop);
+	}
+
+	static boolean isTrainMarienBridgeSouthToNorth(String fromStop, String toStop) {
+		return fromStop.equals(BAHNHOF_MITTE) && toStop.equals(BAHNHOF_NEUSTADT);
+	}
+
+	static boolean isTrainMarienBridgeNorthToSouth(String fromStop, String toStop) {
+		return fromStop.equals(BAHNHOF_NEUSTADT) && toStop.equals(BAHNHOF_MITTE);
+	}
 
 
 	// ### Ferry
