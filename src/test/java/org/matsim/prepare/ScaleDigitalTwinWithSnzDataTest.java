@@ -32,7 +32,7 @@ class ScaleDigitalTwinWithSnzDataTest {
 	@Test
 	void testParseData() {
 		String personStats = utils.getClassInputDirectory() + "/testdata.csv";
-		Map<String, Double> personStatsPerPLZ = ScaleDigitalTwinWithSnzData.loadOohStatsPerPLZ(personStats);
+		Map<String, Double> personStatsPerPLZ = ScaleDigitalTwinWithSnzData.loadOohStatsPerZipcode(personStats);
 		assertEquals(0.6905697445972495, personStatsPerPLZ.get("01067"), MatsimTestUtils.EPSILON);
 		assertEquals(0.6767335199004975, personStatsPerPLZ.get("01069"), MatsimTestUtils.EPSILON);
 		assertEquals(0.6811880666244992, personStatsPerPLZ.get(ScaleDigitalTwinWithSnzData.GLOBAL), MatsimTestUtils.EPSILON);
@@ -78,7 +78,9 @@ class ScaleDigitalTwinWithSnzDataTest {
 			"--outputpath", dir,
 			"--inputconfig", configFile,
 			"--personstatsReference", refStats,
-			"--personstats", actualStats
+			"--personstats", actualStats,
+			"--date", "2026-04-27",
+			"--experiment-id", "test-non-person"
 		});
 
 		Population result = PopulationUtils.readPopulation(new File(dir, ScaleDigitalTwinWithSnzData.POPULATIONFILE).getAbsolutePath());
@@ -165,7 +167,9 @@ class ScaleDigitalTwinWithSnzDataTest {
 			"--outputpath", dir,
 			"--inputconfig", configFile,
 			"--personstatsReference", refStats,
-			"--personstats", actualStats
+			"--personstats", actualStats,
+			"--date", "2026-04-27",
+			"--experiment-id", "test-fallback"
 		});
 
 		Population result = PopulationUtils.readPopulation(new File(dir, ScaleDigitalTwinWithSnzData.POPULATIONFILE).getAbsolutePath());
@@ -221,7 +225,9 @@ class ScaleDigitalTwinWithSnzDataTest {
 			"--outputpath", dir,
 			"--inputconfig", configFile,
 			"--personstatsReference", refStats,
-			"--personstats", actualStats
+			"--personstats", actualStats,
+			"--date", "2026-04-27",
+			"--experiment-id", "test-full"
 		});
 
 		// 2 original stay-home removed → 10 remain
@@ -234,7 +240,7 @@ class ScaleDigitalTwinWithSnzDataTest {
 			.count();
 		assertEquals(4, stayHome);
 
-		assertTrue(new File(dir, "mobility-stats-per-plz.csv.gz").exists());
+		assertTrue(new File(dir, "mobility-stats-per-zipcode.csv.gz").exists());
 	}
 
 	private static void addMobilePerson(Population population, String id, String plz) {
