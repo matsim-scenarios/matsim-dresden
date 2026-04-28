@@ -21,7 +21,7 @@ class RunIntegrationTest {
 	@Test
 	void runScenario() {
 		Config config = ConfigUtils.loadConfig(String.format("input/%s/dresden-%s-10pct.config.xml", DresdenScenario.VERSION, DresdenScenario.VERSION));
-		ConfigUtils.addOrGetModule(config, SimWrapperConfigGroup.class).setDefaultDashboards(SimWrapperConfigGroup.Mode.disabled);
+		ConfigUtils.addOrGetModule(config, SimWrapperConfigGroup.class).setDefaultDashboards(SimWrapperConfigGroup.DefaultDashboardsMode.disabled);
 
 		assert MATSimApplication.execute(DresdenScenario.class, config,
 			"--1pct",
