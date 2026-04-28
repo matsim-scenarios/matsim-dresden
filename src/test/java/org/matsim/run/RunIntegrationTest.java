@@ -71,14 +71,14 @@ class RunIntegrationTest {
 		Assertions.assertTrue(new File(utils.getOutputDirectory()).isDirectory());
 		Assertions.assertTrue(new File(utils.getOutputDirectory()).exists());
 
-		String outputPlansFilename = config.controller().getRunId() + ".output_plans.xml.gz";
+		String outputPlansFilename = config.controller().getRunId() + ".output_plans.xml.zst";
 
 		{
 			Population expected = PopulationUtils.createPopulation( ConfigUtils.createConfig() ) ;
-			PopulationUtils.readPopulation( expected, utils.getInputDirectory() + "/" + outputPlansFilename );
+			PopulationUtils.readPopulation( expected, utils.getInputDirectory() + outputPlansFilename );
 
 			Population actual = PopulationUtils.createPopulation( ConfigUtils.createConfig() ) ;
-			PopulationUtils.readPopulation( actual, utils.getOutputDirectory() + "/" + outputPlansFilename );
+			PopulationUtils.readPopulation( actual, utils.getOutputDirectory() + outputPlansFilename );
 
 			for ( Id<Person> personId : expected.getPersons().keySet()) {
 				double scoreReference = expected.getPersons().get(personId).getSelectedPlan().getScore();
@@ -91,8 +91,8 @@ class RunIntegrationTest {
 			// differ by JDK (e.g. oracle vs. ...).   So not testing this any more for the time being.  kai, jul'23
 		}
 		{
-			String expected = utils.getInputDirectory() + "/dresden-1pct.output_events.xml.gz" ;
-			String actual = utils.getOutputDirectory() + "/dresden-1pct.output_events.xml.gz" ;
+			String expected = utils.getInputDirectory() + "dresden-0.1pct.output_events.xml.zst" ;
+			String actual = utils.getOutputDirectory() + "dresden-0.1pct.output_events.xml.zst" ;
 			ComparisonResult result = EventsUtils.compareEventsFiles( expected, actual );
 			assertEquals( ComparisonResult.FILES_ARE_EQUAL, result );
 		}
@@ -125,9 +125,9 @@ class RunIntegrationTest {
 		DresdenModel.main(new String[]{"--config", configPath,
 			"--1pct",
 			"--iterations", "1",
-			"--config:plans.inputPlansFile", "https://svn.vsp.tu-berlin.de/repos/public-svn/matsim/scenarios/countries/de/dresden/dresden-v1.0/input/dresden-v1.0-0.1pct.plans-initial.xml.gz",//记录使用的样品数量
-			"--output", utils.getOutputDirectory(),//记录output路径
-			"--config:controller.overwriteFiles=deleteDirectoryIfExists",//刷新output
+			"--config:plans.inputPlansFile", "https://svn.vsp.tu-berlin.de/repos/public-svn/matsim/scenarios/countries/de/dresden/dresden-v1.0/input/dresden-v1.0-0.1pct.plans-initial.xml.gz",
+			"--output", utils.getOutputDirectory(),
+			"--config:controller.overwriteFiles=deleteDirectoryIfExists",
 			"--config:global.numberOfThreads", "2",
 			"--config:qsim.numberOfThreads", "2",
 			"--config:simwrapper.defaultDashboards", "disabled",
@@ -143,7 +143,7 @@ class RunIntegrationTest {
 		String configPath = String.format("input/%s/dresden-%s-10pct.config.xml", DresdenModel.VERSION, DresdenModel.VERSION);
 
 		// start with wrong plans file
-		Assertions.assertThrows(UncheckedIOException.class, () ->//if fail go pass, if pass go fail
+		Assertions.assertThrows(UncheckedIOException.class, () ->
 			DresdenModel.main(new String[]{"--config", configPath,
 				"--1pct",
 				"--iterations", "1",

@@ -226,7 +226,9 @@ public class DresdenModel extends MATSimApplication {
 				addTravelTimeBinding(TransportMode.ride).to(carTravelTime());
 				addTravelDisutilityFactoryBinding(TransportMode.ride).to(carTravelDisutilityFactoryKey());
 
-				Multibinder.newSetBinder( binder(), DashboardProvider.class ).addBinding().to( DresdenDashboardProvider.class );
+				DresdenDashboardProvider dashboardProvider = new DresdenDashboardProvider(emissions);
+
+				Multibinder.newSetBinder( binder(), DashboardProvider.class ).addBinding().toInstance( dashboardProvider );
 			}
 		});
 	}
