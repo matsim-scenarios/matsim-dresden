@@ -11,7 +11,8 @@ import org.matsim.application.prepare.population.ExtractHomeCoordinates;
 import org.matsim.core.population.PersonUtils;
 import org.matsim.core.population.PopulationUtils;
 import org.matsim.core.router.TripStructureUtils;
-import org.matsim.utils.DresdenUtils;
+import org.matsim.run.scenarios.DresdenUtils;
+import org.matsim.run.scenarios.DresdenUtils.SNZPersonAttributeNames;
 import picocli.CommandLine;
 
 import java.math.BigDecimal;
@@ -82,7 +83,7 @@ public class PreparePopulation implements MATSimAppCommand {
 		// Set car availability to "never" for agents below 18 years old
 		// Standardize the attribute "age"
 		String avail = "always";
-		Object age = person.getAttributes().getAttribute(DresdenUtils.SNZPersonAttributeNames.getAgeAttributeName());
+		Object age = person.getAttributes().getAttribute( SNZPersonAttributeNames.AGE );
 		if (age != null && (int) age < 18) {
 			avail = "never";
 		}
@@ -92,7 +93,7 @@ public class PreparePopulation implements MATSimAppCommand {
 		PersonUtils.setCarAvail(person, avail);
 
 		// Standardize the attribute "sex"
-		Object sex = person.getAttributes().getAttribute(DresdenUtils.SNZPersonAttributeNames.getGenderAttributeName());
+		Object sex = person.getAttributes().getAttribute( SNZPersonAttributeNames.GENDER );
 		if (sex != null) {
 			PersonUtils.setSex(person, (String) sex);
 //			gender and sex are two different things: sex is the biological sex, assigned at birth
@@ -108,8 +109,8 @@ public class PreparePopulation implements MATSimAppCommand {
 
 		ExtractHomeCoordinates.setHomeCoordinate(person);
 
-		String incomeGroupString = (String) person.getAttributes().getAttribute(DresdenUtils.SNZPersonAttributeNames.getHhIncomeAttributeName());
-		String householdSizeString = (String) person.getAttributes().getAttribute(DresdenUtils.SNZPersonAttributeNames.getHhSizeAttributeName());
+		String incomeGroupString = (String) person.getAttributes().getAttribute( SNZPersonAttributeNames.HH_INCOME );
+		String householdSizeString = (String) person.getAttributes().getAttribute( SNZPersonAttributeNames.HH_SIZE );
 		int incomeGroup = 0;
 		double householdSize = 1;
 		if (incomeGroupString != null && householdSizeString != null) {

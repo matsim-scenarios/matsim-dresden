@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--TODO: before release: set correct input paths for all input files in this file to public svn calib output run files!-->
 <!DOCTYPE config SYSTEM "http://www.matsim.org/files/dtd/config_v2.dtd">
 <config>
 	<module name="timeAllocationMutator">
@@ -37,6 +38,7 @@
 	</module>
 
 	<module name="plans">
+<!--		TODO before release: set calibrated v1.1 plans input file.-->
 		<param name="inputPlansFile"
 			   value="https://svn.vsp.tu-berlin.de/repos/public-svn/matsim/scenarios/countries/de/dresden/dresden-v1.0/input/dresden-v1.0-10pct.plans.xml.gz"/>
 		<param name="removingUnnecessaryPlanAttributes" value="true"/>
@@ -143,6 +145,11 @@
 <!--		</parameterset>-->
 	</module>
 
+	<module name="simwrapper" >
+		<!-- Sample size of the run, which may be required by certain analysis functions. -->
+		<param name="sampleSize" value="0.1" />
+	</module>
+
 	<module name="subtourModeChoice">
 		<param name="chainBasedModes" value="car,bike"/>
 		<param name="modes" value="car,ride,pt,bike,walk"/>
@@ -178,6 +185,7 @@
 
 	<module name="scoring">
 		<param name="fractionOfIterationsToStartScoreMSA" value="0.9"/>
+		<!--		TODO before release: set calibrated v1.1 ascs.-->
 		<parameterset type="scoringParameters">
 			<parameterset type="modeParams">
 				<param name="constant" value="0.31670929636482503"/>

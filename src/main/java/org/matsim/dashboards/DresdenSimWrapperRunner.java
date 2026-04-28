@@ -36,6 +36,7 @@ import org.matsim.simwrapper.SimWrapperConfigGroup;
 import org.matsim.simwrapper.dashboard.EmissionsDashboard;
 import org.matsim.simwrapper.dashboard.NoiseDashboard;
 import org.matsim.simwrapper.dashboard.TripDashboard;
+import org.matsim.run.scenarios.DresdenUtils;
 import org.matsim.vehicles.MatsimVehicleWriter;
 import picocli.CommandLine;
 
@@ -43,11 +44,12 @@ import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.List;
 
 import static org.matsim.prepare.PrepareNetwork.prepareEmissionsAttributes;
-import static org.matsim.utils.DresdenUtils.prepareVehicleTypesForEmissionAnalysis;
-import static org.matsim.utils.DresdenUtils.setEmissionsConfigs;
+import static org.matsim.run.scenarios.DresdenUtils.prepareVehicleTypesForEmissionAnalysis;
+import static org.matsim.run.scenarios.DresdenUtils.setEmissionsConfigs;
 
 @CommandLine.Command(
 	name = "simwrapper",
@@ -60,14 +62,16 @@ public final class DresdenSimWrapperRunner implements MATSimAppCommand {
 	private List<Path> inputPaths;
 	@CommandLine.Mixin
 	private final ShpOptions shp = new ShpOptions();
-	@CommandLine.Option(names = "--noise", defaultValue = "false", description = "create noise dashboard")
-	private boolean noise;
-	@CommandLine.Option(names = "--trips", defaultValue = "false", description = "create trips dashboard")
-	private boolean trips;
-	@CommandLine.Option(names = "--emissions", defaultValue = "false", description = "create emission dashboard")
-	private boolean emissions;
+	@CommandLine.Option(names = "--noise", defaultValue = "NO_NOISE_ANALYSIS", description = "create noise dashboard")
+	private DresdenUtils.NoiseAnalysisHandling noise;
+	@CommandLine.Option(names = "--trips", defaultValue = "NO_TRIPS_ANALYSIS", description = "create trips dashboard")
+	private DresdenUtils.TripsAnalysisHandling trips;
+	@CommandLine.Option(names = "--emissions", defaultValue = "NO_EMISSIONS_ANALYSIS", description = "create emission dashboard. Options: RUN_EMISSIONS_ANALYSIS, NO_EMISSIONS_ANALYSIS")
+	DresdenUtils.EmissionsAnalysisHandling emissions;
 
-	private static final String FILE_TYPE = "_before_emissions.xml";
+	public static final String BEFORE = "_before_emissions.xml";
+	public static final String AFTER = "_after_emissions.xml";
+	public static final String XML = ".xml";
 
 
 	public DresdenSimWrapperRunner(){
@@ -81,7 +85,8 @@ public final class DresdenSimWrapperRunner implements MATSimAppCommand {
 	@Override
 	public Integer call() throws Exception {
 
-		if (!noise && !trips && !emissions){
+		if (noise == DresdenUtils.NoiseAnalysisHandling.NO_NOISE_ANALYSIS && trips == DresdenUtils.TripsAnalysisHandling.NO_TRIPS_ANALYSIS &&
+			emissions == DresdenUtils.EmissionsAnalysisHandling.NO_EMISSIONS_ANALYSIS){
 			throw new IllegalArgumentException("you have not configured any dashboard to be created! Please use command line parameters!");
 		}
 
@@ -97,15 +102,15 @@ public final class DresdenSimWrapperRunner implements MATSimAppCommand {
 				simwrapperCfg.get("").setShp(shp.getShapeFile());
 			}
 			//skip default dashboards
-			simwrapperCfg.setDefaultDashboards(SimWrapperConfigGroup.Mode.disabled);
+			simwrapperCfg.setDefaultDashboards(SimWrapperConfigGroup.DefaultDashboardsMode.disabled);
 
 			//add dashboards according to command line parameters
 //			if more dashboards are to be added here, we need to check if noise==true before adding noise dashboard here
-			if (noise) {
+			if (noise == DresdenUtils.NoiseAnalysisHandling.RUN_NOISE_ANALYSIS) {
 				sw.addDashboard(Dashboard.customize(new NoiseDashboard(config.global().getCoordinateSystem())).context("noise"));
 			}
 
-			if (trips) {
+			if (trips == DresdenUtils.TripsAnalysisHandling.RUN_TRIPS_ANALYSIS) {
 				sw.addDashboard(Dashboard.customize(new TripDashboard(
 					"mode_share_ref.csv",
 					"mode_share_per_dist_ref.csv",
@@ -115,15 +120,20 @@ public final class DresdenSimWrapperRunner implements MATSimAppCommand {
 					.setAnalysisArgs("--person-filter", "subpopulation=person")).context("calibration").title("Trips (calibration)"));
 			}
 
-			if (emissions) {
+//			we need to define the following paths outside of the following if clause because we need to use them later on.
+			String networkPath = ApplicationUtils.matchInput("*output_network.xml*", runDirectory).toString();
+			String vehiclesPath = ApplicationUtils.matchInput("*output_vehicles.xml*", runDirectory).toString();
+			String transitVehiclesPath = ApplicationUtils.matchInput("*output_transitVehicles.xml*", runDirectory).toString();
+			String populationPath = ApplicationUtils.matchInput("*output_plans.xml*", runDirectory).toString();
+			Path beforeEmissionsConfigPath = getUniqueTargetPath(Path.of(configPath.split(XML)[0] + BEFORE));
+			Path beforeEmissionsNetworkPath = getUniqueTargetPath(Path.of(networkPath.split(XML)[0] + BEFORE + ".gz"));
+			Path beforeEmissionsVehiclesPath = getUniqueTargetPath(Path.of(vehiclesPath.split(XML)[0] + BEFORE + ".gz"));
+			Path beforeEmissionsTransitVehiclesPath = getUniqueTargetPath(Path.of(transitVehiclesPath.split(XML)[0] + BEFORE + ".gz"));
+
+			if (emissions == DresdenUtils.EmissionsAnalysisHandling.RUN_EMISSIONS_ANALYSIS) {
 				sw.addDashboard(Dashboard.customize(new EmissionsDashboard(config.global().getCoordinateSystem())).context("emissions"));
 
 				setEmissionsConfigs(config);
-
-				String networkPath = ApplicationUtils.matchInput("output_network.xml.gz", runDirectory).toString();
-				String vehiclesPath = ApplicationUtils.matchInput("output_vehicles.xml.gz", runDirectory).toString();
-				String transitVehiclesPath = ApplicationUtils.matchInput("output_transitVehicles.xml.gz", runDirectory).toString();
-				String populationPath = ApplicationUtils.matchInput("output_plans.xml.gz", runDirectory).toString();
 
 				config.network().setInputFile(networkPath);
 				config.vehicles().setVehiclesFile(vehiclesPath);
@@ -136,14 +146,16 @@ public final class DresdenSimWrapperRunner implements MATSimAppCommand {
 				prepareEmissionsAttributes(scenario.getNetwork());
 				prepareVehicleTypesForEmissionAnalysis(scenario);
 
-//				write outputs with adapted files.
-//				original output files need to be overwritten as AirPollutionAnalysis searches for "config.xml".
-//				copy old files to separate files
-				Files.copy(Path.of(configPath), getUniqueTargetPath(Path.of(configPath.split(".xml")[0] + FILE_TYPE)));
-				Files.copy(Path.of(networkPath), getUniqueTargetPath(Path.of(networkPath.split(".xml")[0] + FILE_TYPE + ".gz")));
-				Files.copy(Path.of(vehiclesPath), getUniqueTargetPath(Path.of(vehiclesPath.split(".xml")[0] + FILE_TYPE + ".gz")));
-				Files.copy(Path.of(transitVehiclesPath), getUniqueTargetPath(Path.of(transitVehiclesPath.split(".xml")[0] + FILE_TYPE + ".gz")));
+//			write outputs with adapted files
+// 			original output files need to be overwritten as AirPollutionAnalysis searches for "config.xml".
+//			We will copy the original output files back to their old file names later. very clunky, but I see no alternative, if we want to keep our run output consistent.
+//			copy old files to separate files
+				Files.copy(Path.of(configPath), beforeEmissionsConfigPath);
+				Files.copy(Path.of(networkPath), beforeEmissionsNetworkPath);
+				Files.copy(Path.of(vehiclesPath), beforeEmissionsVehiclesPath);
+				Files.copy(Path.of(transitVehiclesPath), beforeEmissionsTransitVehiclesPath);
 
+//			now we can write the prepared output to the usual output file paths.
 				ConfigUtils.writeConfig(config, configPath);
 				NetworkUtils.writeNetwork(scenario.getNetwork(), networkPath);
 				new MatsimVehicleWriter(scenario.getVehicles()).writeFile(vehiclesPath);
@@ -155,6 +167,29 @@ public final class DresdenSimWrapperRunner implements MATSimAppCommand {
 				sw.run(runDirectory);
 			} catch (IOException e) {
 				throw new InterruptedIOException();
+			}
+
+			if (emissions == DresdenUtils.EmissionsAnalysisHandling.RUN_EMISSIONS_ANALYSIS) {
+//			after finishing the emissions analysis we can
+//			1) copy the transformed files to paths with _after_emissions suffix
+//			2) copy the original files from paths with suffix _before_emissions to original paths
+//			3) delete the files with _before_emissions suffix.
+				Path afterEmissionsConfigPath = getUniqueTargetPath(Path.of(configPath.split(XML)[0] + AFTER));
+				Path afterEmissionsNetworkPath = getUniqueTargetPath(Path.of(networkPath.split(XML)[0] + AFTER + ".gz"));
+				Path afterEmissionsVehiclesPath = getUniqueTargetPath(Path.of(vehiclesPath.split(XML)[0] + AFTER + ".gz"));
+				Path afterEmissionsTransitVehiclesPath = getUniqueTargetPath(Path.of(transitVehiclesPath.split(XML)[0] + AFTER + ".gz"));
+				Files.copy(Path.of(configPath), afterEmissionsConfigPath);
+				Files.copy(Path.of(networkPath), afterEmissionsNetworkPath);
+				Files.copy(Path.of(vehiclesPath), afterEmissionsVehiclesPath);
+				Files.copy(Path.of(transitVehiclesPath), afterEmissionsTransitVehiclesPath);
+				Files.copy(beforeEmissionsConfigPath, Path.of(configPath), StandardCopyOption.REPLACE_EXISTING);
+				Files.copy(beforeEmissionsNetworkPath, Path.of(networkPath), StandardCopyOption.REPLACE_EXISTING);
+				Files.copy(beforeEmissionsVehiclesPath, Path.of(vehiclesPath), StandardCopyOption.REPLACE_EXISTING);
+				Files.copy(beforeEmissionsTransitVehiclesPath, Path.of(transitVehiclesPath), StandardCopyOption.REPLACE_EXISTING);
+				Files.delete(beforeEmissionsConfigPath);
+				Files.delete(beforeEmissionsNetworkPath);
+				Files.delete(beforeEmissionsVehiclesPath);
+				Files.delete(beforeEmissionsTransitVehiclesPath);
 			}
 		}
 
