@@ -76,7 +76,7 @@ public class DresdenScenario extends MATSimApplication {
 	@CommandLine.Option(names = "--explicit-walk-intermodality", defaultValue = "ENABLED", description = "Define if explicit walk intermodality parameter to/from pt should be set or not (use default).")
 	static DresdenUtils.FunctionalityHandling explicitWalkIntermodality;
 	@CommandLine.Option(names = "--simwrapper", negatable = true, description = "Switch that enables or disables SimWrapper dashboard creation. If disabled, other SimWrapper related config options will be ignored. Default is enabled.", defaultValue = "true", fallbackValue = "true")
-	private boolean simwrapper;
+	protected boolean simwrapper;
 
 	public DresdenScenario(@Nullable Config config) {
 		super(config);
