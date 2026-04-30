@@ -1,13 +1,17 @@
 package org.matsim.prepare.digitalTwin;
 
+import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVPrinter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.matsim.api.core.v01.Scenario;
 import org.matsim.api.core.v01.population.Person;
+import org.matsim.api.core.v01.population.Population;
 import org.matsim.api.core.v01.population.PopulationWriter;
 import org.matsim.core.config.ConfigWriter;
 import org.matsim.core.gbl.MatsimRandom;
 import org.matsim.core.population.PopulationUtils;
+import org.matsim.core.utils.io.IOUtils;
 
 import java.io.File;
 import java.util.*;
@@ -116,5 +120,60 @@ public final class DigitalTwinUtils {
 		scenario.getConfig().counts().setCountsScaleFactor(scenario.getConfig().counts().getCountsScaleFactor() / originalOutOfHomeRate);
 
 		new ConfigWriter(scenario.getConfig()).write(outputconfig);
+	}
+
+
+	/**
+	 * Groups persons of subpopulation "person" by their attributes (ignoring home_x and home_y)
+	 * and returns the count per attribute combination. Also writes the results to a file.
+	 */
+	public static Map<TreeMap<String, String>, Long> analyzePopulationClusters(Population population, String outputfile) {
+		final Set<String> IGNORED_ATTRIBUTES = Set.of("home_x", "home_y", "subpopulation");
+
+		Map<TreeMap<String, String>, Long> clusters = new LinkedHashMap<>();
+
+		for (Person person : population.getPersons().values()) {
+			if (!SUBPOPULATION_PERSON.equals(PopulationUtils.getSubpopulation(person))) {
+				continue;
+			}
+
+			TreeMap<String, String> key = new TreeMap<>();
+			for (Map.Entry<String, Object> entry : person.getAttributes().getAsMap().entrySet()) {
+				if (!IGNORED_ATTRIBUTES.contains(entry.getKey())) {
+					key.put(entry.getKey(), String.valueOf(entry.getValue()));
+				}
+			}
+
+			clusters.merge(key, 1L, Long::sum);
+		}
+
+		log.info("Found {} distinct clusters in subpopulation 'person'.", clusters.size());
+
+		List<String> columns = clusters.keySet().stream().flatMap(k -> k.keySet().stream()).distinct().sorted().toList();
+
+		try (CSVPrinter printer = new CSVPrinter(IOUtils.getBufferedWriter(outputfile), CSVFormat.DEFAULT)) {
+			ArrayList<String> header = new ArrayList<>(columns);
+			header.add("cnt");
+			printer.printRecord(header);
+
+			for (Map.Entry<TreeMap<String, String>, Long> e : clusters.entrySet()) {
+				List<String> record = new ArrayList<>();
+				for (String k : columns) {
+					record.add(String.valueOf(e.getKey().getOrDefault(k, "NULL")));
+				}
+				record.add(String.valueOf(e.getValue()));
+				printer.printRecord(record);
+			}
+
+		} catch (Exception e) {
+			throw new RuntimeException(e);
+		}
+
+
+		clusters.entrySet().stream()
+			.sorted(Map.Entry.<TreeMap<String, String>, Long>comparingByValue().reversed())
+			.forEach(e -> log.info("count={} | {}", e.getValue(), e.getKey()));
+
+		return clusters;
 	}
 }
