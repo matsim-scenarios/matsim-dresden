@@ -56,6 +56,8 @@ public class ScaleDigitalTwinWithSnzData implements MATSimAppCommand {
 		Config config = ConfigUtils.loadConfig(inputconfig);
 		Scenario scenario = ScenarioUtils.loadScenario(config);
 
+		String inputDemographicsFile = new File(outputpath, "inputDemographics.csv.gz").getAbsolutePath();
+		Map<TreeMap<String, String>, Long> inputDemographics = DigitalTwinUtils.analyzePopulationClusters(scenario.getPopulation(), inputDemographicsFile);
 		Map<String, Double> modelOutOfHomeRates = DigitalTwinUtils.dropNonMobilePersonAgentsAndCalcOutOfHomeRate(scenario);
 
 		Map<String, Double> refOutOfHomeRate = loadOohStatsPerZipcode(refMobilityPersonStats);
@@ -67,6 +69,9 @@ public class ScaleDigitalTwinWithSnzData implements MATSimAppCommand {
 		 */
 		double globalOutOfHomeRate = modelOutOfHomeRates.get(DigitalTwinUtils.GLOBAL);
 		applyOutOfHomeRateChangeForPersonAgents(refOutOfHomeRate, actualOutOfHomeRate, modelOutOfHomeRates, scenario);
+		String outputDemographicsFile = new File(outputpath, "outputDemographics.csv.gz").getAbsolutePath();
+		Map<TreeMap<String, String>, Long> outputDemographics = DigitalTwinUtils.analyzePopulationClusters(scenario.getPopulation(), outputDemographicsFile);
+
 		DigitalTwinUtils.scaleNonPersonAgents(scenario, globalOutOfHomeRate);
 		DigitalTwinUtils.scaleConfigAndDumpResults(scenario, outputpath,globalOutOfHomeRate);
 		return 0;

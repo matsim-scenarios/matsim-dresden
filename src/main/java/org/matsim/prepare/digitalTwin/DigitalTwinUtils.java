@@ -128,7 +128,7 @@ public final class DigitalTwinUtils {
 	 * and returns the count per attribute combination. Also writes the results to a file.
 	 */
 	public static Map<TreeMap<String, String>, Long> analyzePopulationClusters(Population population, String outputfile) {
-		final Set<String> IGNORED_ATTRIBUTES = Set.of("home_x", "home_y", "subpopulation");
+		final Set<String> IGNORED_ATTRIBUTES = Set.of("home_x", "home_y", "subpopulation", "vehicles");
 
 		Map<TreeMap<String, String>, Long> clusters = new LinkedHashMap<>();
 
@@ -168,7 +168,6 @@ public final class DigitalTwinUtils {
 		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}
-
 
 		clusters.entrySet().stream()
 			.sorted(Map.Entry.<TreeMap<String, String>, Long>comparingByValue().reversed())
