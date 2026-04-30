@@ -83,11 +83,11 @@ public class AssignPersonAttributeFromShapefile implements MATSimAppCommand {
 
 		log.info("Assigned '{}' to {} persons; {} persons had no matching shapefile feature", attributeName, assigned, notFound);
 
-		String outputplans = new File(output.toString(), ScaleDigitalTwinWithSnzData.POPULATIONFILE).getAbsolutePath();
+		String outputplans = new File(output.toString(), DigitalTwinUtils.POPULATIONFILE).getAbsolutePath();
 		new PopulationWriter(scenario.getPopulation()).write(outputplans);
 
 		scenario.getConfig().plans().setInputFile(outputplans);
-		String outputconfig = new File(output.toString(), ScaleDigitalTwinWithSnzData.CONFIG).getAbsolutePath();
+		String outputconfig = new File(output.toString(), DigitalTwinUtils.CONFIG).getAbsolutePath();
 		new ConfigWriter(scenario.getConfig()).write(outputconfig);
 
 		return 0;

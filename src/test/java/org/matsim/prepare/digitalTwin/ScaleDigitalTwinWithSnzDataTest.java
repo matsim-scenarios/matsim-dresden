@@ -83,7 +83,7 @@ class ScaleDigitalTwinWithSnzDataTest {
 			"--experiment-id", "test-non-person"
 		});
 
-		Population result = PopulationUtils.readPopulation(new File(dir, ScaleDigitalTwinWithSnzData.POPULATIONFILE).getAbsolutePath());
+		Population result = PopulationUtils.readPopulation(new File(dir, DigitalTwinUtils.POPULATIONFILE).getAbsolutePath());
 
 		// globalOOH = 10/11 → rng.nextDouble() > 10/11 removes ~1/11 of freight agents
 		long freightCount = result.getPersons().values().stream()
@@ -172,7 +172,7 @@ class ScaleDigitalTwinWithSnzDataTest {
 			"--experiment-id", "test-fallback"
 		});
 
-		Population result = PopulationUtils.readPopulation(new File(dir, ScaleDigitalTwinWithSnzData.POPULATIONFILE).getAbsolutePath());
+		Population result = PopulationUtils.readPopulation(new File(dir, DigitalTwinUtils.POPULATIONFILE).getAbsolutePath());
 
 		// 22 total − 2 stay-home removed = 20 remain
 		assertEquals(20, result.getPersons().size());
@@ -231,7 +231,7 @@ class ScaleDigitalTwinWithSnzDataTest {
 		});
 
 		// 2 original stay-home removed → 10 remain
-		Population result = PopulationUtils.readPopulation(new File(dir, ScaleDigitalTwinWithSnzData.POPULATIONFILE).getAbsolutePath());
+		Population result = PopulationUtils.readPopulation(new File(dir, DigitalTwinUtils.POPULATIONFILE).getAbsolutePath());
 		assertEquals(10, result.getPersons().size());
 
 		// 4 persons made stay-home by rate change

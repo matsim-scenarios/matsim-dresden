@@ -64,7 +64,7 @@ class AssignPersonAttributeFromShapefileTest {
 		});
 
 		Population result = PopulationUtils.readPopulation(
-			new File(dir + "output", ScaleDigitalTwinWithSnzData.POPULATIONFILE).getAbsolutePath());
+			new File(dir + "output", DigitalTwinUtils.POPULATIONFILE).getAbsolutePath());
 
 		assertEquals("Zone1", result.getPersons().get(Id.createPersonId("inside")).getAttributes().getAttribute(ATTR_NAME));
 		assertNull(result.getPersons().get(Id.createPersonId("outside")).getAttributes().getAttribute(ATTR_NAME));

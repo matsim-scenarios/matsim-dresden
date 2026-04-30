@@ -10,11 +10,9 @@ import org.matsim.api.core.v01.Scenario;
 import org.matsim.api.core.v01.population.Activity;
 import org.matsim.api.core.v01.population.Person;
 import org.matsim.api.core.v01.population.Plan;
-import org.matsim.api.core.v01.population.PopulationWriter;
 import org.matsim.application.MATSimAppCommand;
 import org.matsim.core.config.Config;
 import org.matsim.core.config.ConfigUtils;
-import org.matsim.core.config.ConfigWriter;
 import org.matsim.core.gbl.MatsimRandom;
 import org.matsim.core.population.PopulationUtils;
 import org.matsim.core.scenario.ScenarioUtils;
@@ -24,7 +22,6 @@ import picocli.CommandLine;
 import java.io.File;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
 @CommandLine.Command(name = "ScaleDigitalTwinWithSnzData", description = "read a configuration, read the population, read personStats per zipcode, adjust mobilityRate.")
@@ -50,19 +47,6 @@ public class ScaleDigitalTwinWithSnzData implements MATSimAppCommand {
 	@CommandLine.Option(names = "--experiment-id", description = "the the id of the experiment", required = true)
 	private String experimentId;
 
-	static final String CONFIG = "config.xml";
-	static final String POPULATIONFILE = "population.xml.gz";
-
-	static final String GLOBAL = "==GLOBAL==";
-	private static final String PLZ = "PLZ";
-	private static final String HOME_X = "home_x";
-	private static final String HOME_Y = "home_y";
-	private static final String HOME = "home";
-	private static final String N_MOBILE_PERSONS = "nMobilePersons";
-	private static final String N_PERSONS = "nPersons";
-	private static final String ZIP_CODE = "zipCode";
-	private static final String SUBPOPULATION_PERSON = "person";
-
 	public static void main(String[] args) {
 		new ScaleDigitalTwinWithSnzData().execute(args);
 	}
@@ -72,14 +56,7 @@ public class ScaleDigitalTwinWithSnzData implements MATSimAppCommand {
 		Config config = ConfigUtils.loadConfig(inputconfig);
 		Scenario scenario = ScenarioUtils.loadScenario(config);
 
-		/*
-		 * We assume, that the mobile persons depict our full population. For that we drop all stay-home-agents
-		 * and calc the outOfHome-rates (OOH) per zipcode.
-		 *
-		 * We use the global OOH to scale our model, i.e. we use a 10% model initally and have a OOH of 75%,
-		 * we assume our resulting model has a scalingFactor of S = 0.1 * 0.75 = 0.075
-		 */
-		Map<String, Double> modelOutOfHomeRates = dropNonMobilePersonAgentsAndCalcOutOfHomeRate(scenario);
+		Map<String, Double> modelOutOfHomeRates = DigitalTwinUtils.dropNonMobilePersonAgentsAndCalcOutOfHomeRate(scenario);
 
 		Map<String, Double> refOutOfHomeRate = loadOohStatsPerZipcode(refMobilityPersonStats);
 		Map<String, Double> actualOutOfHomeRate = loadOohStatsPerZipcode(mobilityPersonStats);
@@ -88,65 +65,13 @@ public class ScaleDigitalTwinWithSnzData implements MATSimAppCommand {
 		 * We calc outOfHomeRates from the mobile-phone-data for the actual day OOH_a and the reference-day OOH_r.
 		 * We use this to calc the change of OOH and calc our new OOH-rate OOH' , i.e. OOH' = OOH * (OOH_a / OOH_r).
 		 */
-		double globalOutOfHomeRate = modelOutOfHomeRates.get(GLOBAL);
+		double globalOutOfHomeRate = modelOutOfHomeRates.get(DigitalTwinUtils.GLOBAL);
 		applyOutOfHomeRateChangeForPersonAgents(refOutOfHomeRate, actualOutOfHomeRate, modelOutOfHomeRates, scenario);
-		scaleNonPersonAgents(scenario, globalOutOfHomeRate);
-		dumpResults(scenario, globalOutOfHomeRate);
+		DigitalTwinUtils.scaleNonPersonAgents(scenario, globalOutOfHomeRate);
+		DigitalTwinUtils.scaleConfigAndDumpResults(scenario, outputpath,globalOutOfHomeRate);
 		return 0;
 	}
 
-	private void scaleNonPersonAgents(Scenario scenario, double originalOutOfHomeRate) {
-		Random rng = MatsimRandom.getLocalInstance(20260423);
-
-		// we use the original ooh-rate to scale the other parts of the populations
-		Map<String, List<Person>> nonPersonAgentsBySubpopulation = scenario.getPopulation().getPersons().values().stream()
-				.filter(p -> !PopulationUtils.getSubpopulation(p).equals(SUBPOPULATION_PERSON))
-				.collect(Collectors.groupingBy(PopulationUtils::getSubpopulation));
-
-		for (Map.Entry<String, List<Person>> entry : nonPersonAgentsBySubpopulation.entrySet()) {
-			String zipcode = entry.getKey();
-			List<Person> subpopPersons = entry.getValue();
-			Collections.shuffle(subpopPersons, rng);
-
-			int numberOfStayHomePersons = (int) Math.round((1 - originalOutOfHomeRate) * subpopPersons.size());
-
-			for (int i = 0; i < numberOfStayHomePersons; i++) {
-				Person person = subpopPersons.get(i);
-				scenario.getPopulation().removePerson(person.getId());
-			}
-		}
-	}
-
-
-	private Map<String, Double> dropNonMobilePersonAgentsAndCalcOutOfHomeRate(Scenario scenario) {
-		List<? extends Person> persons = scenario.getPopulation().getPersons().values().stream()
-			.filter(p -> PopulationUtils.getSubpopulation(p).equals(SUBPOPULATION_PERSON))
-			.toList();
-
-		Map<String, int[]> countsByZipcode = new HashMap<>(); // [total, stayHome]
-		List<Person> stayHomePersons = new ArrayList<>();
-		for (Person person : persons) {
-			String zipcode = person.getAttributes().getAsMap().getOrDefault(PLZ, GLOBAL).toString();
-			int[] counts = countsByZipcode.computeIfAbsent(zipcode, k -> new int[2]);
-			counts[0]++;
-			if (person.getSelectedPlan().getPlanElements().size() == 1) {
-				counts[1]++;
-				stayHomePersons.add(person);
-			}
-		}
-		stayHomePersons.forEach(p -> scenario.getPopulation().removePerson(p.getId()));
-
-		Map<String, Double> outOfHomeRates = new HashMap<>();
-		for (Map.Entry<String, int[]> entry : countsByZipcode.entrySet()) {
-			int total = entry.getValue()[0];
-			int stayHome = entry.getValue()[1];
-			outOfHomeRates.put(entry.getKey(), 1 - 1. * stayHome / total);
-		}
-		double globalRate = 1 - 1. * stayHomePersons.size() / persons.size();
-		outOfHomeRates.put(GLOBAL, globalRate);
-		log.info("original model out of home rate of person-agents (global): {}", globalRate);
-		return outOfHomeRates;
-	}
 
 	private void applyOutOfHomeRateChangeForPersonAgents(Map<String, Double> refRateMap, Map<String, Double> curRateMap, Map<String, Double> modelOutOfHomeRates, Scenario scenario) {
 		Random rng = MatsimRandom.getLocalInstance(20260423);
@@ -155,8 +80,8 @@ public class ScaleDigitalTwinWithSnzData implements MATSimAppCommand {
 
 		Map<String, List<Person>> personsByZipcode = new TreeMap<>();
 		for (Person person : scenario.getPopulation().getPersons().values()) {
-			if (!PopulationUtils.getSubpopulation(person).equals(SUBPOPULATION_PERSON)) continue;
-			String zipcode = person.getAttributes().getAsMap().getOrDefault(PLZ, GLOBAL).toString();
+			if (!PopulationUtils.getSubpopulation(person).equals(DigitalTwinUtils.SUBPOPULATION_PERSON)) continue;
+			String zipcode = person.getAttributes().getAsMap().getOrDefault(DigitalTwinUtils.PLZ, DigitalTwinUtils.GLOBAL).toString();
 			personsByZipcode.computeIfAbsent(zipcode, k -> new ArrayList<>()).add(person);
 		}
 
@@ -166,9 +91,9 @@ public class ScaleDigitalTwinWithSnzData implements MATSimAppCommand {
 
 			for (Map.Entry<String, List<Person>> entry : personsByZipcode.entrySet()) {
 				String zipcode = entry.getKey();
-				double curRate = curRateMap.getOrDefault(zipcode, curRateMap.get(GLOBAL));
-				double refRate = refRateMap.getOrDefault(zipcode, refRateMap.get(GLOBAL));
-				double modelRate = modelOutOfHomeRates.getOrDefault(zipcode, modelOutOfHomeRates.get(GLOBAL));
+				double curRate = curRateMap.getOrDefault(zipcode, curRateMap.get(DigitalTwinUtils.GLOBAL));
+				double refRate = refRateMap.getOrDefault(zipcode, refRateMap.get(DigitalTwinUtils.GLOBAL));
+				double modelRate = modelOutOfHomeRates.getOrDefault(zipcode, modelOutOfHomeRates.get(DigitalTwinUtils.GLOBAL));
 				double expectedOutOfHomeRate = Math.clamp(modelRate * (curRate / refRate), 0.0, 1.0);
 
 				List<Person> zipcodePersons = entry.getValue();
@@ -199,28 +124,15 @@ public class ScaleDigitalTwinWithSnzData implements MATSimAppCommand {
 	}
 
 	private Activity getHome(Person person) {
-		Object homeX = person.getAttributes().getAttribute(HOME_X);
-		Object homeY = person.getAttributes().getAttribute(HOME_Y);
+		Object homeX = person.getAttributes().getAttribute(DigitalTwinUtils.HOME_X);
+		Object homeY = person.getAttributes().getAttribute(DigitalTwinUtils.HOME_Y);
 		if (homeX != null && homeY != null) {
-			return PopulationUtils.createActivityFromCoord(HOME, new Coord((Double) homeX, (Double) homeY));
+			return PopulationUtils.createActivityFromCoord(DigitalTwinUtils.HOME, new Coord((Double) homeX, (Double) homeY));
 		} else {
 			throw new RuntimeException("found a person without home-coord. This must not happen.");
 		}
 	}
 
-	private void dumpResults(Scenario scenario, double originalOutOfHomeRate) {
-		String outputplans = new File(outputpath, POPULATIONFILE).getAbsolutePath();
-		new PopulationWriter(scenario.getPopulation()).write(outputplans);
-
-		scenario.getConfig().plans().setInputFile(outputplans);
-		String outputconfig = new File(outputpath, CONFIG).getAbsolutePath();
-
-		scenario.getConfig().qsim().setFlowCapFactor(scenario.getConfig().qsim().getFlowCapFactor() * originalOutOfHomeRate);
-		scenario.getConfig().qsim().setStorageCapFactor(scenario.getConfig().qsim().getStorageCapFactor() * originalOutOfHomeRate);
-		scenario.getConfig().counts().setCountsScaleFactor(scenario.getConfig().counts().getCountsScaleFactor() / originalOutOfHomeRate);
-
-		new ConfigWriter(scenario.getConfig()).write(outputconfig);
-	}
 
 	static Map<String, Double> loadOohStatsPerZipcode(String personStatsFile) {
 		try {
@@ -231,17 +143,17 @@ public class ScaleDigitalTwinWithSnzData implements MATSimAppCommand {
 			AtomicInteger nPersonsGlobal = new AtomicInteger(0);
 			AtomicInteger nMobilePersonsGlobal = new AtomicInteger(0);
 			StreamSupport.stream(records.spliterator(), false).forEach(r -> {
-				String zipcode = r.get(ZIP_CODE);
-				int nPersons = Integer.parseInt(r.get(N_PERSONS));
+				String zipcode = r.get(DigitalTwinUtils.ZIP_CODE);
+				int nPersons = Integer.parseInt(r.get(DigitalTwinUtils.N_PERSONS));
 				nPersonsGlobal.addAndGet(nPersons);
-				int nMobilePersons = Integer.parseInt(r.get(N_MOBILE_PERSONS));
+				int nMobilePersons = Integer.parseInt(r.get(DigitalTwinUtils.N_MOBILE_PERSONS));
 				nMobilePersonsGlobal.addAndGet(nMobilePersons);
 				if ( nPersons > 0 ) {
 					mobilityRate.put(zipcode, 1. * nMobilePersons / nPersons);
 				}
 			});
 			double defaultMobilityRate = nPersonsGlobal.get() > 0 ? (1.* nMobilePersonsGlobal.get() / nPersonsGlobal.get()) : 0;
-			mobilityRate.put(GLOBAL, defaultMobilityRate);
+			mobilityRate.put(DigitalTwinUtils.GLOBAL, defaultMobilityRate);
 			log.info("done parsing personstats from: {}, global out-of-home-rate is {}", personStatsFile, defaultMobilityRate);
 
 			return mobilityRate;
