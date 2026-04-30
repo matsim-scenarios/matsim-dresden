@@ -1,20 +1,9 @@
-package org.matsim.prepare;
+package org.matsim.prepare.digitalTwin;
 
-import org.geotools.api.data.SimpleFeatureStore;
-import org.geotools.api.data.Transaction;
 import org.geotools.api.feature.simple.SimpleFeature;
-import org.geotools.api.feature.simple.SimpleFeatureType;
-import org.geotools.data.DataUtilities;
-import org.geotools.data.DefaultTransaction;
-import org.geotools.data.collection.ListFeatureCollection;
-import org.geotools.data.shapefile.ShapefileDataStore;
-import org.geotools.data.shapefile.ShapefileDataStoreFactory;
-import org.geotools.feature.simple.SimpleFeatureBuilder;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.locationtech.jts.geom.Coordinate;
-import org.locationtech.jts.geom.Polygon;
-import org.locationtech.jts.io.WKTReader;
 import org.matsim.api.core.v01.Coord;
 import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.population.*;
@@ -30,7 +19,6 @@ import org.matsim.testcases.MatsimTestUtils;
 
 import java.io.File;
 import java.util.List;
-import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;

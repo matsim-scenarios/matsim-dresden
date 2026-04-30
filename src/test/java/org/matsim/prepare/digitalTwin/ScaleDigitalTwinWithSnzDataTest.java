@@ -1,4 +1,4 @@
-package org.matsim.prepare;
+package org.matsim.prepare.digitalTwin;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -35,7 +35,7 @@ class ScaleDigitalTwinWithSnzDataTest {
 		Map<String, Double> personStatsPerPLZ = ScaleDigitalTwinWithSnzData.loadOohStatsPerZipcode(personStats);
 		assertEquals(0.6905697445972495, personStatsPerPLZ.get("01067"), MatsimTestUtils.EPSILON);
 		assertEquals(0.6767335199004975, personStatsPerPLZ.get("01069"), MatsimTestUtils.EPSILON);
-		assertEquals(0.6811880666244992, personStatsPerPLZ.get(ScaleDigitalTwinWithSnzData.GLOBAL), MatsimTestUtils.EPSILON);
+		assertEquals(0.6811880666244992, personStatsPerPLZ.get(DigitalTwinUtils.GLOBAL), MatsimTestUtils.EPSILON);
 	}
 
 	/**

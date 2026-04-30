@@ -1,4 +1,4 @@
-package org.matsim.prepare;
+package org.matsim.prepare.digitalTwin;
 
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
