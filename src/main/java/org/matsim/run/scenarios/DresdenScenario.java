@@ -13,7 +13,6 @@ import org.matsim.api.core.v01.network.Link;
 import org.matsim.application.MATSimApplication;
 import org.matsim.application.analysis.CheckPopulation;
 import org.matsim.application.analysis.traffic.LinkStats;
-import org.matsim.application.options.SampleOptions;
 import org.matsim.application.prepare.CreateLandUseShp;
 import org.matsim.application.prepare.counts.CreateCountsFromBAStData;
 import org.matsim.application.prepare.longDistanceFreightGER.tripExtraction.ExtractRelevantFreightTrips;
@@ -76,7 +75,8 @@ public class DresdenScenario extends MATSimApplication {
 	DresdenUtils.FunctionalityHandling emissions;
 	@CommandLine.Option(names = "--explicit-walk-intermodality", defaultValue = "ENABLED", description = "Define if explicit walk intermodality parameter to/from pt should be set or not (use default).")
 	static DresdenUtils.FunctionalityHandling explicitWalkIntermodality;
-
+	@CommandLine.Option(names = "--simwrapper", negatable = true, description = "Switch that enables or disables SimWrapper dashboard creation. If disabled, other SimWrapper related config options will be ignored. Default is enabled.", defaultValue = "true", fallbackValue = "true")
+	private boolean simwrapper;
 
 	public DresdenScenario(@Nullable Config config) {
 		super(config);
@@ -87,13 +87,12 @@ public class DresdenScenario extends MATSimApplication {
 	}
 
 	public static void main(String[] args) {
-		MATSimApplication.run(DresdenScenario.class, args);
+		MATSimApplication.execute(DresdenScenario.class, args);
 	}
 
 	@Nullable
 	@Override
 	protected Config prepareConfig(Config config) {
-
 		// Add all activity types with time bins
 		SnzActivities.addScoringParams(config);
 
@@ -106,7 +105,8 @@ public class DresdenScenario extends MATSimApplication {
 //		the tarifzone shp file basically is a dresden shp file with fare prices as additional information
 		simWrapper.defaultParams().setShp(String.format("vvo_tarifzone_10_dresden/%s_vvo_tarifzone_10_dresden_utm32n.shp", VERSION));
 
-		config.vspExperimental().setVspDefaultsCheckingLevel(VspExperimentalConfigGroup.VspDefaultsCheckingLevel.abort);
+		// set to warn because this scenario was built with an older matsim version. consistency checks now fail.
+		config.vspExperimental().setVspDefaultsCheckingLevel(VspExperimentalConfigGroup.VspDefaultsCheckingLevel.warn);
 
 		//		performing set to 6.0 after calibration task force july 24
 		double performing = 6.0;
@@ -222,7 +222,10 @@ public class DresdenScenario extends MATSimApplication {
 		//analyse PersonMoneyEvents
 		controler.addOverridingModule(new PersonMoneyEventsAnalysisModule());
 
-		controler.addOverridingModule(new SimWrapperModule());
+		// totally turn off simwrapper in case it is not used afterwards. reduces runtime considerably.
+		if (simwrapper) {
+			controler.addOverridingModule(new SimWrapperModule());
+		}
 
 		controler.addOverridingModule(new AbstractModule() {
 			@Override

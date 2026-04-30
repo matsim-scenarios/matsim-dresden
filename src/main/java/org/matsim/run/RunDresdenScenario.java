@@ -12,6 +12,6 @@ public final class RunDresdenScenario {
 	}
 
 	public static void main(String[] args) {
-		MATSimApplication.runWithDefaults(DresdenScenario.class, args);
+		MATSimApplication.run(DresdenScenario.class, args);
 	}
 }
