@@ -25,6 +25,7 @@ import org.matsim.contrib.vsp.pt.fare.DistanceBasedPtFareParams;
 import org.matsim.contrib.vsp.pt.fare.FareZoneBasedPtFareParams;
 import org.matsim.contrib.vsp.pt.fare.PtFareConfigGroup;
 import org.matsim.contrib.vsp.pt.fare.PtFareModule;
+import org.matsim.contrib.vsp.scenario.Activities;
 import org.matsim.contrib.vsp.scenario.SnzActivities;
 import org.matsim.contrib.vsp.scoring.RideScoringParamsFromCarParams;
 import org.matsim.core.config.Config;
@@ -185,6 +186,10 @@ public class DresdenModel extends MATSimApplication {
 		//		add freight modes of DresdenUtils to network.
 //		this happens in the makefile pipeline already, but we do it here anyways, in case somebody uses a preliminary network.
 		PrepareNetwork.prepareFreightNetwork(scenario.getNetwork());
+
+//		switch off wrap around scoring if not done already. The method creates separate _morning and _evening act types for the first and last act if they have the same act type, e.g. home.
+//		Thus, no wrap-around scoring will be performed.
+		Activities.changeWrapAroundActsIntoMorningAndEveningActs(scenario);
 
 //		remove disallowed links. The disallowed links cause many problems and (usually) are not useful in our rather macroscopic view on transport systems.
 		// yyyy I have no idea what this means; could someone please explain?  kai, dec'25
