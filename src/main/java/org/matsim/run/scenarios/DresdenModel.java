@@ -97,7 +97,17 @@ public class DresdenModel extends MATSimApplication {
 		// yyyy need to find a way to remove the existing scoring params; then this can be programmed without inheritance
 		SnzActivities.addScoringParams(config);
 //		add scoring params for split act types for _morning and _evening. See method prepareScenario.
-		SnzActivities.addMorningEveningScoringParams(config);
+//		SnzActivities.addMorningEveningScoringParams(config);
+
+		for (SnzActivities value : SnzActivities.values()) {
+			for (long ii = 600; ii <= 97200; ii += 600) {
+//				the following 3 lines are the only change to line 100. here, we want to explicitly use opening and closing times for activities.
+				config.scoring().addActivityParams(value.apply(new ScoringConfigGroup.ActivityParams(value.name() + "_" + ii).setTypicalDuration(ii)));
+
+				config.scoring().addActivityParams(value.apply(new ScoringConfigGroup.ActivityParams( SnzActivities.createMorningActivityType( value.name())+"_"+ii).setTypicalDuration(ii)) );
+				config.scoring().addActivityParams(value.apply(new ScoringConfigGroup.ActivityParams( SnzActivities.createEveningActivityType( value.name())+"_"+ii).setTypicalDuration(ii)) );
+			}
+		}
 	}
 
 	@Nullable
