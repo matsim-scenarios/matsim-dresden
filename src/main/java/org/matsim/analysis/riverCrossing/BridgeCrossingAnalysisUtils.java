@@ -15,8 +15,10 @@ public class BridgeCrossingAnalysisUtils {
 
 	static final String ELBE_BRIDGE_A4 = "Elbebrücke";
 	static final String TRAIN_MARIEN_BRIDGE = "Trains (Marienbrücke)";
+	static final String TRAIN_NIEDERWARTHA_BRIDGE = "Trains (Niederwarthaer Brücke)";
 
 	// relevant stops
+	// trams + buses
 	static final String SYNAGOGE = "Dresden Synagoge";
 	static final String CAROLAPLATZ = "Dresden Carolaplatz";
 	static final String PIRNAISCHER_PLATZ = "Dresden Pirnaischer Platz";
@@ -40,8 +42,21 @@ public class BridgeCrossingAnalysisUtils {
 	static final String SCHILLERPLATZ = "Dresden Schillerplatz";
 	static final String KOERNERPLATZ = "Dresden Körnerplatz";
 
+	// trains
 	static final String BAHNHOF_MITTE = "Dresden Mitte";
 	static final String BAHNHOF_NEUSTADT = "Dresden-Neustadt";
+
+	static final String BAHNHOF_NIEDERWARTHA = "Niederwartha";
+	static final String BAHNHOF_RADEBEUL_NAUNDORF = "Radebeul-Naundorf";
+
+	// ferries
+	static final String FERRY_JOHANNSTADT = "Dresden Fährstelle Johannstadt";
+	static final String FERRY_NEUSTADT = "Dresden Fährstelle Neustadt";
+	static final String FERRY_LAUBEGAST = "Dresden Fährstelle Laubegast";
+	static final String FERRY_NIEDERPOYRITZ = "DD Fährstelle Niederpoyritz";
+	static final String FERRY_KLEINZCHACHWITZ = "DD Fährstelle Kleinzschachwitz";
+	static final String FERRY_PILLNITZ = "Dresden Fährstelle Pillnitz";
+
 
 	static final String OTHER_STOP = "other";
 
@@ -66,6 +81,16 @@ public class BridgeCrossingAnalysisUtils {
 
 		relevantStops.add(BAHNHOF_MITTE);
 		relevantStops.add(BAHNHOF_NEUSTADT);
+		relevantStops.add(BAHNHOF_NIEDERWARTHA);
+		relevantStops.add(BAHNHOF_RADEBEUL_NAUNDORF);
+
+		relevantStops.add(FERRY_JOHANNSTADT);
+		relevantStops.add(FERRY_NEUSTADT);
+		relevantStops.add(FERRY_LAUBEGAST);
+		relevantStops.add(FERRY_NIEDERPOYRITZ);
+		relevantStops.add(FERRY_KLEINZCHACHWITZ);
+		relevantStops.add(FERRY_PILLNITZ);
+
 		return relevantStops;
 	}
 
@@ -168,15 +193,15 @@ public class BridgeCrossingAnalysisUtils {
 		return isBlauesWunderBridgeSouthToNorth(fromStop, toStop) || isBlauesWunderBridgeNorthToSouth(fromStop, toStop);
 	}
 
-	static boolean isBlauesWunderBridgeSouthToNorth(String fromStop, String toStop){
+	static boolean isBlauesWunderBridgeSouthToNorth(String fromStop, String toStop) {
 		return fromStop.equals(SCHILLERPLATZ) && toStop.equals(KOERNERPLATZ);
 	}
 
-	static boolean isBlauesWunderBridgeNorthToSouth(String fromStop, String toStop){
+	static boolean isBlauesWunderBridgeNorthToSouth(String fromStop, String toStop) {
 		return fromStop.equals(KOERNERPLATZ) && toStop.equals(SCHILLERPLATZ);
 	}
 
-	// ### Regional trains
+	// ### Local and egional trains
 	static boolean isTrainMarienBridge(String fromStop, String toStop) {
 		return isTrainMarienBridgeNorthToSouth(fromStop, toStop) || isTrainMarienBridgeSouthToNorth(fromStop, toStop);
 	}
@@ -189,8 +214,33 @@ public class BridgeCrossingAnalysisUtils {
 		return fromStop.equals(BAHNHOF_NEUSTADT) && toStop.equals(BAHNHOF_MITTE);
 	}
 
+	// ### RB 31 Niederwartha bridge
+	static boolean isRB31NiederwarthaBridge(String fromStop, String toStop) {
+		return isRB31NiederwarthaBridgeSouthToNorth(fromStop, toStop) || isRB31NiederwarthaBridgeNorthToSouth(fromStop, toStop);
+	}
+
+	static boolean isRB31NiederwarthaBridgeSouthToNorth(String fromStop, String toStop) {
+		return fromStop.equals(BAHNHOF_NIEDERWARTHA) && toStop.equals(BAHNHOF_RADEBEUL_NAUNDORF);
+	}
+
+	static boolean isRB31NiederwarthaBridgeNorthToSouth(String fromStop, String toStop) {
+		return fromStop.equals(BAHNHOF_RADEBEUL_NAUNDORF) && toStop.equals(BAHNHOF_NIEDERWARTHA);
+	}
 
 	// ### Ferry
+	static boolean isFerry(String fromStop, String toStop) {
+		return isFerrySouthToNorth(fromStop, toStop) || isFerryNorthToSouth(fromStop, toStop);
+	}
 
+	static boolean isFerrySouthToNorth(String fromStop, String toStop) {
+		return (fromStop.equals(FERRY_JOHANNSTADT) && toStop.equals(FERRY_NEUSTADT))
+			|| (fromStop.equals(FERRY_LAUBEGAST) && toStop.equals(FERRY_NIEDERPOYRITZ))
+			|| (fromStop.equals(FERRY_KLEINZCHACHWITZ) && toStop.equals(FERRY_PILLNITZ));
+	}
 
+	static boolean isFerryNorthToSouth(String fromStop, String toStop) {
+		return (fromStop.equals(FERRY_NEUSTADT) && toStop.equals(FERRY_JOHANNSTADT))
+			|| (fromStop.equals(FERRY_NIEDERPOYRITZ) && toStop.equals(FERRY_LAUBEGAST))
+			|| (fromStop.equals(FERRY_PILLNITZ) && toStop.equals(FERRY_KLEINZCHACHWITZ));
+	}
 }

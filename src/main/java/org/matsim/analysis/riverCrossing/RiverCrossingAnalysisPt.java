@@ -9,8 +9,7 @@ import org.matsim.api.core.v01.Scenario;
 import org.matsim.core.config.Config;
 import org.matsim.core.config.ConfigUtils;
 import org.matsim.core.scenario.ScenarioUtils;
-import org.matsim.pt.transitSchedule.api.TransitSchedule;
-import org.matsim.pt.transitSchedule.api.TransitStopFacility;
+import org.matsim.pt.transitSchedule.api.*;
 
 import java.io.*;
 import java.nio.file.Files;
@@ -151,6 +150,24 @@ public class RiverCrossingAnalysisPt {
 					}
 				}
 
+				if (isRB31NiederwarthaBridge(previousStop, currentStop)) {
+					data.trainNiederwarthaBridge.total += passengerOnboard;
+					if (isRB31NiederwarthaBridgeSouthToNorth(previousStop, currentStop)) {
+						data.trainNiederwarthaBridge.southToNorth += passengerOnboard;
+					} else {
+						data.trainNiederwarthaBridge.northToSouth += passengerOnboard;
+					}
+				}
+
+				if (isFerry(previousStop, currentStop)) {
+					data.ferry.total += passengerOnboard;
+					if (isFerrySouthToNorth(previousStop, currentStop)) {
+						data.ferry.southToNorth += passengerOnboard;
+					} else {
+						data.ferry.northToSouth += passengerOnboard;
+					}
+				}
+
 			}
 		}
 
@@ -190,6 +207,14 @@ public class RiverCrossingAnalysisPt {
 			data.trainMarienBridge.northToSouth, data.trainMarienBridge.total,
 			data.trainMarienBridge.northEnd.getX(), data.trainMarienBridge.northEnd.getY(),
 			data.trainMarienBridge.southEnd.getX(), data.trainMarienBridge.southEnd.getY(), remark);
+		csvPrinter.printRecord(data.trainNiederwarthaBridge.bridgeName, data.trainNiederwarthaBridge.southToNorth,
+			data.trainNiederwarthaBridge.northToSouth, data.trainNiederwarthaBridge.total,
+			data.trainNiederwarthaBridge.northEnd.getX(), data.trainNiederwarthaBridge.northEnd.getY(),
+			data.trainNiederwarthaBridge.southEnd.getX(), data.trainNiederwarthaBridge.southEnd.getY(), remark);
+		csvPrinter.printRecord(data.ferry.bridgeName, data.ferry.southToNorth,
+			data.ferry.northToSouth, data.ferry.total,
+			null, null,
+			null, null, remark);
 		csvPrinter.close();
 	}
 }

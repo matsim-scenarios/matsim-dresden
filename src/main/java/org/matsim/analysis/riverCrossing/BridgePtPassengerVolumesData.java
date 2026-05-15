@@ -14,7 +14,7 @@ public class BridgePtPassengerVolumesData {
 	CountData blauesWunderBridgeCountData = new CountData(BLAUES_WUNDER_BRIDGE, new Coord(837162.67, 5666855.47), new Coord(836940.64, 5666696.95));
 
 	CountData trainMarienBridge = new CountData(TRAIN_MARIEN_BRIDGE, new Coord(832085.45, 5667844.89), new Coord(831026.32, 5666703.9));
-	CountData rb31 = new CountData("RB31");
+	CountData trainNiederwarthaBridge = new CountData(TRAIN_NIEDERWARTHA_BRIDGE, new Coord(822087.58, 5671370.38), new Coord(822430.67, 5670359.97));
 	CountData ferry = new CountData("Ferry");
 
 	CountData elbeBridgeCountData = new CountData(ELBE_BRIDGE_A4);
