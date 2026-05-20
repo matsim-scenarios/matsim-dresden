@@ -34,7 +34,6 @@ import org.matsim.core.config.groups.ScoringConfigGroup;
 import org.matsim.core.controler.AbstractModule;
 import org.matsim.core.controler.Controler;
 import org.matsim.core.network.NetworkUtils;
-import org.matsim.core.network.turnRestrictions.DisallowedNextLinks;
 import org.matsim.core.replanning.annealing.ReplanningAnnealerConfigGroup.AnnealOption;
 import org.matsim.core.replanning.annealing.ReplanningAnnealerConfigGroup.AnnealingVariable;
 import org.matsim.core.scoring.functions.ScoringParametersForPerson;
@@ -197,20 +196,15 @@ public class DresdenModel extends MATSimApplication {
 //		wrap-around scoring's semantic of treating first + last as one combined activity.
 		DresdenActivities.changeNonWrapAroundActsIntoWrapAroundActs(scenario);
 
-//		Strip turn restrictions. The DisallowedNextLinks attribute holds per-mode lists of
-//		forbidden next-link sequences (i.e. turn restrictions); only SpeedyDijkstra and
-//		SpeedyALT honor them in routing. We don't want them here, so we clear them for
-//		every mode that is actually allowed on the link. We only drop the wrapper attribute
-//		itself if the map ends up empty: a link may also carry restrictions for modes that
-//		are NOT in its allowed-modes set (those are inert anyway, since the mode can't use
-//		the link), and we leave those entries in place rather than silently wipe them.
+//		Strip turn restrictions from every link. The DisallowedNextLinks attribute holds
+//		per-mode lists of forbidden next-link sequences (only honored by SpeedyDijkstra and
+//		SpeedyALT in routing); we don't want any here, so drop the attribute outright.
+//		Previously the loop only cleared sequences for modes already in
+//		link.getAllowedModes(), leaving entries for other modes in place — those are inert
+//		today but would wake up the moment somebody widens the link's allowed-modes set.
 		for (Link link : scenario.getNetwork().getLinks().values()) {
-			DisallowedNextLinks disallowed = NetworkUtils.getDisallowedNextLinks(link);
-			if (disallowed != null) {
-				link.getAllowedModes().forEach(disallowed::removeDisallowedLinkSequences);
-				if (disallowed.isEmpty()) {
-					NetworkUtils.removeDisallowedNextLinks(link);
-				}
+			if (NetworkUtils.getDisallowedNextLinks(link) != null) {
+				NetworkUtils.removeDisallowedNextLinks(link);
 			}
 		}
 
