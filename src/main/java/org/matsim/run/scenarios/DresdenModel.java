@@ -197,17 +197,19 @@ public class DresdenModel extends MATSimApplication {
 //		wrap-around scoring's semantic of treating first + last as one combined activity.
 		DresdenActivities.changeNonWrapAroundActsIntoWrapAroundActs(scenario);
 
-//		remove disallowed links. The disallowed links cause many problems and (usually) are not useful in our rather macroscopic view on transport systems.
-		// yyyy I have no idea what this means; could someone please explain?  kai, dec'25
-		// --> The way this reads to me is that we may have a network where the "disallowedNextLinks" attribute is used.    In the
-		// code that follows here, we disable those attributes.  kai, dec'25
+//		Strip turn restrictions. The DisallowedNextLinks attribute holds per-mode lists of
+//		forbidden next-link sequences (i.e. turn restrictions); only SpeedyDijkstra and
+//		SpeedyALT honor them in routing. We don't want them here, so we clear them for
+//		every mode that is actually allowed on the link. We only drop the wrapper attribute
+//		itself if the map ends up empty: a link may also carry restrictions for modes that
+//		are NOT in its allowed-modes set (those are inert anyway, since the mode can't use
+//		the link), and we leave those entries in place rather than silently wipe them.
 		for (Link link : scenario.getNetwork().getLinks().values()) {
 			DisallowedNextLinks disallowed = NetworkUtils.getDisallowedNextLinks(link);
 			if (disallowed != null) {
 				link.getAllowedModes().forEach(disallowed::removeDisallowedLinkSequences);
 				if (disallowed.isEmpty()) {
 					NetworkUtils.removeDisallowedNextLinks(link);
-					// yyyy whey do we only do this if disallowed is empty, and not in all cases?  kai, dec'25
 				}
 			}
 		}
