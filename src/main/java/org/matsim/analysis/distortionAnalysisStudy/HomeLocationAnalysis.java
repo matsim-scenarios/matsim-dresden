@@ -20,7 +20,7 @@ import java.util.Map;
 
 public class HomeLocationAnalysis {
 	public static void main(String[] args) throws IOException {
-		String output = args.length == 1 ? args[0] : "/Users/luchengqi/Documents/MATSimScenarios/Dresden/distortion-study-analysis/analysis/home-locations.tsv";
+		String output = args.length == 1 ? args[0] : "/Users/luchengqi/Documents/MATSimScenarios/Dresden/distortion-study-analysis/analysis/home-locations-from-attribute.tsv";
 
 		ShpOptions shp = new ShpOptions("input/v1.0/vvo_tarifzone_10_dresden/v1.0_vvo_tarifzone_10_dresden_utm32n.shp", "EPSG:25832", null);
 		Geometry studyArea = shp.getGeometry("EPSG:25832");
@@ -34,17 +34,25 @@ public class HomeLocationAnalysis {
 			}
 			// identify home location
 			Coord homeCoord = null;
-			for (PlanElement planElement : person.getSelectedPlan().getPlanElements()) {
-				if (planElement instanceof Activity activity) {
-					if (activity.getType().contains("home")) {
-						homeCoord = activity.getCoord();
-						break;
+			// try to get home location from the attribute
+			String homeXString = person.getAttributes().getAttribute("home_x").toString();
+			String homeYString = person.getAttributes().getAttribute("home_y").toString();
+			if (homeXString != null && homeYString != null) {
+				homeCoord = new Coord(Double.parseDouble(homeXString), Double.parseDouble(homeYString));
+			} else {
+				// otherwise, use first home activity as home location
+				for (PlanElement planElement : person.getSelectedPlan().getPlanElements()) {
+					if (planElement instanceof Activity activity) {
+						if (activity.getType().contains("home")) {
+							homeCoord = activity.getCoord();
+							break;
+						}
 					}
 				}
 			}
 
 			if (homeCoord == null) {
-				// person does not have home activity / location
+				// person does not have home location or home activity
 				continue;
 			}
 
