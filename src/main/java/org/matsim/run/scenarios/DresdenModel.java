@@ -25,7 +25,6 @@ import org.matsim.contrib.vsp.pt.fare.DistanceBasedPtFareParams;
 import org.matsim.contrib.vsp.pt.fare.FareZoneBasedPtFareParams;
 import org.matsim.contrib.vsp.pt.fare.PtFareConfigGroup;
 import org.matsim.contrib.vsp.pt.fare.PtFareModule;
-import org.matsim.contrib.vsp.scenario.Activities;
 import org.matsim.contrib.vsp.scenario.SnzActivities;
 import org.matsim.contrib.vsp.scoring.RideScoringParamsFromCarParams;
 import org.matsim.core.config.Config;
@@ -96,8 +95,11 @@ public class DresdenModel extends MATSimApplication {
 	protected void addScoringParams( Config config ) {
 		// yyyy need to find a way to remove the existing scoring params; then this can be programmed without inheritance
 		SnzActivities.addScoringParams(config);
-//		add scoring params for split act types for _morning and _evening. See method prepareScenario.
-		SnzActivities.addMorningEveningScoringParams(config);
+//		The wrap-around rewrite in prepareScenario produces plans where the first and last activity
+//		share a single base type with a typical-duration suffix equal to the binned sum of the two
+//		originals. All such (type, suffix) combinations are covered by SnzActivities.addScoringParams
+//		(typicals 600..97200 in 600s steps for every base type, with their opening hours), so no
+//		additional scoring params are needed.
 	}
 
 	@Nullable
@@ -189,9 +191,11 @@ public class DresdenModel extends MATSimApplication {
 //		this happens in the makefile pipeline already, but we do it here anyways, in case somebody uses a preliminary network.
 		PrepareNetwork.prepareFreightNetwork(scenario.getNetwork());
 
-//		switch off wrap around scoring if not done already. The method creates separate _morning and _evening act types for the first and last act if they have the same act type, e.g. home.
-//		Thus, no wrap-around scoring will be performed.
-		Activities.changeWrapAroundActsIntoMorningAndEveningActs(scenario);
+//		force wrap-around scoring for every plan: where first and last act have different base types,
+//		pick one side (by coin flip) and set both first and last to that base type with a combined
+//		typical-duration suffix. The merged typical is the sum of the originals, which matches the
+//		wrap-around scoring's semantic of treating first + last as one combined activity.
+		DresdenActivities.changeNonWrapAroundActsIntoWrapAroundActs(scenario);
 
 //		remove disallowed links. The disallowed links cause many problems and (usually) are not useful in our rather macroscopic view on transport systems.
 		// yyyy I have no idea what this means; could someone please explain?  kai, dec'25
