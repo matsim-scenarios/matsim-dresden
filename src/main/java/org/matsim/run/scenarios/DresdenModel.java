@@ -25,7 +25,6 @@ import org.matsim.contrib.vsp.pt.fare.DistanceBasedPtFareParams;
 import org.matsim.contrib.vsp.pt.fare.FareZoneBasedPtFareParams;
 import org.matsim.contrib.vsp.pt.fare.PtFareConfigGroup;
 import org.matsim.contrib.vsp.pt.fare.PtFareModule;
-import org.matsim.contrib.vsp.scenario.Activities;
 import org.matsim.contrib.vsp.scenario.SnzActivities;
 import org.matsim.contrib.vsp.scoring.RideScoringParamsFromCarParams;
 import org.matsim.core.config.Config;
@@ -123,6 +122,12 @@ public class DresdenModel extends MATSimApplication {
 		scoringConfig.setWriteExperiencedPlans(true);
 		scoringConfig.setPathSizeLogitBeta(0.);
 
+//		Move the else-branch overnight scoring clamp from 24:00 to 27:00. handleOvernightActivity
+//		scores the (non-wrap-around) last activity from its start to simulationPeriodInDays * 24h;
+//		1.125 * 24h = 27:00. DresdenActivities reads this same value when binning the morning/evening
+//		split, so the typical durations stay consistent with where the activity is actually scored.
+		config.scenario().setSimulationPeriodInDays( 1.125 );
+
 		prepareCommercialTrafficConfig(config);
 
 		RideScoringParamsFromCarParams.setRideScoringParamsBasedOnCarParams(scoringConfig, rideAlpha );
@@ -191,7 +196,10 @@ public class DresdenModel extends MATSimApplication {
 
 //		switch off wrap around scoring if not done already. The method creates separate _morning and _evening act types for the first and last act if they have the same act type, e.g. home.
 //		Thus, no wrap-around scoring will be performed.
-		Activities.changeWrapAroundActsIntoMorningAndEveningActs(scenario);
+//		Dresden-local copy of vsp Activities: bins the morning/evening split with the 27:00 else-branch
+//		clamp in mind (see simulationPeriodInDays in prepareConfig) so evening typicals don't collapse
+//		into the 10-minute floor bin.
+		DresdenActivities.changeWrapAroundActsIntoMorningAndEveningActs(scenario);
 
 //		remove disallowed links. The disallowed links cause many problems and (usually) are not useful in our rather macroscopic view on transport systems.
 		// yyyy I have no idea what this means; could someone please explain?  kai, dec'25
