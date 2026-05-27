@@ -37,11 +37,8 @@ public final class DresdenActivities {
 	 *
 	 * <p>The coin flip is keyed by person id and the original first/last type strings, so the
 	 * realization is stable across runs and changes only if a plan's first/last types change.
-	 * On the last activity, endTime/maximumDuration are unset so it behaves as a true overnight
-	 * activity. The startTime is kept: QSim ignores a planned start on an end-time-less activity
-	 * (the agent starts on arrival) and scoring runs on the experienced plan, so the initial
-	 * start is inert for the simulation — but {@link #setPlanDerivedOpeningTimes} reads it as the
-	 * observed evening arrival.
+	 * On the last activity, endTime/startTime/maximumDuration are unset so it behaves as a
+	 * true overnight activity.
 	 */
 	public static void changeNonWrapAroundActsIntoWrapAroundActs(Scenario scenario) {
 		Set<String> firstActTypes = new HashSet<>();
@@ -86,8 +83,8 @@ public final class DresdenActivities {
 				first.setType(newType);
 				last.setType(newType);
 				last.setEndTimeUndefined();
+				last.setStartTimeUndefined();
 				last.setMaximumDurationUndefined();
-//				startTime is intentionally kept; see javadoc and setPlanDerivedOpeningTimes.
 			}
 		}
 		log.info("Activity types of first activity in plans: {}", firstActTypes);
@@ -95,14 +92,6 @@ public final class DresdenActivities {
 	}
 
 	private static final int BIN_SIZE = 600;
-
-	/**
-	 * Reference anchor for overnight activities: CharyparNagelActivityScoring scores the
-	 * wrap-around (first==last type) activity over [last.startTime, first.endTime + 24h], so a
-	 * morning departure maps to closing-time {@code 24h + morningDeparture}. Matches the
-	 * hard-coded {@code 24*3600} in {@code handleOvernightActivity}.
-	 */
-	private static final int ANCHOR_S = 24 * 3600;
 
 	/**
 	 * Buffer (seconds) added on each side of the observed window before binning. 0 means the
@@ -113,30 +102,28 @@ public final class DresdenActivities {
 	private static final double OPENING_TIME_BUFFER_S = 0.0;
 
 	/**
-	 * Derive each activity instance's scoring opening window from the initial plan and encode it
-	 * into the activity type, the same way typical durations are read off the plan and encoded as
-	 * a {@code _<seconds>} type suffix (cf.
+	 * Derive each <em>middle</em> activity instance's scoring opening window from the initial plan
+	 * and encode it into the activity type, the same way typical durations are read off the plan
+	 * and encoded as a {@code _<seconds>} type suffix (cf.
 	 * {@link org.matsim.application.prepare.population.SplitActivityTypesDuration}). MATSim only
 	 * supports opening times per activity <em>type</em>, so we mint a distinct type per binned
 	 * (base, typical, opening, closing) tuple and register its {@link ActivityParams}
 	 * programmatically.
 	 *
-	 * <p>Run <em>after</em> {@link #changeNonWrapAroundActsIntoWrapAroundActs}: every plan is then
-	 * wrap-around, so the first and last activity are scored as one combined overnight term over
-	 * [last.startTime, first.endTime + 24h] using the last activity's params (see
-	 * {@code CharyparNagelActivityScoring#handleOvernightActivity}). We therefore give first and
-	 * last the <em>same</em> augmented type — preserving the type equality the wrap branch keys on
-	 * — with opening = observed evening arrival and closing = 24h + observed morning departure.
-	 * Middle activities get their own observed [start, end] window.
+	 * <p>The first and last activity are deliberately left untouched. After
+	 * {@link #changeNonWrapAroundActsIntoWrapAroundActs} every plan is wrap-around, so first and
+	 * last are scored as one combined overnight term (see
+	 * {@code CharyparNagelActivityScoring#handleOvernightActivity}), and that method explicitly
+	 * warns that scoring correctness "cannot be guaranteed" when the first/last activity has
+	 * opening times. We take that warning seriously and tag only the middle activities; first and
+	 * last keep the plain {@code <base>_<typical>} type registered by SnzActivities.addScoringParams.
 	 *
 	 * <p>The opening window is read from the <em>initial</em> plan; at scoring time MATSim passes
 	 * the experienced activity (correct simulated start/end), looks up these params by type, and
 	 * clamps the experienced duration to the baked-in observed window.
 	 *
 	 * <p>Note: this mints one ActivityParams per distinct binned window, so the scoring config can
-	 * grow large on big populations; and because the wrap (first/last) activity now carries opening
-	 * times, CharyparNagelActivityScoring logs a (harmless, here intentional) warning that scoring
-	 * correctness "cannot be guaranteed" for first/last activities.
+	 * grow large on big populations.
 	 */
 	public static void setPlanDerivedOpeningTimes(Scenario scenario) {
 		ScoringConfigGroup scoring = scenario.getConfig().scoring();
@@ -151,29 +138,17 @@ public final class DresdenActivities {
 
 			for (Plan plan : p.getPlans()) {
 				List<Activity> acts = TripStructureUtils.getActivities(plan, TripStructureUtils.StageActivityHandling.ExcludeStageActivities);
-				int n = acts.size();
-				if (n < 2) {
-					continue;
-				}
 
-				Activity first = acts.getFirst();
-				Activity last = acts.getLast();
-
-//				combined overnight (wrap-around) home: opening = observed evening arrival,
-//				closing = 24h + observed morning departure. Both endpoints share one augmented type.
-				double open = observedStart(last);
-				double close = ANCHOR_S + observedEnd(first);
-				applyOpeningWindow(first, open, close, scoring, registered);
-				applyOpeningWindow(last, open, close, scoring, registered);
-
-//				middle activities: their own observed [start, end] window.
-				for (int i = 1; i < n - 1; i++) {
+//				tag only middle activities, each with its own observed [start, end] window. The
+//				first/last (wrap-around overnight) activity is left untouched so the overnight term
+//				is not scored with opening times (see javadoc).
+				for (int i = 1; i < acts.size() - 1; i++) {
 					Activity act = acts.get(i);
 					applyOpeningWindow(act, observedStart(act), observedEnd(act), scoring, registered);
 				}
 			}
 		}
-		log.info("plan-derived opening times: registered {} distinct activity-type params", registered.size());
+		log.info("plan-derived opening times: registered {} distinct activity-type params (middle activities only)", registered.size());
 	}
 
 	/**
