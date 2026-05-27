@@ -186,6 +186,12 @@ public class DresdenModel extends MATSimApplication {
 //		this happens in the makefile pipeline already, but we do it here anyways, in case somebody uses a preliminary network.
 		PrepareNetwork.prepareFreightNetwork(scenario.getNetwork());
 
+//		derive per-activity-instance opening times from each plan's observed activity windows and
+//		encode them into the activity type (analogous to how typical durations are read off the plan).
+//		Registers the corresponding scoring params programmatically. Must run after the wrap rewrite
+//		so types are final and every plan is wrap-around.
+		DresdenActivities.setPlanDerivedOpeningTimes(scenario);
+
 //		Strip turn restrictions from every link. The DisallowedNextLinks attribute holds
 //		per-mode lists of forbidden next-link sequences (only honored by SpeedyDijkstra and
 //		SpeedyALT in routing); we don't want any here, so drop the attribute outright.

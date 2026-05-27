@@ -6,10 +6,14 @@ import org.matsim.api.core.v01.Scenario;
 import org.matsim.api.core.v01.population.Activity;
 import org.matsim.api.core.v01.population.Person;
 import org.matsim.api.core.v01.population.Plan;
+import org.matsim.core.config.groups.ScoringConfigGroup;
+import org.matsim.core.config.groups.ScoringConfigGroup.ActivityParams;
+import org.matsim.core.router.TripStructureUtils;
 import org.matsim.contrib.vsp.scenario.SnzActivities;
 
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -45,89 +49,6 @@ public final class DresdenActivities {
 	private DresdenActivities(){}
 
 	/**
-	 * Disable wrap-around scoring of the first and last act of the day by setting them to different
-	 * subtypes "_morning" and "_evening". Clamp-aware variant of
-	 * {@link org.matsim.contrib.vsp.scenario.Activities#changeWrapAroundActsIntoMorningAndEveningActs(Scenario)}.
-	 */
-	public static void changeWrapAroundActsIntoMorningAndEveningActs( Scenario scenario ) {
-		Set<String> firstActTypes = new HashSet<>();
-		Set<String> lastActTypes = new HashSet<>();
-
-		// Else-branch overnight clamp = simulationPeriodInDays * 24h (read from the same config the
-		// scoring function uses). The evening activity is scored from its start to this clamp.
-		double elseClampS = scenario.getConfig().scenario().getSimulationPeriodInDays() * 24 * 3600;
-		double clampSlack = elseClampS - WRAP_OFFSET_S;
-		int maxBinSeconds = (int) Math.round( elseClampS );
-
-		for ( Person p : scenario.getPopulation().getPersons().values()) {
-//			ignore freight / commercial traffic agents and stay home agents
-			if (!p.getAttributes().getAttribute("subpopulation").equals("person") ||
-			p.getSelectedPlan().getPlanElements().size() == 1) {
-				continue;
-			}
-
-			for ( Plan plan : p.getPlans()) {
-				Activity first = (Activity) plan.getPlanElements().getFirst();
-				Activity last = (Activity) plan.getPlanElements().getLast();
-
-				String[] splitFirst = first.getType().split("_");
-				String typeFirst = String.join("_", Arrays.copyOfRange(splitFirst, 0, splitFirst.length - 1 ) );
-				int orginalTimeBinFirst = Integer.parseInt(splitFirst[splitFirst.length - 1]);
-				firstActTypes.add(typeFirst);
-
-				String[] splitLast = last.getType().split("_");
-				String typeLast = String.join("_", Arrays.copyOfRange(splitLast, 0, splitLast.length - 1));
-				int orginalTimeBinLast = Integer.parseInt(splitLast[splitLast.length - 1]);
-				lastActTypes.add(typeLast);
-
-				if (!typeFirst.equals(typeLast)) {
-//					if first and last act do not have the same type, we will not change anything.
-//					this is the pragmatic version. There are last acts with without startTime, endTime or maxDuration.
-//					this needs to be repaired upstream (in the makefile process). -sm0226
-					continue;
-				}
-
-				Double durationFirst = null;
-				if (first.getEndTime().isDefined()) {
-//					use act end time if defined
-					durationFirst = first.getEndTime().seconds();
-				}
-
-				if (durationFirst == null && first.getMaximumDuration().isDefined()) {
-					durationFirst = first.getMaximumDuration().seconds();
-				}
-
-				if (durationFirst == null) {
-					log.fatal("Neither duration nor end time is defined for activity {} of agent {}. This should not happen, aborting!", first, p.getId() );
-					throw new IllegalStateException("");
-				}
-
-				int durationBinFirst = getDurationBin(durationFirst, maxBinSeconds);
-
-				first.setType(String.format("%s_%d", SnzActivities.createMorningActivityType(typeFirst ), durationBinFirst ) );
-
-	//			act types of first and last act the same
-				if (orginalTimeBinFirst != orginalTimeBinLast) {
-					log.fatal("typical duration of first and last activity of person {} with the same act type {} are not the same. This should not happen, aborting!", p.getId(), typeLast );
-					throw new IllegalStateException("");
-				}
-//				The evening activity is scored to the 27:00 else-branch clamp, so it has clampSlack
-//				more room than the 24h wrap frame in which orginalTimeBinLast was measured. Carry
-//				that room into the typical so the evening stays satisfied instead of collapsing into
-//				the 10-minute floor bin. clampSlack is 0 when the clamp is at 24:00 (upstream behaviour).
-				double durationLast = orginalTimeBinLast - durationFirst + clampSlack;
-
-				last.setType(String.format("%s_%d", SnzActivities.createEveningActivityType(typeLast ), getDurationBin(durationLast, maxBinSeconds ) ) );
-				last.setMaximumDuration(durationLast);
-				last.setEndTimeUndefined();
-				last.setStartTimeUndefined();
-			}
-		}
-		log.info("Activity types of first activity in plans: {}", firstActTypes );
-		log.info("Activity types of last activity in plans: {}", lastActTypes );
-	}
-
-	/**
 	 * Round a duration to the nearest 10-minute bin, clamped to [600, maxSeconds]. Clamp-aware
 	 * variant of the upstream getDurationBin, whose ceiling is fixed at 86400; here it tracks the
 	 * day length so morning/evening typicals can reach the 27:00 clamp (matching the scoring params
@@ -146,5 +67,140 @@ public final class DresdenActivities {
 			durationCategoryNr = maxCategories;
 		}
 		return durationCategoryNr * 600;
+	}
+
+
+	private static final int BIN_SIZE = 600;
+
+	/**
+	 * Reference anchor for overnight activities: CharyparNagelActivityScoring scores the
+	 * wrap-around (first==last type) activity over [last.startTime, first.endTime + 24h], so a
+	 * morning departure maps to closing-time {@code 24h + morningDeparture}. Matches the
+	 * hard-coded {@code 24*3600} in {@code handleOvernightActivity}.
+	 */
+	private static final int ANCHOR_S = 24 * 3600;
+
+	/**
+	 * Buffer (seconds) added on each side of the observed window before binning. 0 means the
+	 * scored opening window is exactly the observed performance window (snapped outward to the
+	 * bin grid). Increase to give agents a tolerance band in which they can shift without the
+	 * opening-time duration clamp biting. The single knob for experimenting with this rewrite.
+	 */
+	private static final double OPENING_TIME_BUFFER_S = 0.0;
+
+	/**
+	 * Derive each activity instance's scoring opening window from the initial plan and encode it
+	 * into the activity type, the same way typical durations are read off the plan and encoded as
+	 * a {@code _<seconds>} type suffix (cf.
+	 * {@link org.matsim.application.prepare.population.SplitActivityTypesDuration}). MATSim only
+	 * supports opening times per activity <em>type</em>, so we mint a distinct type per binned
+	 * (base, typical, opening, closing) tuple and register its {@link ActivityParams}
+	 * programmatically.
+	 *
+	 * <p>Run <em>after</em> {@link #changeNonWrapAroundActsIntoWrapAroundActs}: every plan is then
+	 * wrap-around, so the first and last activity are scored as one combined overnight term over
+	 * [last.startTime, first.endTime + 24h] using the last activity's params (see
+	 * {@code CharyparNagelActivityScoring#handleOvernightActivity}). We therefore give first and
+	 * last the <em>same</em> augmented type — preserving the type equality the wrap branch keys on
+	 * — with opening = observed evening arrival and closing = 24h + observed morning departure.
+	 * Middle activities get their own observed [start, end] window.
+	 *
+	 * <p>The opening window is read from the <em>initial</em> plan; at scoring time MATSim passes
+	 * the experienced activity (correct simulated start/end), looks up these params by type, and
+	 * clamps the experienced duration to the baked-in observed window.
+	 *
+	 * <p>Note: this mints one ActivityParams per distinct binned window, so the scoring config can
+	 * grow large on big populations; and because the wrap (first/last) activity now carries opening
+	 * times, CharyparNagelActivityScoring logs a (harmless, here intentional) warning that scoring
+	 * correctness "cannot be guaranteed" for first/last activities.
+	 */
+	public static void setPlanDerivedOpeningTimes(Scenario scenario) {
+		ScoringConfigGroup scoring = scenario.getConfig().scoring();
+		Set<String> registered = new HashSet<>();
+
+		for (Person p : scenario.getPopulation().getPersons().values()) {
+//			ignore freight / commercial traffic agents and stay home agents (same cohort as the wrap rewrite)
+			if (!p.getAttributes().getAttribute("subpopulation").equals("person") ||
+				p.getSelectedPlan().getPlanElements().size() == 1) {
+				continue;
+			}
+
+			for (Plan plan : p.getPlans()) {
+				List<Activity> acts = TripStructureUtils.getActivities(plan, TripStructureUtils.StageActivityHandling.ExcludeStageActivities);
+				int n = acts.size();
+				if (n < 2) {
+					continue;
+				}
+
+				Activity first = acts.getFirst();
+				Activity last = acts.getLast();
+
+//				combined overnight (wrap-around) home: opening = observed evening arrival,
+//				closing = 24h + observed morning departure. Both endpoints share one augmented type.
+				double open = observedStart(last);
+				double close = ANCHOR_S + observedEnd(first);
+				applyOpeningWindow(first, open, close, scoring, registered);
+				applyOpeningWindow(last, open, close, scoring, registered);
+
+//				middle activities: their own observed [start, end] window.
+				for (int i = 1; i < n - 1; i++) {
+					Activity act = acts.get(i);
+					applyOpeningWindow(act, observedStart(act), observedEnd(act), scoring, registered);
+				}
+			}
+		}
+		log.info("plan-derived opening times: registered {} distinct activity-type params", registered.size());
+	}
+
+	/**
+	 * Observed start (arrival) of an activity in the initial plan. The first activity of a plan has
+	 * no start time (the agent begins there at t=0).
+	 */
+	private static double observedStart(Activity act) {
+		return act.getStartTime().orElse(0.0);
+	}
+
+	/**
+	 * Observed end (departure) of an activity in the initial plan: its end time, or start + maximum
+	 * duration when the end time was encoded as a duration (cf. SplitActivityTypesDuration's
+	 * end-time-to-duration step). Not meaningful for an open-ended overnight last activity, which
+	 * this method is never called on.
+	 */
+	private static double observedEnd(Activity act) {
+		if (act.getEndTime().isDefined()) {
+			return act.getEndTime().seconds();
+		}
+		if (act.getMaximumDuration().isDefined()) {
+			return observedStart(act) + act.getMaximumDuration().seconds();
+		}
+		return observedStart(act);
+	}
+
+	/**
+	 * Map an observed [start, end] window (± buffer) to a binned scoring opening window and bake it
+	 * onto the activity: append {@code _op<opening>_cl<closing>} to the type and register the
+	 * matching {@link ActivityParams} once. The typical duration is preserved from the incoming
+	 * {@code <base>_<typical>} type. Opening is floored and closing ceiled to the bin grid, so the
+	 * binned window always contains the observed window (it never collapses, even for short acts).
+	 */
+	private static void applyOpeningWindow(Activity act, double obsStart, double obsEnd,
+	                                       ScoringConfigGroup scoring, Set<String> registered) {
+		double opening = Math.max(0.0, Math.floor((obsStart - OPENING_TIME_BUFFER_S) / BIN_SIZE) * BIN_SIZE);
+		double closing = Math.ceil((obsEnd + OPENING_TIME_BUFFER_S) / BIN_SIZE) * BIN_SIZE;
+//		guard against a collapsed window for zero-/sub-bin observed durations (floor(start)==ceil(end)):
+//		keep it at least one bin wide so the activity stays performable rather than scoring as "closed".
+		closing = Math.max(closing, opening + BIN_SIZE);
+
+		String baseType = act.getType();
+		int typical = Integer.parseInt(baseType.substring(baseType.lastIndexOf('_') + 1));
+		String newType = String.format("%s_op%d_cl%d", baseType, (long) opening, (long) closing);
+		act.setType(newType);
+
+		if (registered.add(newType)) {
+			scoring.addActivityParams(new ActivityParams(newType)
+				.setTypicalDuration(typical)
+				.setOpeningTime(opening)
+				.setClosingTime(closing));
+		}
 	}
 }
