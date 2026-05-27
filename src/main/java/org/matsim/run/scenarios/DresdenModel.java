@@ -25,7 +25,6 @@ import org.matsim.contrib.vsp.pt.fare.DistanceBasedPtFareParams;
 import org.matsim.contrib.vsp.pt.fare.FareZoneBasedPtFareParams;
 import org.matsim.contrib.vsp.pt.fare.PtFareConfigGroup;
 import org.matsim.contrib.vsp.pt.fare.PtFareModule;
-import org.matsim.contrib.vsp.scenario.Activities;
 import org.matsim.contrib.vsp.scenario.SnzActivities;
 import org.matsim.contrib.vsp.scoring.RideScoringParamsFromCarParams;
 import org.matsim.core.config.Config;
@@ -35,7 +34,6 @@ import org.matsim.core.config.groups.ScoringConfigGroup;
 import org.matsim.core.controler.AbstractModule;
 import org.matsim.core.controler.Controler;
 import org.matsim.core.network.NetworkUtils;
-import org.matsim.core.network.turnRestrictions.DisallowedNextLinks;
 import org.matsim.core.replanning.annealing.ReplanningAnnealerConfigGroup.AnnealOption;
 import org.matsim.core.replanning.annealing.ReplanningAnnealerConfigGroup.AnnealingVariable;
 import org.matsim.core.scoring.functions.ScoringParametersForPerson;
@@ -93,19 +91,12 @@ public class DresdenModel extends MATSimApplication {
 		MATSimApplication.execute(DresdenModel.class, args);
 	}
 
-	protected void addScoringParams( Config config ) {
-		// yyyy need to find a way to remove the existing scoring params; then this can be programmed without inheritance
-		SnzActivities.addScoringParams(config);
-//		add scoring params for split act types for _morning and _evening. See method prepareScenario.
-		SnzActivities.addMorningEveningScoringParams(config);
-	}
-
 	@Nullable
 	@Override
 	protected Config prepareConfig(Config config) {
 
 		// Add all activity types with time bins
-		this.addScoringParams( config );
+		SnzActivities.addScoringParams(config);
 
 		//		add simwrapper config module
 		ConfigUtils.addOrGetModule(config, SimWrapperConfigGroup.class).defaultParams().setContext("").setMapCenter("14.5,51.53").setMapZoomLevel(6.8)
@@ -122,6 +113,11 @@ public class DresdenModel extends MATSimApplication {
 		scoringConfig.setPerforming_utils_hr( 6.0 );
 		scoringConfig.setWriteExperiencedPlans(true);
 		scoringConfig.setPathSizeLogitBeta(0.);
+
+//		Move the else-branch overnight scoring clamp from 24:00 to 27:00. handleOvernightActivity
+//		scores the (non-wrap-around) last activity from its start to simulationPeriodInDays * 24h;
+//		1.125 * 24h = 27:00.
+		config.scenario().setSimulationPeriodInDays( 1.125 );
 
 		prepareCommercialTrafficConfig(config);
 
@@ -189,22 +185,21 @@ public class DresdenModel extends MATSimApplication {
 //		this happens in the makefile pipeline already, but we do it here anyways, in case somebody uses a preliminary network.
 		PrepareNetwork.prepareFreightNetwork(scenario.getNetwork());
 
-//		switch off wrap around scoring if not done already. The method creates separate _morning and _evening act types for the first and last act if they have the same act type, e.g. home.
-//		Thus, no wrap-around scoring will be performed.
-		Activities.changeWrapAroundActsIntoMorningAndEveningActs(scenario);
+//		derive per-activity-instance opening times from each plan's observed activity windows and
+//		encode them into the activity type (analogous to how typical durations are read off the plan).
+//		Does nothing if the activity type already has them so runs can be chained.
+//		Registers the corresponding scoring params programmatically.
+		DresdenActivities.setPlanDerivedOpeningTimes(scenario);
 
-//		remove disallowed links. The disallowed links cause many problems and (usually) are not useful in our rather macroscopic view on transport systems.
-		// yyyy I have no idea what this means; could someone please explain?  kai, dec'25
-		// --> The way this reads to me is that we may have a network where the "disallowedNextLinks" attribute is used.    In the
-		// code that follows here, we disable those attributes.  kai, dec'25
+//		Strip turn restrictions from every link. The DisallowedNextLinks attribute holds
+//		per-mode lists of forbidden next-link sequences (only honored by SpeedyDijkstra and
+//		SpeedyALT in routing); we don't want any here, so drop the attribute outright.
+//		Previously the loop only cleared sequences for modes already in
+//		link.getAllowedModes(), leaving entries for other modes in place — those are inert
+//		today but would wake up the moment somebody widens the link's allowed-modes set.
 		for (Link link : scenario.getNetwork().getLinks().values()) {
-			DisallowedNextLinks disallowed = NetworkUtils.getDisallowedNextLinks(link);
-			if (disallowed != null) {
-				link.getAllowedModes().forEach(disallowed::removeDisallowedLinkSequences);
-				if (disallowed.isEmpty()) {
-					NetworkUtils.removeDisallowedNextLinks(link);
-					// yyyy whey do we only do this if disallowed is empty, and not in all cases?  kai, dec'25
-				}
+			if (NetworkUtils.getDisallowedNextLinks(link) != null) {
+				NetworkUtils.removeDisallowedNextLinks(link);
 			}
 		}
 
