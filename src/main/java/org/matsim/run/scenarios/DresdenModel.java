@@ -77,8 +77,8 @@ public class DresdenModel extends MATSimApplication {
 	private long emissionsFromIteration = 10;
 
 //	TODO: remove before release
-	@CommandLine.Option(names="--ride-alpha", description = "alpha value for ride. For calibration only! To be removed before release.")
-	private double rideAlpha = 2.;
+//	@CommandLine.Option(names="--ride-alpha", description = "alpha value for ride. For calibration only! To be removed before release.")
+	private final double rideAlpha = 1.;
 
 	public DresdenModel(){}
 
