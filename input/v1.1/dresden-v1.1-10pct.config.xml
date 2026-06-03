@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!--TODO: before release: set correct input paths for all input files in this file to public svn calib output run files!-->
 <!DOCTYPE config SYSTEM "http://www.matsim.org/files/dtd/config_v2.dtd">
 <config>
 	<module name="timeAllocationMutator">
@@ -38,7 +37,6 @@
 	</module>
 
 	<module name="plans">
-<!--		TODO before release: set calibrated v1.1 plans input file.-->
 		<param name="inputPlansFile"
 			   value="https://svn.vsp.tu-berlin.de/repos/public-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/calibrated-10pct/output/012.output_plans.xml.gz"/>
 		<param name="removingUnnecessaryPlanAttributes" value="true"/>
@@ -185,10 +183,9 @@
 
 	<module name="scoring">
 		<param name="fractionOfIterationsToStartScoreMSA" value="0.9"/>
-		<!--		TODO before release: set calibrated v1.1 ascs.-->
 		<parameterset type="scoringParameters">
 			<parameterset type="modeParams">
-				<param name="constant" value="0.31670929636482503"/>
+				<param name="constant" value="0.28812495713388736"/>
 				<param name="marginalUtilityOfTraveling_util_hr" value="0.0"/>
 				<param name="mode" value="car"/>
 				<param name="monetaryDistanceRate" value="-0.00025"/>
@@ -196,7 +193,7 @@
 				<param name="dailyMonetaryConstant" value="-13.22"/>
 			</parameterset>
 			<parameterset type="modeParams">
-				<param name="constant" value="-0.3181313429018894"/>
+				<param name="constant" value="-1.970554030861951"/>
 				<param name="mode" value="ride"/>
 <!--				the following are set in code, see run class -->
 <!--				<param name="marginalUtilityOfTraveling_util_hr" value="-18.0"/>-->
@@ -204,13 +201,13 @@
 <!--				<param name="dailyMonetaryConstant" value="-0.0"/>-->
 			</parameterset>
 			<parameterset type="modeParams">
-				<param name="constant" value="-0.8143658493278783"/>
+				<param name="constant" value="-0.8922534052482403"/>
 				<param name="marginalUtilityOfTraveling_util_hr" value="0.0"/>
 				<param name="mode" value="pt"/>
 				<param name="dailyMonetaryConstant" value="0.0"/>
 			</parameterset>
 			<parameterset type="modeParams">
-				<param name="constant" value="-1.4063545335132797"/>
+				<param name="constant" value="-1.590836404007188"/>
 				<param name="marginalUtilityOfTraveling_util_hr" value="-4.0"/>
 				<param name="mode" value="bike"/>
 			</parameterset>
