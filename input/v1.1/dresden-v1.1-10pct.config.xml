@@ -27,35 +27,35 @@
 
 	<module name="network">
 		<param name="inputNetworkFile"
-			   value="https://svn.vsp.tu-berlin.de/repos/shared-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/calibrated-10pct/output/012.output_network.xml.gz"/>
+			   value="https://svn.vsp.tu-berlin.de/repos/public-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/calibrated-10pct/output/012.output_network.xml.gz"/>
 		<param name="laneDefinitionsFile" value="null"/>
 	</module>
 
 	<module name="facilities" >
 		<param name="facilitiesSource" value="fromFile" />
 		<param name="inputCRS" value="EPSG:25832" />
-		<param name="inputFacilitiesFile" value="https://svn.vsp.tu-berlin.de/repos/shared-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/calibrated-10pct/output/012.output_facilities.xml.gz" />
+		<param name="inputFacilitiesFile" value="https://svn.vsp.tu-berlin.de/repos/public-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/calibrated-10pct/output/012.output_facilities.xml.gz" />
 	</module>
 
 	<module name="plans">
 <!--		TODO before release: set calibrated v1.1 plans input file.-->
 		<param name="inputPlansFile"
-			   value="https://svn.vsp.tu-berlin.de/repos/shared-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/calibrated-10pct/output/012.output_plans.xml.gz"/>
+			   value="https://svn.vsp.tu-berlin.de/repos/public-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/calibrated-10pct/output/012.output_plans.xml.gz"/>
 		<param name="removingUnnecessaryPlanAttributes" value="true"/>
 	</module>
 
 	<module name="vehicles">
-		<param name="vehiclesFile" value="https://svn.vsp.tu-berlin.de/repos/shared-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/calibrated-10pct/output/012.output_vehicles.xml.gz"/>
+		<param name="vehiclesFile" value="https://svn.vsp.tu-berlin.de/repos/public-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/calibrated-10pct/output/012.output_vehicles.xml.gz"/>
 	</module>
 
 	<module name="transit">
-		<param name="transitScheduleFile" value="https://svn.vsp.tu-berlin.de/repos/shared-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/calibrated-10pct/output/012.output_transitSchedule.xml.gz"/>
-		<param name="vehiclesFile"  value="https://svn.vsp.tu-berlin.de/repos/shared-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/calibrated-10pct/output/012.output_transitVehicles.xml.gz"/>
+		<param name="transitScheduleFile" value="https://svn.vsp.tu-berlin.de/repos/public-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/calibrated-10pct/output/012.output_transitSchedule.xml.gz"/>
+		<param name="vehiclesFile"  value="https://svn.vsp.tu-berlin.de/repos/public-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/calibrated-10pct/output/012.output_transitVehicles.xml.gz"/>
 		<param name="useTransit" value="true"/>
 	</module>
 
 	<module name="counts">
-		<param name="inputCountsFile" value="https://svn.vsp.tu-berlin.de/repos/shared-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/calibrated-10pct/output/012.output_counts.xml.gz"/>
+		<param name="inputCountsFile" value="https://svn.vsp.tu-berlin.de/repos/public-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/calibrated-10pct/output/012.output_counts.xml.gz"/>
 		<param name="countsScaleFactor" value="0.1"/>
 	</module>
 
