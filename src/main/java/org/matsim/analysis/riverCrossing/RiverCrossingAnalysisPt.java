@@ -6,10 +6,12 @@ import org.apache.commons.csv.CSVPrinter;
 import org.apache.commons.csv.CSVRecord;
 import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.Scenario;
+import org.matsim.application.MATSimAppCommand;
 import org.matsim.core.config.Config;
 import org.matsim.core.config.ConfigUtils;
 import org.matsim.core.scenario.ScenarioUtils;
 import org.matsim.pt.transitSchedule.api.*;
+import picocli.CommandLine;
 
 import java.io.*;
 import java.nio.file.Files;
@@ -20,19 +22,30 @@ import java.util.Set;
 import java.util.zip.GZIPInputStream;
 
 import static org.matsim.analysis.riverCrossing.BridgeCrossingAnalysisUtils.*;
+import static org.matsim.contrib.drt.analysis.afterSimAnalysis.DrtVehicleStoppingTaskWriter.glob;
 
 
-public class RiverCrossingAnalysisPt {
+public class RiverCrossingAnalysisPt implements MATSimAppCommand {
+	@CommandLine.Option(names = "--output-folder", required = true, description = "output folder of the MATSim run")
+	private String outputFolder;
+
+	@CommandLine.Option(names = "--case", defaultValue = "before", description = "values to choose from: before, after")
+	private String remark;
 
 	public static void main(String[] args) throws IOException {
-		String ptSchedulePath = "https://svn.vsp.tu-berlin.de/repos/public-svn/matsim/scenarios/countries/de/dresden/dresden-v1.0/input/dresden-v1.0-transitSchedule.xml.gz";
-		String ptVolumesAnalysis = "/Users/luchengqi/Desktop/pt_pax_volumes.csv.gz";
-		String remark = "before";
-		String output = "/Users/luchengqi/Desktop/bridges_pt_pax_volumes_" + remark + ".csv";
+		new RiverCrossingAnalysisPt().execute(args);
+	}
+
+	@Override
+	public Integer call() throws Exception {
+		String ptSchedulePath = glob(Path.of(outputFolder), "*transitSchedule.xml.gz").get().toAbsolutePath().toString();
+		String ptVolumesAnalysis = outputFolder + "/analysis/pt/pt_pax_volumes.csv.gz";
+		String output = outputFolder + "/bridges_pt_pax_volumes_" + remark + ".csv";
 
 		// identify the bridge crossing places
 		// load transit schedule
 		Config config = ConfigUtils.createConfig();
+		config.global().setCoordinateSystem("EPSG:25832");
 		config.transit().setTransitScheduleFile(ptSchedulePath);
 
 		Scenario scenario = ScenarioUtils.loadScenario(config);
@@ -216,5 +229,7 @@ public class RiverCrossingAnalysisPt {
 			null, null,
 			null, null, remark);
 		csvPrinter.close();
+
+		return 0;
 	}
 }
