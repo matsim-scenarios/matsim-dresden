@@ -10,8 +10,8 @@
 	<module name="controller">
 		<param name="lastIteration" value="500"/>
 		<param name="overwriteFiles" value="failIfDirectoryExists"/>
-		<param name="runId" value="dresden-v1.1-10pct"/>
-		<param name="outputDirectory" value="./output/dresden-v1.1-10pct"/>
+		<param name="runId" value="dresden-v1.1-1pct"/>
+		<param name="outputDirectory" value="./output/dresden-v1.1-1pct"/>
 		<param name="writeEventsInterval" value="100"/>
 		<param name="writePlansInterval" value="100"/>
 		<param name="enableLinkToLinkRouting" value="false"/>
