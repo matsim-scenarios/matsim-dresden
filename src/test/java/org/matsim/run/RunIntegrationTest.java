@@ -37,7 +37,7 @@ class RunIntegrationTest {
 
 	@Test
 	void runScenario() {
-		Config config = ConfigUtils.loadConfig(String.format("input/%s/dresden-%s-0.1pct.config.xml", DresdenModel.VERSION, DresdenModel.VERSION));
+		Config config = ConfigUtils.loadConfig(String.format("input/%s/dresden-%s-IT.config.xml", DresdenModel.VERSION, DresdenModel.VERSION));
 
 //		config.controller().setWritePlansInterval( 0 );
 //		config.controller().setWritePlansUntilIteration( -1 );

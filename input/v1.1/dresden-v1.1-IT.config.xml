@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!--TODO: before release: set correct input paths for all input files in this file to public svn calib output run files!-->
+<!-- We use input from v1.0 here since this is more here to test if the Controller is running and v1.1 is using a larger area (.i.e more RAM). -->
 <!DOCTYPE config SYSTEM "http://www.matsim.org/files/dtd/config_v2.dtd">
 <config>
 	<module name="timeAllocationMutator">
@@ -38,7 +38,6 @@
 	</module>
 
 	<module name="plans">
-<!--		TODO before release: set calibrated v1.1 plans input file.-->
 		<param name="inputPlansFile"
 			   value="../v1.0/dresden-v1.0-0.1pct.plans-initial.xml.gz"/>
 		<param name="removingUnnecessaryPlanAttributes" value="true"/>
