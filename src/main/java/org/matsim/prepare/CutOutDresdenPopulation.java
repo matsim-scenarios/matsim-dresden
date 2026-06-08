@@ -28,6 +28,7 @@ import picocli.CommandLine;
 import java.util.HashSet;
 import java.util.Set;
 
+@Deprecated(since = "v1.1")
 @CommandLine.Command(
 	name = "cutout",
 	description = "Cut out a population from a bigger population based on network routing and a shp file."

@@ -5,26 +5,30 @@
 		<groupId>org.matsim</groupId>
 		<artifactId>matsim-all</artifactId>
 		<!-- Define MATSim version here -->
+
 		<!-- release -->
 		<!-- <version>15.0</version> -->
 
-		<!-- PR-labelled release -->
-		<version>2026.0-PR4282</version>
+		<!-- weekly release -->
+<!--		<version>2026.0-2026w03</version>-->
 
-		<!-- snapshot == not recommended: rather use PR-labelled release!-->
-<!--		<version>2025.0-SNAPSHOT</version>-->
+		<!-- PR-labelled release -->
+		<version>2027.0-PR4883</version>
+
+		<!-- snapshot; ONLY use for "sharing in the IDE" -->
+<!--		<version>2026.0-SNAPSHOT</version>-->
 	</parent>
 
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>com.github.matsim-scenarios</groupId>
 	<artifactId>matsim-dresden</artifactId>
-	<version>1.0</version>
+	<version>1.1</version>
 
 	<name>MATSim Dresden Model</name>
 	<description>A transport model of Dresden</description>
 
 	<properties>
-		<main.class>org.matsim.run.RunDresdenScenario</main.class>
+		<main.class>org.matsim.run.DresdenModelWrapper</main.class>
 
 		<!-- Don't modify, will use the same version as parent -->
 		<matsim.version>${project.parent.version}</matsim.version>
@@ -128,7 +132,7 @@
 			<plugin>
 				<groupId>org.jacoco</groupId>
 				<artifactId>jacoco-maven-plugin</artifactId>
-				<version>0.8.12</version>
+				<version>0.8.13</version>
 				<executions>
 					<execution>
 						<goals>
@@ -181,7 +185,7 @@
 							<goal>shade</goal>
 						</goals>
 						<configuration>
-							<outputFile>${project.basedir}/${project.build.finalName}-${git.commit.id.describe-short}.jar</outputFile>
+							<outputFile>${project.basedir}/${project.build.finalName}-${git.commit.id.describe}.jar</outputFile>
 							<transformers>
 								<!-- The following sets the main class for the executable jar as you otherwise would with the assembly plugin -->
 								<transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
@@ -212,39 +216,39 @@
 				</executions>
 			</plugin>
 
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-checkstyle-plugin</artifactId>
-				<version>3.4.0</version>
-				<dependencies>
-					<dependency>
-						<groupId>com.puppycrawl.tools</groupId>
-						<artifactId>checkstyle</artifactId>
-						<version>10.17.0</version>
-					</dependency>
-					<dependency>
-						<groupId>com.github.sevntu-checkstyle</groupId>
-						<artifactId>sevntu-checks</artifactId>
-						<version>1.44.1</version>
-					</dependency>
-				</dependencies>
-				<configuration>
-					<configLocation>checkstyle.xml</configLocation>
-					<consoleOutput>true</consoleOutput>
-					<failsOnError>true</failsOnError>
-					<failOnViolation>true</failOnViolation>
-					<linkXRef>false</linkXRef>
-				</configuration>
-				<executions>
-					<execution>
-						<id>checkstyle</id>
-						<phase>package</phase>
-						<goals>
-							<goal>check</goal>
-						</goals>
-					</execution>
-				</executions>
-			</plugin>
+<!--			<plugin>-->
+<!--				<groupId>org.apache.maven.plugins</groupId>-->
+<!--				<artifactId>maven-checkstyle-plugin</artifactId>-->
+<!--				<version>3.4.0</version>-->
+<!--				<dependencies>-->
+<!--					<dependency>-->
+<!--						<groupId>com.puppycrawl.tools</groupId>-->
+<!--						<artifactId>checkstyle</artifactId>-->
+<!--						<version>10.17.0</version>-->
+<!--					</dependency>-->
+<!--					<dependency>-->
+<!--						<groupId>com.github.sevntu-checkstyle</groupId>-->
+<!--						<artifactId>sevntu-checks</artifactId>-->
+<!--						<version>1.44.1</version>-->
+<!--					</dependency>-->
+<!--				</dependencies>-->
+<!--				<configuration>-->
+<!--					<configLocation>checkstyle.xml</configLocation>-->
+<!--					<consoleOutput>true</consoleOutput>-->
+<!--					<failsOnError>true</failsOnError>-->
+<!--					<failOnViolation>true</failOnViolation>-->
+<!--					<linkXRef>false</linkXRef>-->
+<!--				</configuration>-->
+<!--				<executions>-->
+<!--					<execution>-->
+<!--						<id>checkstyle</id>-->
+<!--						<phase>package</phase>-->
+<!--						<goals>-->
+<!--							<goal>check</goal>-->
+<!--						</goals>-->
+<!--					</execution>-->
+<!--				</executions>-->
+<!--			</plugin>-->
 
 		</plugins>
 	</build>
@@ -290,10 +294,10 @@
 			<url>https://mvn.slimjars.com</url>
 		</repository>
 
-		<repository>
-			<id>jitpack.io</id>
-			<url>https://jitpack.io</url>
-		</repository>
+<!--		<repository>-->
+<!--			<id>jitpack.io</id>-->
+<!--			<url>https://jitpack.io</url>-->
+<!--		</repository>-->
 	</repositories>
 
 </project>

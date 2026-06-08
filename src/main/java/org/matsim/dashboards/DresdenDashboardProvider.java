@@ -1,6 +1,7 @@
 package org.matsim.dashboards;
 
 import org.matsim.core.config.Config;
+import org.matsim.run.scenarios.DresdenUtils;
 import org.matsim.simwrapper.Dashboard;
 import org.matsim.simwrapper.DashboardProvider;
 import org.matsim.simwrapper.SimWrapper;
@@ -13,6 +14,12 @@ import java.util.List;
  * Default Dashboards for the Dresden scenario.
  */
 public class DresdenDashboardProvider implements DashboardProvider {
+	private final DresdenUtils.EmissionsAnalysisHandling emissionsHandling;
+
+	public DresdenDashboardProvider(DresdenUtils.EmissionsAnalysisHandling emissionsHandling) {
+		this.emissionsHandling = emissionsHandling;
+	}
+
 	@Override
 	public List<Dashboard> getDashboards(Config config, SimWrapper simWrapper) {
 //		create TripDashboard with reference files for calibration
@@ -26,10 +33,17 @@ public class DresdenDashboardProvider implements DashboardProvider {
 			.withDistanceDistribution("mode_share_distance_distribution.csv")
 			.setAnalysisArgs("--person-filter", "subpopulation=person")).context("calibration").title("Trips (calibration)");
 
-		return List.of(trips,
-			new EmissionsDashboard(config.global().getCoordinateSystem())
+		if (emissionsHandling == DresdenUtils.EmissionsAnalysisHandling.RUN_EMISSIONS_ANALYSIS) {
+			return List.of(trips,
+				new EmissionsDashboard(config.global().getCoordinateSystem())
 //			the NoiseAnalysis is not run here because it needs more RAM than the entire simulation,
 //			which leads to VM crashes and prevents other analysis to run. We have to run it separately (e.g. with DresdenSimWrapperRunner)
-		);
+			);
+		} else {
+			return List.of(trips
+//			the NoiseAnalysis is not run here because it needs more RAM than the entire simulation,
+//			which leads to VM crashes and prevents other analysis to run. We have to run it separately (e.g. with DresdenSimWrapperRunner)
+			);
+		}
 	}
 }

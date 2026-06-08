@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!-- We use input from v1.0 here since this is more here to test if the Controller is running and v1.1 is using a larger area (.i.e more RAM). -->
 <!DOCTYPE config SYSTEM "http://www.matsim.org/files/dtd/config_v2.dtd">
 <config>
 	<module name="timeAllocationMutator">
@@ -10,8 +11,8 @@
 	<module name="controller">
 		<param name="lastIteration" value="500"/>
 		<param name="overwriteFiles" value="failIfDirectoryExists"/>
-		<param name="runId" value="dresden-10pct"/>
-		<param name="outputDirectory" value="./output/output-dresden-10pct"/>
+		<param name="runId" value="dresden-0.1pct"/>
+		<param name="outputDirectory" value="./output/output-dresden-0.1pct"/>
 		<param name="writeEventsInterval" value="100"/>
 		<param name="writePlansInterval" value="100"/>
 		<param name="enableLinkToLinkRouting" value="false"/>
@@ -38,7 +39,7 @@
 
 	<module name="plans">
 		<param name="inputPlansFile"
-			   value="https://svn.vsp.tu-berlin.de/repos/public-svn/matsim/scenarios/countries/de/dresden/dresden-v1.0/input/dresden-v1.0-10pct.plans.xml.gz"/>
+			   value="../v1.0/dresden-v1.0-0.1pct.plans-initial.xml.gz"/>
 		<param name="removingUnnecessaryPlanAttributes" value="true"/>
 	</module>
 
@@ -54,7 +55,7 @@
 
 	<module name="counts">
 		<param name="inputCountsFile" value="https://svn.vsp.tu-berlin.de/repos/public-svn/matsim/scenarios/countries/de/dresden/dresden-v1.0/input/dresden-v1.0-counts-bast.xml.gz"/>
-		<param name="countsScaleFactor" value="0.1"/>
+		<param name="countsScaleFactor" value="0.001"/>
 	</module>
 
 	<module name="routing">
@@ -70,8 +71,8 @@
 
 	<module name="qsim">
 		<param name="endTime" value="36:00:00"/>
-		<param name="flowCapacityFactor" value="0.1"/>
-		<param name="storageCapacityFactor" value="0.1"/>
+		<param name="flowCapacityFactor" value="0.001"/>
+		<param name="storageCapacityFactor" value="0.001"/>
 		<param name="mainMode" value="car,bike"/>
 		<param name="numberOfThreads" value="12"/>
 		<param name="startTime" value="00:00:00"/>
@@ -143,6 +144,11 @@
 <!--		</parameterset>-->
 	</module>
 
+	<module name="simwrapper" >
+		<!-- Sample size of the run, which may be required by certain analysis functions. -->
+		<param name="sampleSize" value="0.001" />
+	</module>
+
 	<module name="subtourModeChoice">
 		<param name="chainBasedModes" value="car,bike"/>
 		<param name="modes" value="car,ride,pt,bike,walk"/>
@@ -178,6 +184,7 @@
 
 	<module name="scoring">
 		<param name="fractionOfIterationsToStartScoreMSA" value="0.9"/>
+		<!--		TODO before release: set calibrated v1.1 ascs.-->
 		<parameterset type="scoringParameters">
 			<parameterset type="modeParams">
 				<param name="constant" value="0.31670929636482503"/>
