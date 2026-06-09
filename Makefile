@@ -37,11 +37,9 @@ $(JAR):
 #when not wanting to download osm data for the current year (2026), there is only one dataset per year available.
 #We are sticking to 2024 as we want to depict the status (shortly) before Carola bridge collapsed (sep24).
 #we need to manually svn copy the above to shared-svn/raw/europe/de/de/osm because we do not want to state our svn credentials here
-input/before-calibration/output/network.osm.pbf:
+input/before-calibration/output/germany-240101.osm.pbf:
 	curl https://download.geofabrik.de/europe/germany-240101.osm.pbf \
 	-o $@
-
-NETWORK := input/before-calibration/output/network.osm.pbf
 
 #retrieve detailed network (see param highway) from OSM
 # the .poly files contain point coords. The coordinates should be in EPSG:4326.
@@ -51,32 +49,23 @@ NETWORK := input/before-calibration/output/network.osm.pbf
 # 3) ad x/y coords as feature attributes: Vector - Geometry Tools - Add Geometry Attributes.
 # 4) Export as csv and copy content of csv without the id column to a .poly file.
 # see https://wiki.openstreetmap.org/wiki/Osmosis/Polygon_Filter_File_Format for .poly structure
-$(shared)/before-calibration/output/network-detailed.osm.pbf: $(NETWORK)
+input/before-calibration/output/network-detailed-regional.osm.pbf: input/before-calibration/output/germany-240101.osm.pbf
 	$(osmosis) --rb file=$<\
 	 --tf accept-ways bicycle=yes highway=motorway,motorway_link,trunk,trunk_link,primary,primary_link,secondary_link,secondary,tertiary,motorway_junction,residential,unclassified,living_street\
 	 --bounding-polygon file="input/before-calibration/shp-for-regional-trains_points.poly"\
-	 --used-node --wb $@
+	 --used-node\
+	 --wb $@\
 
-#update: we want to use a more detailed feeder pt in saxony, so we also need a more detailed car/bike network in saxony.
-#Hence, the coarse network step is not needed anymore, we just a bigger shp file shp-for-regional-trains_points.poly for the detailed network.
-#the shp file is the same as for the bus feeders + regional trains in the gtfs extraction (below). -sm0426
-#	retrieve coarse network (see param highway) from OSM
-#../../shared-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/before-calibration/output/network-coarse.osm.pbf: $(NETWORK)
-#	$(osmosis) --rb file=$<\
-#	 --tf accept-ways highway=motorway,motorway_link,trunk,trunk_link,primary,primary_link,secondary_link,secondary,tertiary,motorway_junction\
-#	 --bounding-polygon file="$(shared)/before-calibration/shp-for-regional-trains_points.poly"\
-#	 --used-node --wb $@
-
-#	retrieve germany wide network (see param highway) from OSM
-input/before-calibration/output/network-germany.osm.pbf: $(NETWORK)
+input/before-calibration/output/network-coarse-germany.osm.pbf: input/before-calibration/output/germany-240101.osm.pbf
 	$(osmosis) --rb file=$<\
  	 --tf accept-ways highway=motorway,motorway_link,motorway_junction,trunk,trunk_link,primary,primary_link\
- 	 --used-node --wb $@
+ 	 --used-node\
+ 	 --wb $@
 
-input/before-calibration/output/network.osm: input/before-calibration/output/network-germany.osm.pbf input/before-calibration/output/network-detailed.osm.pbf
+input/before-calibration/output/network.osm: input/before-calibration/output/network-coarse-germany.osm.pbf input/before-calibration/output/network-detailed-regional.osm.pbf
 	$(osmosis) --rb file=$< --rb file=$(word 2,$^)\
   	 --merge\
-  	 --tag-transform file=$(shared)/before-calibration/remove-railway.xml\
+  	 --tag-transform file=input/remove-railway.xml\
   	 --wx $@
 
 # !! See comment above on commented-out material.  !!
