@@ -1,0 +1,6 @@
+outs:
+- md5: cfcd1ab73902689c4a1013089fca9a4f.dir
+  size: 1178952097
+  nfiles: 5
+  hash: md5
+  path: landuse

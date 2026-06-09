@@ -1,0 +1,6 @@
+outs:
+- md5: a2dd7e03dda4d9a8cd8d365a67bddaba.dir
+  size: 336111
+  nfiles: 10
+  hash: md5
+  path: shp
