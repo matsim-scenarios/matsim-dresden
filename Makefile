@@ -11,14 +11,13 @@ endif
 # osmosis path needs to be in " because of blank space in path...
 osmosis := "C:/Program Files/osmosis-0.49.2//bin/osmosis.bat"
 germany := $(CURDIR)/../../shared-svn/raw/europe/de/de
-germanWideFreight := $(CURDIR)/../../public-svn/matsim/scenarios/countries/de/german-wide-freight/v2
+germanWideFreight := input/germanWideFreight
 shared := $(CURDIR)/../../shared-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/
 sharedOberlausitzDresden := $(CURDIR)/../../shared-svn/projects/matsim-oberlausitz-dresden
 dresdenRaw := $(CURDIR)/../../shared-svn/raw/europe/de/dresden
 
 MEMORY ?= 50G
-#JAR := matsim-$(N)-*.jar
-JAR := matsim-dresden-1.1-v1.0.2-68.jar
+JAR := matsim-$(N)-*.jar
 
 # Scenario creation tool
 sc := java -Xms$(MEMORY) -Xmx$(MEMORY) -jar $(JAR)
@@ -38,11 +37,11 @@ $(JAR):
 #when not wanting to download osm data for the current year (2026), there is only one dataset per year available.
 #We are sticking to 2024 as we want to depict the status (shortly) before Carola bridge collapsed (sep24).
 #we need to manually svn copy the above to shared-svn/raw/europe/de/de/osm because we do not want to state our svn credentials here
-../../shared-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/before-calibration/output/network.osm.pbf:
+input/before-calibration/output/network.osm.pbf:
 	curl https://download.geofabrik.de/europe/germany-240101.osm.pbf \
 	-o $@
 
-NETWORK := $(shared)/before-calibration/output/network.osm.pbf
+NETWORK := input/before-calibration/output/network.osm.pbf
 
 #retrieve detailed network (see param highway) from OSM
 # the .poly files contain point coords. The coordinates should be in EPSG:4326.
@@ -52,10 +51,10 @@ NETWORK := $(shared)/before-calibration/output/network.osm.pbf
 # 3) ad x/y coords as feature attributes: Vector - Geometry Tools - Add Geometry Attributes.
 # 4) Export as csv and copy content of csv without the id column to a .poly file.
 # see https://wiki.openstreetmap.org/wiki/Osmosis/Polygon_Filter_File_Format for .poly structure
-../../shared-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/before-calibration/output/network-detailed.osm.pbf: $(NETWORK)
+$(shared)/before-calibration/output/network-detailed.osm.pbf: $(NETWORK)
 	$(osmosis) --rb file=$<\
 	 --tf accept-ways bicycle=yes highway=motorway,motorway_link,trunk,trunk_link,primary,primary_link,secondary_link,secondary,tertiary,motorway_junction,residential,unclassified,living_street\
-	 --bounding-polygon file="$(shared)/before-calibration/shp-for-regional-trains_points.poly"\
+	 --bounding-polygon file="input/before-calibration/shp-for-regional-trains_points.poly"\
 	 --used-node --wb $@
 
 #update: we want to use a more detailed feeder pt in saxony, so we also need a more detailed car/bike network in saxony.
@@ -69,12 +68,12 @@ NETWORK := $(shared)/before-calibration/output/network.osm.pbf
 #	 --used-node --wb $@
 
 #	retrieve germany wide network (see param highway) from OSM
-../../shared-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/before-calibration/output/network-germany.osm.pbf: $(NETWORK)
+input/before-calibration/output/network-germany.osm.pbf: $(NETWORK)
 	$(osmosis) --rb file=$<\
  	 --tf accept-ways highway=motorway,motorway_link,motorway_junction,trunk,trunk_link,primary,primary_link\
  	 --used-node --wb $@
 
-../../shared-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/before-calibration/output/network.osm: ../../shared-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/before-calibration/output/network-germany.osm.pbf ../../shared-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/before-calibration/output/network-detailed.osm.pbf
+input/before-calibration/output/network.osm: input/before-calibration/output/network-germany.osm.pbf input/before-calibration/output/network-detailed.osm.pbf
 	$(osmosis) --rb file=$< --rb file=$(word 2,$^)\
   	 --merge\
   	 --tag-transform file=$(shared)/before-calibration/remove-railway.xml\
@@ -84,7 +83,7 @@ NETWORK := $(shared)/before-calibration/output/network.osm.pbf
 
 #	roadTypes are taken either from the general file "osmNetconvert.typ.xml"
 #	or from the german one "osmNetconvertUrbanDe.ty.xml"
-../../shared-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/before-calibration/output/sumo.net.xml: ../../shared-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/before-calibration/output/network.osm
+$(shared)/before-calibration/output/sumo.net.xml: $(shared)/before-calibration/output/network.osm
 	"$(SUMO_HOME)/bin/netconvert" --geometry.remove --ramps.guess --ramps.no-split\
 	 --type-files "$(SUMO_HOME)/data/typemap/osmNetconvert.typ.xml","$(SUMO_HOME)/data/typemap/osmNetconvertUrbanDe.typ.xml"\
 	 --tls.guess-signals true --tls.discard-simple --tls.join --tls.default-type actuated\
@@ -101,7 +100,7 @@ NETWORK := $(shared)/before-calibration/output/network.osm.pbf
 #--remove-turn-restrictions used instead of new TurnRestrictionCleaner,
 # the cleaner needs more testing, as it destroys the bike network e.g.
 #if you change the underlying osm file, you also have to check/change the augustus bridge links in PrepareNetwork.fixAugustusBridgeAllowedModes
-../../shared-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/before-calibration/output/dresden-v1.1-network.xml.gz: ../../shared-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/before-calibration/output/sumo.net.xml
+$(shared)/before-calibration/output/dresden-v1.1-network.xml.gz: $(shared)/before-calibration/output/sumo.net.xml
 	$(sc) prepare network-from-sumo $< --output $@ --free-speed-factor 0.7 --turn-restrictions IGNORE_TURN_RESTRICTIONS
 	$(sc) prepare clean-network $@ --output $@ --modes car --modes bike --modes ride --remove-turn-restrictions
 #	delete truck as allowed mode (not used), add longDistanceFreight as allowed mode, prepare network for emissions analysis
@@ -113,43 +112,43 @@ NETWORK := $(shared)/before-calibration/output/network.osm.pbf
 # this might not be relevant anymore for this specific model (dresden only), but out of convenience it wont be altered. -sm0925
 #--merge-stops mergeToParentAndRouteTypes merges all tracks at a station to one stop according to GL. This avoids agents waiting at track 1 while there is a suitable connection at track 2 e.g.
 #the following date is a wednesday
-../../shared-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/before-calibration/output/dresden-v1.1-network-with-pt.xml.gz: ../../shared-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/before-calibration/output/dresden-v1.1-network.xml.gz
+input/before-calibration/output/dresden-v1.1-network-with-pt.xml.gz: input/before-calibration/output/dresden-v1.1-network.xml.gz
 	$(sc) prepare transit-from-gtfs --network $<\
-	 --output="../../shared-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/before-calibration/output/"\
+	 --output="input/before-calibration/output/"\
 	 --name $N-$V --date "2023-01-11" --target-crs $(CRS) \
-	 $(germany)/gtfs/20230113_regio.zip\
-	 $(germany)/gtfs/20230113_train_short.zip\
-	 $(germany)/gtfs/20230113_train_long.zip\
+	 input/gtfs/20230113_regio.zip\
+	 input/gtfs/20230113_train_short.zip\
+	 input/gtfs/20230113_train_long.zip\
 	 --prefix regio_,short_,long_\
-	 --shp $(shared)/before-calibration/shp-for-regional-trains-utm32n.shp\
-	 --shp $(shared)/before-calibration/shp-for-regional-trains-utm32n.shp\
-	 --shp $(germany)/shp/germany-area.shp\
+	 --shp input/before-calibration/shp-for-regional-trains-utm32n.shp\
+	 --shp input/before-calibration/shp-for-regional-trains-utm32n.shp\
+	 --shp input/shp/germany-area.shp\
 	 --merge-stops mergeToParentAndRouteTypes
 
 # create matsim counts file
 # count to link assignments have been checked manually, they look correct. With exception of the following stations:
 #Simmersdorf, Schlagsdorf-Grenze, Plessa, OU Radegast. The assigned links have to be switched for the 4 stations.
 #this has to be done via a manual assignment in a csv file provided via --counts-mapping. The file is in shared-svn.
-../../shared-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/before-calibration/output/dresden-v1.1-counts-bast.xml.gz: ../../shared-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/before-calibration/output/$N-$V-network-with-pt.xml.gz ../../shared-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/before-calibration/matsim-dresden-v1.1-manual-count-link-assignment.csv
+input/before-calibration/output/dresden-v1.1-counts-bast.xml.gz: ../../shared-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/before-calibration/output/$N-$V-network-with-pt.xml.gz ../../shared-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/before-calibration/matsim-dresden-v1.1-manual-count-link-assignment.csv
 	$(sc) prepare counts-from-bast\
 		--network $<\
 		--motorway-data $(germany)/bast/2023_A_S.zip\
 		--primary-data $(germany)/bast/2023_B_S.zip\
 		--station-data $(germany)/bast/Jawe2023.csv\
 		--year 2023\
-		--shp $(shared)/before-calibration/shp-for-regional-trains-utm32n.shp --shp-crs $(CRS)\
+		--shp input/before-calibration/shp-for-regional-trains-utm32n.shp --shp-crs $(CRS)\
 		--output $@\
 		--counts-mapping $(word 2,$^)
 
 ########################### population creation ######################################################################################
 
 # extract dresden long haul freight traffic trips from german wide file
-../../shared-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/before-calibration/output/plans-longHaulFreight.xml.gz: $(germanWideFreight)/german_freight.100pct.plans.xml.gz $(germanWideFreight)/germany-europe-network.xml.gz
+input/before-calibration/output/plans-longHaulFreight.xml.gz: $(germanWideFreight)/german_freight.100pct.plans.xml.gz $(germanWideFreight)/germany-europe-network.xml.gz
 	$(sc) prepare extract-freight-trips $<\
 	 --network $(word 2,$^)\
 	 --input-crs $(CRS)\
 	 --target-crs $(CRS)\
-	 --shp $(shared)/before-calibration/shp-for-regional-trains-utm32n.shp\
+	 --shp input/before-calibration/shp-for-regional-trains-utm32n.shp\
 	 --shp-crs $(CRS)\
 	 --cut-on-boundary\
 	 --legMode "truck40t"\
@@ -203,44 +202,44 @@ NETWORK := $(shared)/before-calibration/output/network.osm.pbf
 # now, most of the functions of this class do have their own class (downsample, splitduration types...)
 # it basically only transforms the old attribute format to the new one
 # --max-typical-duration set to 0 because this switches off the duration split, which we do later
-../../shared-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/before-calibration/output/prepare-100pct.plans.xml.gz: $(dresdenRaw)/senozon/20250123_Teilmodell_Hoyerswerda/Modell/population.xml.gz $(dresdenRaw)/senozon/20250130_Teilmodell_Hoyerswerda/Modell/personAttributes.xml.gz $(shared)/before-calibration/output/$N-$V-network.xml.gz
+input/before-calibration/output/prepare-100pct.plans.xml.gz: input/20250123_Teilmodell_Hoyerswerda/Modell/population.xml.gz input/20250130_Teilmodell_Hoyerswerda/Modell/personAttributes.xml.gz input/before-calibration/output/$N-$V-network.xml.gz
 	$(sc) prepare trajectory-to-plans\
-	 --name prepare --sample-size 1 --output $(shared)/before-calibration/output\
+	 --name prepare --sample-size 1 --output input/before-calibration/output\
 	 --max-typical-duration 0\
 	 --population $<\
 	 --attributes $(word 2,$^)
 # adapt coords of activities in the wider network such that they are closer to a link
 # such that agents do not have to walk as far as before
 	$(sc) prepare adjust-activity-to-link-distances $@\
- 	  --shp $(shared)/before-calibration/shp-for-regional-trains-utm32n.shp --shp-crs $(CRS)\
+ 	  --shp input/before-calibration/shp-for-regional-trains-utm32n.shp --shp-crs $(CRS)\
  	  --scale 1.15\
  	  --input-crs $(CRS)\
  	  --network $(word 3,$^)\
- 	  --output $(shared)/before-calibration/output/prepare-100pct.plans-adj.xml.gz
+ 	  --output input/before-calibration/output/prepare-100pct.plans-adj.xml.gz
 # resolve senozon aggregated grid coords (activities): distribute them based on landuse.shp
-	$(sc) prepare resolve-grid-coords $(shared)/before-calibration/output/prepare-100pct.plans-adj.xml.gz\
+	$(sc) prepare resolve-grid-coords input/before-calibration/output/prepare-100pct.plans-adj.xml.gz\
 	 --input-crs $(CRS)\
 	 --grid-resolution 300\
-	 --landuse $(germany)/landuse/landuse.shp\
+	 --landuse input/landuse/landuse.shp\
 	 --output $@
 
 # the population from snz was delivered for oberlausitz-dresden, so we have to cut out the dresden population.
 #this uses the scenario cutout class from CR, which is able to produce a cutout network, network change events and facilities.
 #here, we just want to use it to cut out the population. Everything else is not used. --output-network is a required option, so we delete the network afterwards.
-../../shared-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/before-calibration/output/prepare-cutout-100pct.plans.xml.gz: $(shared)/before-calibration/output/prepare-100pct.plans.xml.gz $(shared)/before-calibration/output/$N-$V-network.xml.gz
+input/before-calibration/output/prepare-cutout-100pct.plans.xml.gz: input/before-calibration/output/prepare-100pct.plans.xml.gz input/before-calibration/output/$N-$V-network.xml.gz
 	$(sc) prepare scenario-cutout\
 	 --population $<\
 	 --network $(word 2,$^)\
 	 --output-population $@\
-	 --output-network $(shared)/before-calibration/output/$N-$V-network-cutout-to-be-deleted.xml.gz\
+	 --output-network input/before-calibration/output/$N-$V-network-cutout-to-be-deleted.xml.gz\
 	 --input-crs $(CRS)\
-	 --shp $(shared)/shp/v1.1_vvo_tarifzone_10_dresden_utm32n.shp\
+	 --shp input/shp/v1.1_vvo_tarifzone_10_dresden_utm32n.shp\
 	 --shp-crs $(CRS)\
 	 --buffer 10000\
 	 --check-beeline
 
 # same goes for small scale commercial traffic.
-../../shared-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/before-calibration/output/dresden-small-scale-commercialTraffic-v1.1-100pct.xml.gz: $(shared)/before-calibration/commercial_traffic/output/oberlausitz-dresden-small-scale-commercialTraffic-v1.0-100pct.xml.gz $(shared)/before-calibration/output/$N-$V-network.xml.gz
+input/before-calibration/output/dresden-small-scale-commercialTraffic-v1.1-100pct.xml.gz: input/before-calibration/output/oberlausitz-dresden-small-scale-commercialTraffic-v1.0-100pct.xml.gz input/before-calibration/output/$N-$V-network.xml.gz
 	 $(sc) prepare scenario-cutout\
 	 --population $<\
 	 --network $(word 2,$^)\
@@ -252,7 +251,7 @@ NETWORK := $(shared)/before-calibration/output/network.osm.pbf
 	 --buffer 10000\
 	 --check-beeline
 
-../../shared-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/before-calibration/output/prepare-cutout-fixed-subtours-100pct.plans.xml.gz: $(shared)/before-calibration/output/prepare-cutout-100pct.plans.xml.gz
+input/before-calibration/output/prepare-cutout-fixed-subtours-100pct.plans.xml.gz: input/before-calibration/output/prepare-cutout-100pct.plans.xml.gz
 # change modes in subtours with chain based AND non-chain based by choosing mode for subtour randomly
 	$(sc) prepare fix-subtour-modes --coord-dist 100 --input $< --output $@
 # set car availability for agents below 18 to false, standardize some person attrs, set home coords, set person income
@@ -263,14 +262,13 @@ NETWORK := $(shared)/before-calibration/output/network.osm.pbf
 # the calculation is done in python script extract_ref_data.py
 #some plans apparently have a sum of act_duration >> 86400. This is some issue in the input data, we decided to ignore that for dresden v1.1.
 #To fix the above issue, we set --overlong-plans-factor 1.5
-../../shared-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/before-calibration/output/prepare-100pct-with-trips-split-merged.plans_FOR_0IT_TEST.xml.gz: $(shared)/before-calibration/output/prepare-cutout-fixed-subtours-100pct.plans.xml.gz
-	$(sc) prepare split-activity-types-duration\
-		--input $<\
-		--overlong-plans-factor 1.5\
-		--exclude commercial_start,commercial_end,freight_start,freight_end,service\
-		--output $@
+# $(shared)/before-calibration/output/prepare-100pct-with-trips-split-merged.plans_FOR_0IT_TEST.xml.gz: input/before-calibration/output/prepare-cutout-fixed-subtours-100pct.plans.xml.gz
+# 	$(sc) prepare split-activity-types-duration\
+# 		--input $<\
+# 		--overlong-plans-factor 1.5\
+# 		--exclude commercial_start,commercial_end,freight_start,freight_end,service\
+# 		--output $@
 
-../../shared-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/before-calibration/output/prepare-100pct-with-trips-split-merged.plans.xml.gz: $(shared)/before-calibration/output/plans-longHaulFreight.xml.gz $(shared)/before-calibration/output/prepare-cutout-fixed-subtours-100pct.plans.xml.gz $(shared)/before-calibration/output/$N-small-scale-commercialTraffic-$V-100pct.xml.gz
 # generate some short distance trips, which in senozon data generally are missing
 # 1) we have to calculate the number of trips to add with python script create_ref.py
 # for that it might be necessary to run split-activity-types-duration (see below) separately.
@@ -280,34 +278,39 @@ NETWORK := $(shared)/before-calibration/output/network.osm.pbf
 # 3) for dresden we have SrV data. currently using 2018 data.
 # 43524 additional short trips seems to few here. Usually we are around 250k..
 # I checked the script (extract_ref_data.py) which calculates --num-trips and it seems to be correct. Continuing with 43.5k trips here.
+input/before-calibration/output/prepare-100pct-short-trips.plans.xml.gz: input/before-calibration/output/prepare-cutout-fixed-subtours-100pct.plans.xml.gz
 	$(sc) prepare generate-short-distance-trips\
-   	 --population $(word 2,$^)\
-   	 --input-crs $(CRS)\
-  	 --shp $(shared)/shp/v1.1_vvo_tarifzone_10_dresden_utm32n.shp --shp-crs $(CRS)\
-  	 --range 700\
-    --num-trips 43524\
-    --output $@
+		--population $<\
+		--input-crs $(CRS)\
+		--shp input/shp/v1.1_vvo_tarifzone_10_dresden_utm32n.shp --shp-crs $(CRS)\
+		--range 700\
+		--num-trips 43524\
+		--output $@
+
 #   this step *has to* be done after the generation of short distance trips.
 #	split activity types to type_duration for the scoring to take into account the typical duration
 #some plans apparently have a sum of act_duration >> 86400. This is some issue in the input data, we decided to ignore that for dresden v1.1.
 #To fix the above issue, we set --overlong-plans-factor 1.5
 #	TODO: usage of --end-time-to-duration does not remove all end times of activities below 1800s (default value)
+input/before-calibration/output/prepare-100pct-split.plans.xml.gz: input/before-calibration/output/prepare-100pct-short-trips.plans.xml.gz
 	$(sc) prepare split-activity-types-duration\
-		--input $@\
+		--input $<\
 		--overlong-plans-factor 1.5\
 		--exclude commercial_start,commercial_end,freight_start,freight_end,service\
 		--output $@
+
 #	merge person and freight pops
-	$(sc) prepare merge-populations $@ $< $(word 3,$^) --output $@
+input/before-calibration/output/prepare-100pct-with-trips-split-merged.plans.xml.gz: input/before-calibration/output/prepare-100pct-split.plans.xml.gz input/before-calibration/output/plans-longHaulFreight.xml.gz input/before-calibration/output/dresden-small-scale-commercialTraffic-v1.1-100pct.xml.gz
+	$(sc) prepare merge-populations $< $(word 2,$^) $(word 3,$^) --output $@
 
 # there should be more detailed algorithms to create activity facilities than the below class. it creates one facility per activity coord.
 # see https://github.com/matsim-scenarios/matsim-hannover/issues/1
-../../shared-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/before-calibration/output/dresden-v1.1-100pct.plans-initial.xml.gz: $(shared)/before-calibration/output/prepare-100pct-with-trips-split-merged.plans.xml.gz $(shared)/before-calibration/output/$N-$V-network-with-pt.xml.gz
+input/before-calibration/output/$N-$V-100pct.plans-initial.xml.gz: input/before-calibration/output/prepare-100pct-with-trips-split-merged.plans.xml.gz input/before-calibration/output/$N-$V-network-with-pt.xml.gz
 	$(sc) prepare facilities\
     		--input-population $<\
             --network $(word 2,$^)\
             --output-population $@\
-            --output-facilities $(shared)/before-calibration/output/$N-$V-activity-facilities.xml.gz
+            --output-facilities input/before-calibration/output/$N-$V-activity-facilities.xml.gz
 # for small scale commercial traffic generation some vehicle types (truck8t, truck18t and truck40t) are named differently than in this scenario.
 # this causes a crash of simulation. We delete them here and they will be auto generated when starting the sim. For car the veh types are named equally.
 	$(sc) prepare remove-vehicles\
@@ -321,11 +324,11 @@ NETWORK := $(shared)/before-calibration/output/network.osm.pbf
     	 --samples 0.25 0.1 0.01 0.001\
 
 # output of check population seems to be ok. -sm0426
-check: $(shared)/before-calibration/output/$N-$V-100pct.plans-initial.xml.gz
+check: input/before-calibration/output/$N-$V-100pct.plans-initial.xml.gz
 	$(sc) analysis check-population $<\
  	 --input-crs $(CRS)\
 	 --shp $(shared)/shp/v1.1_vvo_tarifzone_10_dresden_utm32n.shp --shp-crs $(CRS)
 
 # Aggregated target
-prepare: $(shared)/before-calibration/output/$N-$V-100pct.plans-initial.xml.gz $(shared)/before-calibration/output/$N-$V-network-with-pt.xml.gz
+prepare: input/before-calibration/output/$N-$V-100pct.plans-initial.xml.gz input/before-calibration/output/$N-$V-network-with-pt.xml.gz
 	echo "Done"
