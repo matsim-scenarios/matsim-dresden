@@ -1,0 +1,5 @@
+outs:
+- md5: 862c3703a6fbb4b14b09f07b4b399953
+  size: 219837875
+  hash: md5
+  path: matsim-dresden-1.2-SNAPSHOT.jar
