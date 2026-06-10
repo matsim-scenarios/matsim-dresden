@@ -2,4 +2,3 @@
     remote = cluster-home
 ['remote "cluster-home"']
     url = ssh://zilske@cluster-a.math.tu-berlin.de/net/ils/zilske/dvc
-    ask_password = true
