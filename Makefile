@@ -233,9 +233,9 @@ input/before-calibration/output/dresden-small-scale-commercialTraffic-v1.1-100pc
 	 --population $<\
 	 --network $(word 2,$^)\
 	 --output-population $@\
-	 --output-network $(shared)/before-calibration/output/$N-$V-commercial-network-cutout-to-be-deleted.xml.gz\
+	 --output-network input/before-calibration/output/$N-$V-commercial-network-cutout-to-be-deleted.xml.gz\
 	 --input-crs $(CRS)\
-	 --shp $(shared)/shp/v1.1_vvo_tarifzone_10_dresden_utm32n.shp\
+	 --shp input/shp/v1.1_vvo_tarifzone_10_dresden_utm32n.shp\
 	 --shp-crs $(CRS)\
 	 --buffer 10000\
 	 --check-beeline
@@ -316,7 +316,7 @@ input/before-calibration/output/$N-$V-100pct.plans-initial.xml.gz: input/before-
 check: input/before-calibration/output/$N-$V-100pct.plans-initial.xml.gz
 	$(sc) analysis check-population $<\
  	 --input-crs $(CRS)\
-	 --shp $(shared)/shp/v1.1_vvo_tarifzone_10_dresden_utm32n.shp --shp-crs $(CRS)
+	 --shp input/shp/v1.1_vvo_tarifzone_10_dresden_utm32n.shp --shp-crs $(CRS)
 
 # Aggregated target
 prepare: input/before-calibration/output/$N-$V-100pct.plans-initial.xml.gz input/before-calibration/output/$N-$V-network-with-pt.xml.gz
