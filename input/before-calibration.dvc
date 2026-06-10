@@ -1,6 +1,6 @@
 outs:
-- md5: cf4cdf6392f2147ff01bcb8ec69d3dbd.dir
-  size: 1943867090
-  nfiles: 36
+- md5: a782d04570594fbf2fb0ec0d08b782bb.dir
+  size: 814473052
+  nfiles: 31
   hash: md5
   path: before-calibration
