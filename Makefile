@@ -284,7 +284,7 @@ input/before-calibration/output/prepare-100pct-short-trips.plans.xml.gz: input/b
 input/before-calibration/output/prepare-100pct-split.plans.xml.gz: input/before-calibration/output/prepare-100pct-short-trips.plans.xml.gz
 	$(sc) prepare split-activity-types-duration\
 		--input $<\
-		--max-typical-duration 97200
+		--max-typical-duration 97200\
 		--overlong-plans-factor 1.5\
 		--exclude commercial_start,commercial_end,freight_start,freight_end,service\
 		--output $@
