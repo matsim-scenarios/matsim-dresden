@@ -305,25 +305,49 @@ input/before-calibration/output/prepare-100pct-split.plans.xml.gz: input/before-
 input/before-calibration/output/prepare-100pct-with-trips-split-merged.plans.xml.gz: input/before-calibration/output/prepare-100pct-split.plans.xml.gz input/before-calibration/output/plans-longHaulFreight.xml.gz input/before-calibration/output/dresden-small-scale-commercialTraffic-v1.1-100pct.xml.gz
 	$(sc) prepare merge-populations $< $(word 2,$^) $(word 3,$^) --output $@
 
-# there should be more detailed algorithms to create activity facilities than the below class. it creates one facility per activity coord.
+# Step 1: assign activity facilities (one facility per activity coord).
+# there should be more detailed algorithms to create activity facilities than the below class.
 # see https://github.com/matsim-scenarios/matsim-hannover/issues/1
-input/before-calibration/output/$N-$V-100pct.plans-initial.xml.gz: input/before-calibration/output/prepare-100pct-with-trips-split-merged.plans.xml.gz input/before-calibration/output/$N-$V-network-with-pt.xml.gz
+# This single command produces two artifacts: the population (with facility refs) and the
+# facilities file. The facilities file is declared as its own target below so the rest of
+# the build can depend on it explicitly.
+input/before-calibration/output/$N-$V-100pct.plans-with-facilities.xml.gz: input/before-calibration/output/prepare-100pct-with-trips-split-merged.plans.xml.gz input/before-calibration/output/$N-$V-network-with-pt.xml.gz
 	$(sc) prepare facilities\
-    		--input-population $<\
-            --network $(word 2,$^)\
-            --output-population $@\
-            --output-facilities input/before-calibration/output/$N-$V-activity-facilities.xml.gz
+			--input-population $<\
+			--network $(word 2,$^)\
+			--output-population $@\
+			--output-facilities input/before-calibration/output/$N-$V-activity-facilities.xml.gz
+
+# The facilities file is co-produced by the step above. Declaring it as a target that depends
+# on (but does not rebuild) the population makes it a first-class node in the dependency graph
+# without relying on GNU Make 4.3 grouped targets (this repo's make is 3.81).
+input/before-calibration/output/$N-$V-activity-facilities.xml.gz: input/before-calibration/output/$N-$V-100pct.plans-with-facilities.xml.gz
+
+# Step 2: remove wrongly-named commercial vehicle types.
 # for small scale commercial traffic generation some vehicle types (truck8t, truck18t and truck40t) are named differently than in this scenario.
 # this causes a crash of simulation. We delete them here and they will be auto generated when starting the sim. For car the veh types are named equally.
-	$(sc) prepare remove-vehicles\
-			$@\
-			--output $@\
-			--skip car
-# we need to fix subtours again after assignment of facilities to activities.
-	$(sc) prepare fix-subtour-modes --coord-dist 100 --input $@ --output $@
-	$(sc) prepare downsample-population $@\
-    	 --sample-size 1\
-    	 --samples 0.25 0.1 0.01 0.001\
+input/before-calibration/output/$N-$V-100pct.plans-veh-removed.xml.gz: input/before-calibration/output/$N-$V-100pct.plans-with-facilities.xml.gz
+	$(sc) prepare remove-vehicles $< --output $@ --skip car
+
+# Step 3: fix subtours again after assignment of facilities to activities -> final initial plans.
+input/before-calibration/output/$N-$V-100pct.plans-initial.xml.gz: input/before-calibration/output/$N-$V-100pct.plans-veh-removed.xml.gz
+	$(sc) prepare fix-subtour-modes --coord-dist 100 --input $< --output $@
+
+# Step 4: down-sampled populations, derived from the finished 100pct plans.
+# A single downsample-population call writes several files at once
+# (dresden-v1.1-25pct/10pct/1pct/...-plans-initial.xml.gz). We track the group with a stamp
+# file rather than naming each output as a target: the tool builds output names by rounding
+# the share to whole percent (e.g. 0.001 -> "0pct"), which makes the individual filenames
+# awkward to predict. The stamp depends on the 100pct plans, so the samples are rebuilt only
+# when the source changes -- not as a side effect of building the 100pct artifact.
+input/before-calibration/output/$N-$V-downsampled.stamp: input/before-calibration/output/$N-$V-100pct.plans-initial.xml.gz
+	$(sc) prepare downsample-population $<\
+		--sample-size 1\
+		--samples 0.25 0.1 0.01 0.001
+	touch $@
+
+.PHONY: downsample
+downsample: input/before-calibration/output/$N-$V-downsampled.stamp
 
 # output of check population seems to be ok. -sm0426
 check: input/before-calibration/output/$N-$V-100pct.plans-initial.xml.gz
@@ -332,5 +356,5 @@ check: input/before-calibration/output/$N-$V-100pct.plans-initial.xml.gz
 	 --shp input/shp/v1.1_vvo_tarifzone_10_dresden_utm32n.shp --shp-crs $(CRS)
 
 # Aggregated target
-prepare: input/before-calibration/output/$N-$V-100pct.plans-initial.xml.gz input/before-calibration/output/$N-$V-network-with-pt.xml.gz
+prepare: input/before-calibration/output/$N-$V-100pct.plans-initial.xml.gz input/before-calibration/output/$N-$V-activity-facilities.xml.gz input/before-calibration/output/$N-$V-downsampled.stamp input/before-calibration/output/$N-$V-network-with-pt.xml.gz
 	echo "Done"
