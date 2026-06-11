@@ -187,13 +187,6 @@ public class DresdenModel extends MATSimApplication {
 //		this happens in the makefile pipeline already, but we do it here anyways, in case somebody uses a preliminary network.
 		PrepareNetwork.prepareFreightNetwork(scenario.getNetwork());
 
-//		switch off wrap around scoring if not done already. The method creates separate _morning and _evening act types for the first and last act if they have the same act type, e.g. home.
-//		Thus, no wrap-around scoring will be performed.
-//		Dresden-local copy of vsp Activities: bins the morning/evening split with the 27:00 else-branch
-//		clamp in mind (see simulationPeriodInDays in prepareConfig) so evening typicals don't collapse
-//		into the 10-minute floor bin.
-		DresdenActivities.changeWrapAroundActsIntoMorningAndEveningActs(scenario);
-
 //		remove disallowed links. The disallowed links cause many problems and (usually) are not useful in our rather macroscopic view on transport systems.
 		// yyyy I have no idea what this means; could someone please explain?  kai, dec'25
 		// --> The way this reads to me is that we may have a network where the "disallowedNextLinks" attribute is used.    In the
