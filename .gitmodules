@@ -1,0 +1,4 @@
+[submodule "matsim"]
+	path = matsim
+	url = https://github.com/matsim-org/matsim-libs.git
+	branch = split-activity-types

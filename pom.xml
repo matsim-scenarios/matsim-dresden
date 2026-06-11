@@ -12,8 +12,9 @@
 		<!-- weekly release -->
 <!--		<version>2026.0-2026w03</version>-->
 
-		<!-- PR-labelled release -->
-		<version>2027.0-PR4883</version>
+		<!-- Built from source via the matsim/ git submodule (pinned commit), installed into local ~/.m2.
+		     This is the same code as the former 2027.0-PR4883 build; bump by moving the submodule. -->
+		<version>2027.0-SNAPSHOT</version>
 
 		<!-- snapshot; ONLY use for "sharing in the IDE" -->
 <!--		<version>2026.0-SNAPSHOT</version>-->

@@ -24,7 +24,19 @@ sc := java -Xms$(MEMORY) -Xmx$(MEMORY) -jar $(JAR)
 
 .PHONY: prepare
 
-$(JAR):
+# MATSim is built from source via the matsim/ git submodule (pinned commit) and
+# installed into the local maven repo (~/.m2), instead of pulling an ephemeral
+# PR-labelled release from repo.matsim.org. On a fresh checkout run once:
+#   git submodule update --init
+# The stamp is regenerated whenever the submodule is moved to a different commit
+# (.git/modules/matsim/HEAD changes on checkout/update), which re-triggers $(JAR).
+.matsim-install-stamp: .git/modules/matsim/HEAD
+	cd matsim && mvn install -DskipTests
+#	faster alternative, builds only what dresden needs + their deps:
+#	cd matsim && mvn install -N -DskipTests && mvn install -DskipTests -pl :matsim,:application,:simwrapper,:small-scale-traffic-generation,:vsp -am
+	touch $@
+
+$(JAR): .matsim-install-stamp
 	mvn package -DskipTests
 
 ######################################### network creation ############################################################################################
