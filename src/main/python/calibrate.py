@@ -47,7 +47,7 @@ target = {
     "ride": 0.08017387
 }
 
-region = gpd.read_file("../input/v1.0/vvo_tarifzone_10_dresden/v1.0_vvo_tarifzone_10_dresden_utm32n.shp").to_crs("EPSG:25832")
+region = gpd.read_file("input/v1.0/vvo_tarifzone_10_dresden/v1.0_vvo_tarifzone_10_dresden_utm32n.shp").to_crs("EPSG:25832")
 
 
 def filter_persons(persons):
@@ -69,9 +69,8 @@ def filter_modes(df):
 study, obj = create_calibration(
     "calib",
     ASCCalibrator(modes, initial, target, lr=utils.linear_scheduler(start=0.3, interval=12)),
-    "/net/ils/matsim-dresden/calibration-10pct-v1.0-fixed-subtours/matsim-dresden-1.0-f9eab41.jar",
-    "../input/v1.0/dresden-v1.0-10pct.config.xml",
-    args="--10pct --config:plans.inputPlansFile /net/ils/matsim-dresden/calibration-10pct-v1.0-fixed-subtours/dresden-v1.0-10pct.plans-initial.xml.gz",
+    "matsim-dresden-1.2-SNAPSHOT.jar",
+    "input/before-calibration/output/dresden-v1.0-1pct.config.xml",
     jvm_args="-Xmx60G -Xmx60G -XX:+AlwaysPreTouch -XX:+UseParallelGC",
     transform_persons=filter_persons, transform_trips=filter_modes,
     chain_runs=utils.default_chain_scheduler,
