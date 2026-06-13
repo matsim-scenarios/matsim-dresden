@@ -188,8 +188,7 @@ public class DresdenModel extends MATSimApplication {
 
 //		derive per-activity-instance opening times from each plan's observed activity windows and
 //		encode them into the activity type (analogous to how typical durations are read off the plan).
-//		Registers the corresponding scoring params programmatically. Must run after the wrap rewrite
-//		so types are final and every plan is wrap-around.
+//		Registers the corresponding scoring params programmatically.
 		DresdenActivities.setPlanDerivedOpeningTimes(scenario);
 
 //		Strip turn restrictions from every link. The DisallowedNextLinks attribute holds

@@ -15,6 +15,7 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 /**
  * Dresden-local, clamp-aware copy of {@link org.matsim.contrib.vsp.scenario.Activities}.
@@ -73,6 +74,15 @@ public final class DresdenActivities {
 	private static final int BIN_SIZE = 600;
 
 	/**
+	 * The {@code _op<opening>_cl<closing>} suffix this class appends, with the opening/closing values
+	 * captured. Chained runs routinely feed the output population (whose middle-activity types already
+	 * carry this suffix) back in as input. When the suffix is already present we leave the window
+	 * untouched — it was derived from the original demand on the first run and stays pinned to it —
+	 * and only re-register the matching params (the scoring config is rebuilt fresh each run).
+	 */
+	private static final Pattern OPENING_WINDOW_SUFFIX = Pattern.compile("_op(\\d+)_cl(\\d+)$");
+
+	/**
 	 * Buffer (seconds) added on each side of the observed window before binning. 0 means the
 	 * scored opening window is exactly the observed performance window (snapped outward to the
 	 * bin grid). Increase to give agents a tolerance band in which they can shift without the
@@ -89,13 +99,7 @@ public final class DresdenActivities {
 	 * (base, typical, opening, closing) tuple and register its {@link ActivityParams}
 	 * programmatically.
 	 *
-	 * <p>The first and last activity are deliberately left untouched. After
-	 * {@link #changeNonWrapAroundActsIntoWrapAroundActs} every plan is wrap-around, so first and
-	 * last are scored as one combined overnight term (see
-	 * {@code CharyparNagelActivityScoring#handleOvernightActivity}), and that method explicitly
-	 * warns that scoring correctness "cannot be guaranteed" when the first/last activity has
-	 * opening times. We take that warning seriously and tag only the middle activities; first and
-	 * last keep the plain {@code <base>_<typical>} type registered by SnzActivities.addScoringParams.
+	 * <p>The first and last activity are deliberately left untouched.
 	 *
 	 * <p>The opening window is read from the <em>initial</em> plan; at scoring time MATSim passes
 	 * the experienced activity (correct simulated start/end), looks up these params by type, and
@@ -109,7 +113,7 @@ public final class DresdenActivities {
 		Set<String> registered = new HashSet<>();
 
 		for (Person p : scenario.getPopulation().getPersons().values()) {
-//			ignore freight / commercial traffic agents and stay home agents (same cohort as the wrap rewrite)
+//			ignore freight / commercial traffic agents and stay home agents
 			if (!p.getAttributes().getAttribute("subpopulation").equals("person") ||
 				p.getSelectedPlan().getPlanElements().size() == 1) {
 				continue;
@@ -163,13 +167,24 @@ public final class DresdenActivities {
 	 */
 	private static void applyOpeningWindow(Activity act, double obsStart, double obsEnd,
 	                                       ScoringConfigGroup scoring, Set<String> registered) {
-		double opening = Math.max(0.0, Math.floor((obsStart - OPENING_TIME_BUFFER_S) / BIN_SIZE) * BIN_SIZE);
-		double closing = Math.ceil((obsEnd + OPENING_TIME_BUFFER_S) / BIN_SIZE) * BIN_SIZE;
-//		guard against a collapsed window for zero-/sub-bin observed durations (floor(start)==ceil(end)):
-//		keep it at least one bin wide so the activity stays performable rather than scoring as "closed".
-		closing = Math.max(closing, opening + BIN_SIZE);
+		double opening, closing;
 
-		String baseType = act.getType();
+//		chained run: this activity already carries a window baked in on a previous run. Leave the type
+//		and window as-is (pinned to the original demand) and just re-register the params (see field javadoc).
+		var matcher = OPENING_WINDOW_SUFFIX.matcher(act.getType());
+		if (matcher.find()) {
+			opening = Double.parseDouble(matcher.group(1));
+			closing = Double.parseDouble(matcher.group(2));
+		} else {
+			opening = Math.max(0.0, Math.floor((obsStart - OPENING_TIME_BUFFER_S) / BIN_SIZE) * BIN_SIZE);
+			closing = Math.ceil((obsEnd + OPENING_TIME_BUFFER_S) / BIN_SIZE) * BIN_SIZE;
+//			guard against a collapsed window for zero-/sub-bin observed durations (floor(start)==ceil(end)):
+//			keep it at least one bin wide so the activity stays performable rather than scoring as "closed".
+			closing = Math.max(closing, opening + BIN_SIZE);
+		}
+
+//		recover <base>_<typical> by stripping any window suffix, then derive the (re)tagged type.
+		String baseType = matcher.replaceFirst("");
 		int typical = Integer.parseInt(baseType.substring(baseType.lastIndexOf('_') + 1));
 		String newType = String.format("%s_op%d_cl%d", baseType, (long) opening, (long) closing);
 		act.setType(newType);
