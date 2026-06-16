@@ -1,7 +1,6 @@
 package org.matsim.run.scenarios;
 
 import ch.sbb.matsim.config.SwissRailRaptorConfigGroup;
-import ch.sbb.matsim.config.SwissRailRaptorConfigGroup.IntermodalAccessEgressModeSelection;
 import ch.sbb.matsim.config.SwissRailRaptorConfigGroup.IntermodalAccessEgressParameterSet;
 import com.google.common.collect.Sets;
 import org.matsim.api.core.v01.Scenario;
@@ -163,6 +162,11 @@ public final class DresdenUtils {
 	 * Switch on/off analysis on trips and creation of trips dashboard.
 	 */
 	public enum TripsAnalysisHandling {RUN_TRIPS_ANALYSIS, NO_TRIPS_ANALYSIS}
+
+	/**
+	 * Switch on/off if Carola bridge is collapsed.
+	 */
+	public enum CarolaBridgeStatus {FUNCTIONAL, COLLAPSED}
 	/**
 	 * Prepare the config for commercial traffic.
 	 */

@@ -33,7 +33,7 @@ import java.util.stream.Collectors;
 import static org.matsim.contrib.drt.analysis.afterSimAnalysis.DrtVehicleStoppingTaskWriter.glob;
 
 public class BridgeCarTrafficSummary {
-	// Link ids (manual input, v1.0)
+	// Link ids (manual input, v1.0 and v1.1)
 	static final Id<Link> linkIdCarolaBridgeSouthToNorth = Id.createLinkId("901959078");
 	static final Id<Link> linkIdCarolaBridgeNorthToSouth = Id.createLinkId("4214231");
 
@@ -58,10 +58,14 @@ public class BridgeCarTrafficSummary {
 	static final Id<Link> linkIdLoschwitzerBridgeSouthToNorth = Id.createLinkId("30129851");
 	static final Id<Link> linkIdLoschwitzerBridgeNorthToSouth = Id.createLinkId("-30129851");
 
+	static final Id<Link> linkIdNiederwarthaerBridgeSouthToNorth = Id.createLinkId("419106272");
+	static final Id<Link> linkIdNiederwarthaerBridgeNorthToSouth = Id.createLinkId("22112767");
+
 	private static final Logger log = LogManager.getLogger(BridgeCarTrafficSummary.class);
 
 	public static void main(String[] args) throws IOException {
 		String outputFolderBefore = "/Users/luchengqi/hpc_mount/workspace/my_first_workspace/matsim-dresden/output/10pct/zzz-archive/v1.0/base-case";
+//		String outputFolderBefore = "/Users/luchengqi/Volumes/math-cluster/matsim-dresden/dresden-v1.1/calib-dresden-v1.1-10pct-ride-alpha-1-no-wrap-around/runs/012";
 		String outputFolderAfter = "/Users/luchengqi/hpc_mount/workspace/my_first_workspace/matsim-dresden/output/10pct/v1.0-close-carola-bridge-with-rerouted-pt";
 		double sampleSize = 0.1;
 
@@ -152,7 +156,7 @@ public class BridgeCarTrafficSummary {
 			prepareRow("Carolabrücke", getCountData(volumes, linkIdCarolaBridgeSouthToNorth, linkIdCarolaBridgeNorthToSouth, sampleSize), caseName)
 		);
 		csvPrinter.printRecord(
-			prepareRow("Motorway A4", getCountData(volumes, motorwayA4SouthToNorth, motorwayA4NorthToSouth, sampleSize), caseName)
+			prepareRow("Elbebrücke Dresden (A4)", getCountData(volumes, motorwayA4SouthToNorth, motorwayA4NorthToSouth, sampleSize), caseName)
 		);
 		csvPrinter.printRecord(
 			prepareRow("Flügelwegbrücke", getCountData(volumes, linkIdFluegelwegBridgeSouthToNorth, linkIdFluegelwegBridgeNorthToSouth, sampleSize), caseName)
@@ -171,6 +175,9 @@ public class BridgeCarTrafficSummary {
 		);
 		csvPrinter.printRecord(
 			prepareRow("Loschwitzer Brücke", getCountData(volumes, linkIdLoschwitzerBridgeSouthToNorth, linkIdLoschwitzerBridgeNorthToSouth, sampleSize), caseName)
+		);
+		csvPrinter.printRecord(
+			prepareRow("Niederwarthaer Brücke", getCountData(volumes, linkIdNiederwarthaerBridgeSouthToNorth, linkIdNiederwarthaerBridgeNorthToSouth, sampleSize), caseName)
 		);
 		csvPrinter.close();
 	}
@@ -263,6 +270,10 @@ public class BridgeCarTrafficSummary {
 
 		if (linksInTheRouteAfter.contains(linkIdLoschwitzerBridgeSouthToNorth) || linksInTheRouteAfter.contains(linkIdLoschwitzerBridgeNorthToSouth)) {
 			return "Loschwitzer Brücke";
+		}
+
+		if (linksInTheRouteAfter.contains(linkIdNiederwarthaerBridgeSouthToNorth) || linksInTheRouteAfter.contains(linkIdNiederwarthaerBridgeNorthToSouth)) {
+			return "Niederwarthaer Brücke";
 		}
 
 		return null;

@@ -12,7 +12,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import static org.matsim.utils.DresdenUtils.getFreightModes;
+import static org.matsim.run.scenarios.DresdenUtils.getFreightModes;
 
 /**
  * This is a simple script, fixing the known problem in the input network.
