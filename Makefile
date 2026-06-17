@@ -294,6 +294,7 @@ NETWORK := $(shared)/before-calibration/output/network.osm.pbf
 #	TODO: usage of --end-time-to-duration does not remove all end times of activities below 1800s (default value)
 	$(sc) prepare split-activity-types-duration\
 		--input $@\
+		--max-typical-duration 97200\
 		--overlong-plans-factor 1.5\
 		--exclude commercial_start,commercial_end,freight_start,freight_end,service\
 		--output $@
