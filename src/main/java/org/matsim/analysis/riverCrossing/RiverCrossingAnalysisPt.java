@@ -38,7 +38,7 @@ public class RiverCrossingAnalysisPt implements MATSimAppCommand {
 
 	@Override
 	public Integer call() throws Exception {
-		String ptSchedulePath = glob(Path.of(outputFolder), "*transitSchedule.xml.gz").get().toAbsolutePath().toString();
+		String ptSchedulePath = glob(Path.of(outputFolder), "*transitSchedule.xml.*").get().toAbsolutePath().toString();
 		String ptVolumesAnalysis = outputFolder + "/analysis/pt/pt_pax_volumes.csv.gz";
 		String output = outputFolder + "/bridges_pt_pax_volumes_" + remark + ".csv";
 

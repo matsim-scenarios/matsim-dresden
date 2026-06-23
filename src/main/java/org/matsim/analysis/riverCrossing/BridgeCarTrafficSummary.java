@@ -64,12 +64,11 @@ public class BridgeCarTrafficSummary {
 	private static final Logger log = LogManager.getLogger(BridgeCarTrafficSummary.class);
 
 	public static void main(String[] args) throws IOException {
-		String outputFolderBefore = "/Users/luchengqi/hpc_mount/workspace/my_first_workspace/matsim-dresden/output/10pct/zzz-archive/v1.0/base-case";
-//		String outputFolderBefore = "/Users/luchengqi/Volumes/math-cluster/matsim-dresden/dresden-v1.1/calib-dresden-v1.1-10pct-ride-alpha-1-no-wrap-around/runs/012";
-		String outputFolderAfter = "/Users/luchengqi/hpc_mount/workspace/my_first_workspace/matsim-dresden/output/10pct/v1.0-close-carola-bridge-with-rerouted-pt";
+		String outputFolderBefore = "/Users/luchengqi/Documents/MATSimScenarios/Dresden/dresden-scenario/v1.1/output/10pct/modified-network/before";
+		String outputFolderAfter = "/Users/luchengqi/Documents/MATSimScenarios/Dresden/dresden-scenario/v1.1/output/10pct/modified-network/after";
 		double sampleSize = 0.1;
 
-		Network network = NetworkUtils.readNetwork(glob(Path.of(outputFolderBefore), "*output_network.xml.gz").orElseThrow().toString());
+		Network network = NetworkUtils.readNetwork(glob(Path.of(outputFolderBefore), "*output_network.xml.*").orElseThrow().toString());
 
 		// analyze traffic volume on the bridges
 		analyzeTrafficVolume(outputFolderBefore, network, sampleSize, "before");
@@ -80,8 +79,8 @@ public class BridgeCarTrafficSummary {
 	}
 
 	private static void analyzeBehaviorChange(String outputFolderBefore, String outputFolderAfter) throws IOException {
-		Population experiencedPlansBefore = PopulationUtils.readPopulation(glob(Path.of(outputFolderBefore), "*output_experienced_plans.xml.gz").orElseThrow().toString());
-		Population experiencedPlansAfter = PopulationUtils.readPopulation(glob(Path.of(outputFolderAfter), "*output_experienced_plans.xml.gz").orElseThrow().toString());
+		Population experiencedPlansBefore = PopulationUtils.readPopulation(glob(Path.of(outputFolderBefore), "*output_experienced_plans.xml.*").orElseThrow().toString());
+		Population experiencedPlansAfter = PopulationUtils.readPopulation(glob(Path.of(outputFolderAfter), "*output_experienced_plans.xml.*").orElseThrow().toString());
 
 		String behaviorChangeAnalysisOutput = outputFolderAfter + "/behavior-change-analysis.csv";
 		CSVPrinter behaviorAnalysisPrinter = new CSVPrinter(new FileWriter(behaviorChangeAnalysisOutput), CSVFormat.DEFAULT);
@@ -143,7 +142,7 @@ public class BridgeCarTrafficSummary {
 		manager.addHandler(volumes);
 
 		manager.initProcessing();
-		String eventPathString = glob(Path.of(outputFolder), "*output_events.xml.gz").orElseThrow().toString();
+		String eventPathString = glob(Path.of(outputFolder), "*output_events*").orElseThrow().toString();
 		EventsUtils.readEvents(manager, eventPathString);
 		manager.finishProcessing();
 
