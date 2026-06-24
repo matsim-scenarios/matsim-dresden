@@ -20,7 +20,7 @@ public final class FixNetwork {
 	}
 
 	public static void main(String[] args) {
-		String output = args.length > 0 ? args[0] : "/Users/luchengqi/Documents/MATSimScenarios/Dresden/dresden-scenario/v1.1/dresden-v1.1.1-network-with-pt.xml.gz";
+		String output = args.length > 0 ? args[0] : "/Users/luchengqi/Documents/MATSimScenarios/Dresden/dresden-scenario/v1.1/dresden-v1.1.2-network-with-pt.xml.gz";
 		Network network = NetworkUtils.readNetwork("https://svn.vsp.tu-berlin.de/repos/public-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/calibrated-10pct/output/012.output_network.xml.gz");
 
 //		// shut down Augustus bridge for car and freight (already fixed)
@@ -67,7 +67,23 @@ public final class FixNetwork {
 		// Waldschlösschenbrücke
 		network.getLinks().get(Id.createLinkId("132572494")).setCapacity(3000);
 		network.getLinks().get(Id.createLinkId("277710971")).setCapacity(3000);
+		network.getLinks().get(Id.createLinkId("132577857")).setCapacity(3000);
+		network.getLinks().get(Id.createLinkId("235255131")).setCapacity(3000);
+		network.getLinks().get(Id.createLinkId("277710970")).setCapacity(3000);
+		network.getLinks().get(Id.createLinkId("132572486")).setCapacity(3000);
+		network.getLinks().get(Id.createLinkId("132577861")).setCapacity(3000);
 
+		network.getLinks().get(Id.createLinkId("132572494")).setFreespeed(50/3.6);
+		network.getLinks().get(Id.createLinkId("277710971")).setFreespeed(50/3.6);
+		network.getLinks().get(Id.createLinkId("132577857")).setFreespeed(50/3.6);
+		network.getLinks().get(Id.createLinkId("235255131")).setFreespeed(50/3.6);
+		network.getLinks().get(Id.createLinkId("277710970")).setFreespeed(50/3.6);
+		network.getLinks().get(Id.createLinkId("132572486")).setFreespeed(50/3.6);
+		network.getLinks().get(Id.createLinkId("132577861")).setFreespeed(50/3.6);
+
+		// Albert bridge (Further reduce the capacity to match the traffic count data)
+		network.getLinks().get(Id.createLinkId("505502627#0")).setCapacity(1000);
+		network.getLinks().get(Id.createLinkId("-264360396#1")).setCapacity(1000);
 
 		// clean network
 		NetworkUtils.cleanNetwork(network, Set.of(TransportMode.car, TransportMode.ride, TransportMode.truck));

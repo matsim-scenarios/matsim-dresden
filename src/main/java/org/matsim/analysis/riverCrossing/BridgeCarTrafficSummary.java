@@ -64,9 +64,9 @@ public class BridgeCarTrafficSummary {
 	private static final Logger log = LogManager.getLogger(BridgeCarTrafficSummary.class);
 
 	public static void main(String[] args) throws IOException {
-		String outputFolderBefore = "/Users/luchengqi/Documents/MATSimScenarios/Dresden/dresden-scenario/v1.1/output/10pct/modified-network/before";
-		String outputFolderAfter = "/Users/luchengqi/Documents/MATSimScenarios/Dresden/dresden-scenario/v1.1/output/10pct/modified-network/after";
-		double sampleSize = 0.1;
+		String outputFolderBefore = args.length >= 2 ? args[0] : "/Users/luchengqi/Documents/MATSimScenarios/Dresden/dresden-scenario/v1.1/output/10pct/before";
+		String outputFolderAfter = args.length >= 2 ? args[1] : "/Users/luchengqi/Documents/MATSimScenarios/Dresden/dresden-scenario/v1.1/output/10pct/after";
+		double sampleSize = args.length == 3 ? Double.parseDouble(args[2]) : 0.1;
 
 		Network network = NetworkUtils.readNetwork(glob(Path.of(outputFolderBefore), "*output_network.xml.*").orElseThrow().toString());
 
