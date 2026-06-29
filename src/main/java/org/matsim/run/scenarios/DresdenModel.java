@@ -39,6 +39,7 @@ import org.matsim.core.replanning.annealing.ReplanningAnnealerConfigGroup.Anneal
 import org.matsim.core.scoring.functions.ScoringParametersForPerson;
 import org.matsim.dashboards.DresdenDashboardProvider;
 import org.matsim.prepare.*;
+import org.matsim.scoring.PougalaScoringFunctionFactory;
 import org.matsim.simwrapper.DashboardProvider;
 import org.matsim.simwrapper.SimWrapperConfigGroup;
 import org.matsim.simwrapper.SimWrapperModule;
@@ -224,6 +225,11 @@ public class DresdenModel extends MATSimApplication {
 			public void install() {
 				install(new PtFareModule());
 				bind(ScoringParametersForPerson.class).to(IncomeDependentUtilityOfMoneyPersonScoringParameters.class).in( Singleton.class );
+
+//				score activities with the piecewise-linear Pougala penalties driven by the
+//				plan-derived opening-time / typical-duration tags (see DresdenActivities), instead
+//				of the default logarithmic Charypar-Nagel activity scoring.
+				bindScoringFunctionFactory().to(PougalaScoringFunctionFactory.class);
 
 				addTravelTimeBinding(TransportMode.ride).to(carTravelTime());
 				addTravelDisutilityFactoryBinding(TransportMode.ride).to(carTravelDisutilityFactoryKey());
