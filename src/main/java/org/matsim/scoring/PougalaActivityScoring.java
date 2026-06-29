@@ -27,6 +27,9 @@ import org.matsim.core.scoring.functions.CharyparNagelActivityScoring;
 import org.matsim.core.scoring.functions.ScoringParameters;
 import org.matsim.core.utils.misc.OptionalTime;
 
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 /**
  * Activity scoring following the piecewise-linear formulation of
  *
@@ -45,11 +48,17 @@ import org.matsim.core.utils.misc.OptionalTime;
  *   <li>a penalty for <i>starting after</i> its desired start time.</li>
  * </ul>
  *
- * The typical duration is re-used from the existing {@link ActivityUtilityParameters} (i.e. the
- * <code>typicalDuration</code> of the activity in the scoring config). The desired start time is
- * not a configurable parameter yet; here we (ab)use the center between the activity's
- * <code>openingTime</code> and <code>latestStartTime</code>. If those are not both defined, no
- * start-time penalty is applied.
+ * The typical duration and the desired start time are read straight off the activity type tag that
+ * {@link org.matsim.run.scenarios.DresdenActivities} bakes onto each (middle) activity, of the form
+ * <code>&lt;base&gt;_&lt;typical&gt;_op&lt;opening&gt;_cl&lt;closing&gt;</code>, rather than from the
+ * scoring config defaults:
+ * <ul>
+ *   <li>the typical duration is the <code>_&lt;typical&gt;</code> seconds suffix (as encoded by
+ *       {@link org.matsim.application.prepare.population.SplitActivityTypesDuration}),</li>
+ *   <li>the desired start time is the <code>_op&lt;opening&gt;</code> opening time.</li>
+ * </ul>
+ * Activities whose type carries no opening-time tag (e.g. untagged first/last or freight
+ * activities) get no start-time penalty.
  *
  * The four penalty coefficients are, for now, constants shared among all activity types (see the
  * {@code *_PENALTY_PER_HOUR} fields below). They are expressed as utility per hour of deviation and
@@ -78,6 +87,20 @@ public final class PougalaActivityScoring implements org.matsim.core.scoring.Sum
 	private static final double START_TOO_LATE_PENALTY_PER_HOUR = -1.0;
 
 	private static final double INITIAL_SCORE = 0.0;
+
+	/**
+	 * Captures the typical-duration seconds from the activity type tag: the {@code _<seconds>} suffix
+	 * encoded by {@link org.matsim.application.prepare.population.SplitActivityTypesDuration},
+	 * optionally followed by the {@code _op<opening>_cl<closing>} window appended by
+	 * {@link org.matsim.run.scenarios.DresdenActivities}.
+	 */
+	private static final Pattern TYPICAL_DURATION_TAG = Pattern.compile("_(\\d+)(?:_op\\d+_cl\\d+)?$");
+
+	/**
+	 * Captures the opening time (desired start time) from the {@code _op<opening>_cl<closing>} window
+	 * tag appended by {@link org.matsim.run.scenarios.DresdenActivities}.
+	 */
+	private static final Pattern OPENING_TIME_TAG = Pattern.compile("_op(\\d+)_cl\\d+$");
 
 	private final Score score = new Score();
 
@@ -122,8 +145,10 @@ public final class PougalaActivityScoring implements org.matsim.core.scoring.Sum
 		if (actParams.isScoreAtAll()) {
 
 			// --- duration penalties (relative to the typical duration) ---
+			// Typical duration is read from the activity type tag (the _<seconds> suffix baked in by
+			// SplitActivityTypesDuration / DresdenActivities), not from the scoring config defaults.
 			double duration = endTime - startTime;
-			double typicalDuration = actParams.getTypicalDuration();
+			double typicalDuration = typicalDurationFromType(act.getType());
 
 			double durationTooShort = Math.max(0., typicalDuration - duration);
 			if (durationTooShort > 0.) {
@@ -138,12 +163,11 @@ public final class PougalaActivityScoring implements org.matsim.core.scoring.Sum
 			}
 
 			// --- start-time penalties (relative to the desired start time) ---
-			// Desired start time is not a config parameter (yet); abuse the center between
-			// openingTime and latestStartTime. Only applied if both are defined.
-			OptionalTime openingTime = actParams.getOpeningTime();
-			OptionalTime latestStartTime = actParams.getLatestStartTime();
-			if (openingTime.isDefined() && latestStartTime.isDefined()) {
-				double desiredStartTime = 0.5 * (openingTime.seconds() + latestStartTime.seconds());
+			// Desired start time is the opening time encoded in the _op<seconds> tag by
+			// DresdenActivities. Activities without an opening-time tag get no start-time penalty.
+			OptionalTime openingTime = openingTimeFromType(act.getType());
+			if (openingTime.isDefined()) {
+				double desiredStartTime = openingTime.seconds();
 
 				double startTooEarly = Math.max(0., desiredStartTime - startTime);
 				if (startTooEarly > 0.) {
@@ -159,6 +183,29 @@ public final class PougalaActivityScoring implements org.matsim.core.scoring.Sum
 			}
 		}
 		return tmpScore;
+	}
+
+	/**
+	 * The typical duration (seconds) read from the {@code _<seconds>} suffix of the activity type.
+	 */
+	private static double typicalDurationFromType(String type) {
+		Matcher m = TYPICAL_DURATION_TAG.matcher(type);
+		if (!m.find()) {
+			throw new IllegalArgumentException("activity type \"" + type + "\" carries no _<typicalDuration> tag.");
+		}
+		return Double.parseDouble(m.group(1));
+	}
+
+	/**
+	 * The opening time (desired start time, seconds) read from the {@code _op<seconds>} tag of the
+	 * activity type, or {@link OptionalTime#undefined()} when the type carries no opening-time tag.
+	 */
+	private static OptionalTime openingTimeFromType(String type) {
+		Matcher m = OPENING_TIME_TAG.matcher(type);
+		if (m.find()) {
+			return OptionalTime.defined(Double.parseDouble(m.group(1)));
+		}
+		return OptionalTime.undefined();
 	}
 
 	// We only score activities for which we observe both a start and an end (i.e. the "middle"
