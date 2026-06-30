@@ -25,9 +25,11 @@ import org.matsim.api.core.v01.Scenario;
 import org.matsim.api.core.v01.network.Network;
 import org.matsim.api.core.v01.population.Person;
 import org.matsim.core.config.Config;
+import org.matsim.core.population.PopulationUtils;
 import org.matsim.core.scoring.ScoringFunction;
 import org.matsim.core.scoring.ScoringFunctionFactory;
 import org.matsim.core.scoring.SumScoringFunction;
+import org.matsim.core.scoring.functions.CharyparNagelActivityScoring;
 import org.matsim.core.scoring.functions.CharyparNagelAgentStuckScoring;
 import org.matsim.core.scoring.functions.CharyparNagelLegScoring;
 import org.matsim.core.scoring.functions.CharyparNagelMoneyScoring;
@@ -41,9 +43,17 @@ import org.matsim.core.scoring.functions.SubpopulationScoringParameters;
  * {@link PougalaActivityScoring} (piecewise-linear deviation penalties driven by the plan-derived
  * activity-type tags), while keeping the Charypar-Nagel leg, money and agent-stuck terms.
  *
+ * <p>Only agents of the {@value #PERSON_SUBPOPULATION} subpopulation get the Pougala activity term;
+ * everyone else (commercial traffic, freight, ...) keeps the classic logarithmic Charypar-Nagel
+ * activity scoring, since the plan-derived opening-time tags are only minted for that subpopulation
+ * (cf. {@link org.matsim.run.scenarios.DresdenActivities}).
+ *
  * @author michaz with claude
  */
 public final class PougalaScoringFunctionFactory implements ScoringFunctionFactory {
+
+	/** The subpopulation whose activities carry the plan-derived opening-time tags. */
+	private static final String PERSON_SUBPOPULATION = "person";
 
 	private final Config config;
 	private Network network;
@@ -67,7 +77,11 @@ public final class PougalaScoringFunctionFactory implements ScoringFunctionFacto
 		final ScoringParameters parameters = params.getScoringParameters(person);
 
 		SumScoringFunction sumScoringFunction = new SumScoringFunction();
-		sumScoringFunction.addScoringFunction(new PougalaActivityScoring(parameters));
+		if (PERSON_SUBPOPULATION.equals(PopulationUtils.getSubpopulation(person))) {
+			sumScoringFunction.addScoringFunction(new PougalaActivityScoring(parameters));
+		} else {
+			sumScoringFunction.addScoringFunction(new CharyparNagelActivityScoring(parameters));
+		}
 		sumScoringFunction.addScoringFunction(new CharyparNagelLegScoring(parameters, config.transit().getTransitModes()));
 		sumScoringFunction.addScoringFunction(new CharyparNagelMoneyScoring(parameters));
 		sumScoringFunction.addScoringFunction(new CharyparNagelAgentStuckScoring(parameters));
