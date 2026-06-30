@@ -39,7 +39,7 @@ input/before-calibration/output:
 # 3) ad x/y coords as feature attributes: Vector - Geometry Tools - Add Geometry Attributes.
 # 4) Export as csv and copy content of csv without the id column to a .poly file.
 # see https://wiki.openstreetmap.org/wiki/Osmosis/Polygon_Filter_File_Format for .poly structure
-input/before-calibration/output/network-detailed-regional.osm.pbf: input/before-calibration/osm/germany-240101.osm.pbf | input/before-calibration/output
+input/before-calibration/output/network-detailed-regional.osm.pbf: input/osm/germany-240101.osm.pbf | input/before-calibration/output
 	$(osmosis) --rb file=$<\
 	 --tf accept-ways bicycle=yes highway=motorway,motorway_link,trunk,trunk_link,primary,primary_link,secondary_link,secondary,tertiary,motorway_junction,residential,unclassified,living_street\
 	 --bounding-polygon file="input/before-calibration/shp-for-regional-trains_points.poly"\
