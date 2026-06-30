@@ -25,7 +25,7 @@ sc := java -Xms$(MEMORY) -Xmx$(MEMORY) -jar $(JAR)
 .PHONY: prepare
 
 $(JAR):
-	mvn package -DskipTests
+	./mvnw package -DskipTests
 
 input/before-calibration/output:
 	mkdir -p input/before-calibration/output
