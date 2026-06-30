@@ -1,0 +1,6 @@
+outs:
+- md5: a9feb92fc645e4a87ddaa273e13e6425.dir
+  size: 4242318247
+  nfiles: 1
+  hash: md5
+  path: osm
