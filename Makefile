@@ -42,7 +42,7 @@ input/before-calibration/output:
 input/before-calibration/output/network-detailed-regional.osm.pbf: input/osm/germany-240101.osm.pbf | input/before-calibration/output
 	$(osmosis) --rb file=$<\
 	 --tf accept-ways bicycle=yes highway=motorway,motorway_link,trunk,trunk_link,primary,primary_link,secondary_link,secondary,tertiary,motorway_junction,residential,unclassified,living_street\
-	 --bounding-polygon file="input/before-calibration/shp-for-regional-trains_points.poly"\
+	 --bounding-polygon file="input/shp/shp-for-regional-trains_points.poly"\
 	 --used-node\
 	 --wb $@\
 
