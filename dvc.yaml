@@ -1,0 +1,5 @@
+stages:
+  prepare:
+    cmd: make prepare
+    outs:
+    - input/before-calibration
