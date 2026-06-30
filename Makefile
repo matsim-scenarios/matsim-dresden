@@ -9,7 +9,7 @@ endif
 
 #define some important paths
 # osmosis path needs to be in " because of blank space in path...
-osmosis := "C:/Program Files/osmosis-0.49.2//bin/osmosis.bat"
+osmosis := "osmosis"
 germany := $(CURDIR)/../../shared-svn/raw/europe/de/de
 germanWideFreight := input/germanWideFreight
 shared := $(CURDIR)/../../shared-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/
@@ -27,20 +27,10 @@ sc := java -Xms$(MEMORY) -Xmx$(MEMORY) -jar $(JAR)
 $(JAR):
 	mvn package -DskipTests
 
+input/before-calibration/output:
+	mkdir -p input/before-calibration/output
+
 ######################################### network creation ############################################################################################
-
-# !! There are important commands in the following, which need to be run to get started.  However, it seems that window systems
-# quite often run them also in situations where this should not be needed, and so we comment them out to avoid that. !!
-
-# Required files
-#this step is only necessary once. The downloaded network is uploaded to shared-svn/projects/matsim-germany/maps
-#when not wanting to download osm data for the current year (2026), there is only one dataset per year available.
-#We are sticking to 2024 as we want to depict the status (shortly) before Carola bridge collapsed (sep24).
-#we need to manually svn copy the above to shared-svn/raw/europe/de/de/osm because we do not want to state our svn credentials here
-input/before-calibration/output/germany-240101.osm.pbf:
-	curl https://download.geofabrik.de/europe/germany-240101.osm.pbf \
-	-o $@
-
 #retrieve detailed network (see param highway) from OSM
 # the .poly files contain point coords. The coordinates should be in EPSG:4326.
 #it is rather painful to create them. My workflow is the following:
@@ -49,14 +39,14 @@ input/before-calibration/output/germany-240101.osm.pbf:
 # 3) ad x/y coords as feature attributes: Vector - Geometry Tools - Add Geometry Attributes.
 # 4) Export as csv and copy content of csv without the id column to a .poly file.
 # see https://wiki.openstreetmap.org/wiki/Osmosis/Polygon_Filter_File_Format for .poly structure
-input/before-calibration/output/network-detailed-regional.osm.pbf: input/before-calibration/output/germany-240101.osm.pbf
+input/before-calibration/output/network-detailed-regional.osm.pbf: input/before-calibration/osm/germany-240101.osm.pbf | input/before-calibration/output
 	$(osmosis) --rb file=$<\
 	 --tf accept-ways bicycle=yes highway=motorway,motorway_link,trunk,trunk_link,primary,primary_link,secondary_link,secondary,tertiary,motorway_junction,residential,unclassified,living_street\
 	 --bounding-polygon file="input/before-calibration/shp-for-regional-trains_points.poly"\
 	 --used-node\
 	 --wb $@\
 
-input/before-calibration/output/network-coarse-germany.osm.pbf: input/before-calibration/output/germany-240101.osm.pbf
+input/before-calibration/output/network-coarse-germany.osm.pbf: input/osm/germany-240101.osm.pbf | input/before-calibration/output
 	$(osmosis) --rb file=$<\
  	 --tf accept-ways highway=motorway,motorway_link,motorway_junction,trunk,trunk_link,primary,primary_link\
  	 --used-node\
@@ -72,8 +62,8 @@ input/before-calibration/output/network.osm: input/before-calibration/output/net
 
 #	roadTypes are taken either from the general file "osmNetconvert.typ.xml"
 #	or from the german one "osmNetconvertUrbanDe.ty.xml"
-$(shared)/before-calibration/output/sumo.net.xml: $(shared)/before-calibration/output/network.osm
-	"$(SUMO_HOME)/bin/netconvert" --geometry.remove --ramps.guess --ramps.no-split\
+input/before-calibration/output/sumo.net.xml: input/before-calibration/output/network.osm
+	"netconvert" --geometry.remove --ramps.guess --ramps.no-split\
 	 --type-files "$(SUMO_HOME)/data/typemap/osmNetconvert.typ.xml","$(SUMO_HOME)/data/typemap/osmNetconvertUrbanDe.typ.xml"\
 	 --tls.guess-signals true --tls.discard-simple --tls.join --tls.default-type actuated\
 	 --junctions.join --junctions.corner-detail 5\
@@ -89,7 +79,7 @@ $(shared)/before-calibration/output/sumo.net.xml: $(shared)/before-calibration/o
 #--remove-turn-restrictions used instead of new TurnRestrictionCleaner,
 # the cleaner needs more testing, as it destroys the bike network e.g.
 #if you change the underlying osm file, you also have to check/change the augustus bridge links in PrepareNetwork.fixAugustusBridgeAllowedModes
-$(shared)/before-calibration/output/dresden-v1.1-network.xml.gz: $(shared)/before-calibration/output/sumo.net.xml
+input/before-calibration/output/dresden-v1.1-network.xml.gz: input/before-calibration/output/sumo.net.xml
 	$(sc) prepare network-from-sumo $< --output $@ --free-speed-factor 0.7 --turn-restrictions IGNORE_TURN_RESTRICTIONS
 	$(sc) prepare clean-network $@ --output $@ --modes car --modes bike --modes ride --remove-turn-restrictions
 #	delete truck as allowed mode (not used), add longDistanceFreight as allowed mode, prepare network for emissions analysis
