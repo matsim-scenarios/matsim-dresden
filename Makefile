@@ -99,8 +99,8 @@ input/before-calibration/output/dresden-v1.1-network-with-pt.xml.gz: input/befor
 	 input/gtfs/20230113_train_short.zip\
 	 input/gtfs/20230113_train_long.zip\
 	 --prefix regio_,short_,long_\
-	 --shp input/before-calibration/shp-for-regional-trains-utm32n.shp\
-	 --shp input/before-calibration/shp-for-regional-trains-utm32n.shp\
+	 --shp input/shp/shp-for-regional-trains-utm32n.shp\
+	 --shp input/shp/shp-for-regional-trains-utm32n.shp\
 	 --shp input/shp/germany-area.shp\
 	 --merge-stops mergeToParentAndRouteTypes
 
@@ -115,7 +115,7 @@ input/before-calibration/output/dresden-v1.1-counts-bast.xml.gz: ../../shared-sv
 		--primary-data $(germany)/bast/2023_B_S.zip\
 		--station-data $(germany)/bast/Jawe2023.csv\
 		--year 2023\
-		--shp input/before-calibration/shp-for-regional-trains-utm32n.shp --shp-crs $(CRS)\
+		--shp input/before-calibration/shp/shp-for-regional-trains-utm32n.shp --shp-crs $(CRS)\
 		--output $@\
 		--counts-mapping $(word 2,$^)
 
@@ -127,7 +127,7 @@ input/before-calibration/output/plans-longHaulFreight.xml.gz: $(germanWideFreigh
 	 --network $(word 2,$^)\
 	 --input-crs $(CRS)\
 	 --target-crs $(CRS)\
-	 --shp input/before-calibration/shp-for-regional-trains-utm32n.shp\
+	 --shp input/before-calibration/shp/shp-for-regional-trains-utm32n.shp\
 	 --shp-crs $(CRS)\
 	 --cut-on-boundary\
 	 --legMode "truck40t"\
@@ -190,7 +190,7 @@ input/before-calibration/output/prepare-100pct.plans.xml.gz: input/20250123_Teil
 # adapt coords of activities in the wider network such that they are closer to a link
 # such that agents do not have to walk as far as before
 	$(sc) prepare adjust-activity-to-link-distances $@\
- 	  --shp input/before-calibration/shp-for-regional-trains-utm32n.shp --shp-crs $(CRS)\
+ 	  --shp input/before-calibration/shp/shp-for-regional-trains-utm32n.shp --shp-crs $(CRS)\
  	  --scale 1.15\
  	  --input-crs $(CRS)\
  	  --network $(word 3,$^)\
