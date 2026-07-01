@@ -1,0 +1,6 @@
+outs:
+- md5: 73902fdec1ead0ad2e40b5d6ff5d0c1a.dir
+  size: 8124
+  nfiles: 2
+  hash: md5
+  path: sumo
