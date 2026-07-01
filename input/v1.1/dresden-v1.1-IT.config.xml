@@ -4,7 +4,8 @@
 <config>
 	<module name="timeAllocationMutator">
 		<param name="mutationRange" value="1800.0"/>
-		<param name="mutateAroundInitialEndTimeOnly" value="true"/>
+		<!--avoid confusion, we set this in code -->
+		<!--<param name="mutateAroundInitialEndTimeOnly" value="true"/>-->
 <!--		what is this?; please convert boolean to enum!-->
 	</module>
 
