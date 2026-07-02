@@ -1,0 +1,6 @@
+outs:
+- md5: 586031a098cab849e35ba821437efe31.dir
+  size: 17468843
+  nfiles: 1
+  hash: md5
+  path: smallScaleCommercialTraffic
