@@ -218,7 +218,7 @@ input/before-calibration/output/prepare-cutout-100pct.plans.xml.gz: input/before
 	 --check-beeline
 
 # same goes for small scale commercial traffic.
-input/before-calibration/output/dresden-small-scale-commercialTraffic-v1.1-100pct.xml.gz: input/before-calibration/output/oberlausitz-dresden-small-scale-commercialTraffic-v1.0-100pct.xml.gz input/before-calibration/output/$N-$V-network.xml.gz
+input/before-calibration/output/dresden-small-scale-commercialTraffic-v1.1-100pct.xml.gz: input/smallScaleCommercialTraffic/oberlausitz-dresden-small-scale-commercialTraffic-v1.0-100pct.xml.gz input/before-calibration/output/$N-$V-network.xml.gz
 	 $(sc) prepare scenario-cutout\
 	 --population $<\
 	 --network $(word 2,$^)\

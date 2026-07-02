@@ -1,0 +1,10 @@
+schema: '2.0'
+stages:
+  prepare:
+    cmd: make prepare
+    outs:
+    - path: input/before-calibration
+      hash: md5
+      md5: b28e5b74c2c0d0393edfc141c43354f3.dir
+      size: 2564822766
+      nfiles: 28
