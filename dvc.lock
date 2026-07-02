@@ -2,9 +2,50 @@ schema: '2.0'
 stages:
   prepare:
     cmd: make prepare
+    deps:
+    - path: input/20250123_Teilmodell_Hoyerswerda
+      hash: md5
+      md5: 3272a2301c12051831ba875bcb5641e3.dir
+      size: 71389250
+      nfiles: 1
+    - path: input/20250130_Teilmodell_Hoyerswerda
+      hash: md5
+      md5: 0e110ab27f923e8fefb85d5f73cf9975.dir
+      size: 10041161
+      nfiles: 2
+    - path: input/germanWideFreight
+      hash: md5
+      md5: b0322affd41aef6276d7debc61667a99.dir
+      size: 106527099
+      nfiles: 2
+    - path: input/gtfs
+      hash: md5
+      md5: 31f000198d1738d565b89e73733bd9ed.dir
+      size: 197883446
+      nfiles: 3
+    - path: input/landuse
+      hash: md5
+      md5: 4c7811bc5f592b64d44881db1d14b27d.dir
+      size: 1178952097
+      nfiles: 5
+    - path: input/osm
+      hash: md5
+      md5: a9feb92fc645e4a87ddaa273e13e6425.dir
+      size: 4242318247
+      nfiles: 1
+    - path: input/shp
+      hash: md5
+      md5: 580148b3d708f187a6a6b556500b1d3a.dir
+      size: 354474
+      nfiles: 16
+    - path: input/sumo
+      hash: md5
+      md5: 73902fdec1ead0ad2e40b5d6ff5d0c1a.dir
+      size: 8124
+      nfiles: 2
     outs:
     - path: input/before-calibration
       hash: md5
-      md5: b28e5b74c2c0d0393edfc141c43354f3.dir
-      size: 2564822766
+      md5: 6e9c55bc611758942f570ee946ff931e.dir
+      size: 5393186262
       nfiles: 28
