@@ -49,3 +49,26 @@ stages:
       md5: 7bfb4ee994866c40ca4ec75f13d47ce4.dir
       size: 5393314559
       nfiles: 28
+  network:
+    cmd: make input/before-calibration/output/dresden-v1.1-network-with-pt.xml.gz
+    deps:
+    - path: input/osm
+      hash: md5
+      md5: a9feb92fc645e4a87ddaa273e13e6425.dir
+      size: 4242318247
+      nfiles: 1
+    - path: input/shp
+      hash: md5
+      md5: 580148b3d708f187a6a6b556500b1d3a.dir
+      size: 354474
+      nfiles: 16
+    - path: input/sumo
+      hash: md5
+      md5: 73902fdec1ead0ad2e40b5d6ff5d0c1a.dir
+      size: 8124
+      nfiles: 2
+    outs:
+    - path: input/before-calibration/output/dresden-v1.1-network-with-pt.xml.gz
+      hash: md5
+      md5: 4c840afa6e0f02c07abb68e823e071f0
+      size: 42866902

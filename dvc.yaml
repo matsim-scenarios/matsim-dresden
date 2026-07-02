@@ -1,5 +1,13 @@
 stages:
-  prepare:
+  network:
+    cmd: make input/before-calibration/output/dresden-v1.1-network-with-pt.xml.gz
+    deps:
+      - input/sumo
+      - input/osm
+      - input/shp
+    outs:
+      - input/before-calibration/output/dresden-v1.1-network-with-pt.xml.gz
+  population:
     cmd: make prepare
     deps:
       - input/20250123_Teilmodell_Hoyerswerda
@@ -10,5 +18,7 @@ stages:
       - input/shp
       - input/gtfs
       - input/germanWideFreight
+      - input/before-calibration/output/dresden-v1.1-network-with-pt.xml.gz
+
     outs:
-      - input/before-calibration
+      - input/before-calibration/output/$N-$V-100pct.plans-initial.xml.gz

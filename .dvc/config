@@ -1,6 +1,4 @@
 [core]
-    remote = cluster-local
+    remote = cluster-home
 ['remote "cluster-home"']
     url = ssh://zilske@cluster-a.math.tu-berlin.de/net/ils/zilske/dvc
-['remote "cluster-local"']
-    url = /net/ils/zilske/dvc
