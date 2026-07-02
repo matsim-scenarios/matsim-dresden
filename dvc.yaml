@@ -2,13 +2,13 @@ stages:
   prepare:
     cmd: make prepare
     deps:
-      - input/20250123_Teilmodell_Hoyerswerda.dvc
-      - input/sumo.dvc
-      - input/osm.dvc
-      - input/landuse.dvc
-      - input/20250130_Teilmodell_Hoyerswerda.dvc
-      - input/shp.dvc
-      - input/gtfs.dvc
-      - input/germanWideFreight.dvc
+      - input/20250123_Teilmodell_Hoyerswerda
+      - input/sumo
+      - input/osm
+      - input/landuse
+      - input/20250130_Teilmodell_Hoyerswerda
+      - input/shp
+      - input/gtfs
+      - input/germanWideFreight
     outs:
       - input/before-calibration
