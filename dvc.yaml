@@ -21,4 +21,4 @@ stages:
       - input/before-calibration/output/dresden-v1.1-network-with-pt.xml.gz
 
     outs:
-      - input/before-calibration/output/$N-$V-100pct.plans-initial.xml.gz
+      - input/before-calibration/output/dresden-v1.1-100pct.plans-initial.xml.gz
