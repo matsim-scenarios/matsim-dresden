@@ -46,6 +46,6 @@ stages:
     outs:
     - path: input/before-calibration
       hash: md5
-      md5: 6e9c55bc611758942f570ee946ff931e.dir
-      size: 5393186262
+      md5: 7bfb4ee994866c40ca4ec75f13d47ce4.dir
+      size: 5393314559
       nfiles: 28
