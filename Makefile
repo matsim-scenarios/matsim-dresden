@@ -64,7 +64,7 @@ input/before-calibration/output/network.osm: input/before-calibration/output/net
 #	or from the german one "osmNetconvertUrbanDe.ty.xml"
 input/before-calibration/output/sumo.net.xml: input/before-calibration/output/network.osm
 	"netconvert" --geometry.remove --ramps.guess --ramps.no-split\
-	 --type-files "$(SUMO_HOME)/data/typemap/osmNetconvert.typ.xml","$(SUMO_HOME)/data/typemap/osmNetconvertUrbanDe.typ.xml"\
+	 --type-files "sumo/osmNetconvert.typ.xml","sumo/osmNetconvertUrbanDe.typ.xml"\
 	 --tls.guess-signals true --tls.discard-simple --tls.join --tls.default-type actuated\
 	 --junctions.join --junctions.corner-detail 5\
 	 --roundabouts.guess --remove-edges.isolated\
