@@ -10,6 +10,7 @@ stages:
   population:
     cmd: make prepare
     deps:
+      - Makefile
       - input/20250123_Teilmodell_Hoyerswerda
       - input/sumo
       - input/osm
