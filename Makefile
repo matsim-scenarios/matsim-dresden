@@ -180,7 +180,7 @@ input/before-calibration/output/plans-longHaulFreight.xml.gz: $(germanWideFreigh
 # trajectory-to-plans formerly was a collection of methods to prepare a given population
 # now, most of the functions of this class do have their own class (downsample, splitduration types...)
 # it basically only transforms the old attribute format to the new one
-# --max-typical-duration set to 0 because this switches off the duration split, which we do later
+# --max-typical-duration set to 0 because this switches off the duration split, which we don't do anymore
 input/before-calibration/output/prepare-100pct.plans.xml.gz: input/20250123_Teilmodell_Hoyerswerda/Modell/population.xml.gz input/20250130_Teilmodell_Hoyerswerda/Modell/personAttributes.xml.gz input/before-calibration/output/$N-$V-network.xml.gz
 	$(sc) prepare trajectory-to-plans\
 	 --name prepare --sample-size 1 --output input/before-calibration/output\
@@ -266,25 +266,13 @@ input/before-calibration/output/prepare-100pct-short-trips.plans.xml.gz: input/b
 		--num-trips 43524\
 		--output $@
 
-#   this step *has to* be done after the generation of short distance trips.
-#	split activity types to type_duration for the scoring to take into account the typical duration
-#some plans apparently have a sum of act_duration >> 86400. This is some issue in the input data, we decided to ignore that for dresden v1.1.
-#To fix the above issue, we set --overlong-plans-factor 1.5
-#	TODO: usage of --end-time-to-duration does not remove all end times of activities below 1800s (default value)
-input/before-calibration/output/prepare-100pct-split.plans.xml.gz: input/before-calibration/output/prepare-100pct-short-trips.plans.xml.gz
-	$(sc) prepare split-activity-types-duration\
-		--input $<\
-		--overlong-plans-factor 1.5\
-		--exclude commercial_start,commercial_end,freight_start,freight_end,service\
-		--output $@
-
 #	merge person and freight pops
-input/before-calibration/output/prepare-100pct-with-trips-split-merged.plans.xml.gz: input/before-calibration/output/prepare-100pct-split.plans.xml.gz input/before-calibration/output/plans-longHaulFreight.xml.gz input/before-calibration/output/dresden-small-scale-commercialTraffic-v1.1-100pct.xml.gz
+input/before-calibration/output/prepare-100pct-with-trips-merged.plans.xml.gz: input/before-calibration/output/prepare-100pct-short-trips.plans.xml.gz input/before-calibration/output/plans-longHaulFreight.xml.gz input/before-calibration/output/dresden-small-scale-commercialTraffic-v1.1-100pct.xml.gz
 	$(sc) prepare merge-populations $< $(word 2,$^) $(word 3,$^) --output $@
 
 # there should be more detailed algorithms to create activity facilities than the below class. it creates one facility per activity coord.
 # see https://github.com/matsim-scenarios/matsim-hannover/issues/1
-input/before-calibration/output/$N-$V-100pct.plans-initial.xml.gz: input/before-calibration/output/prepare-100pct-with-trips-split-merged.plans.xml.gz input/before-calibration/output/$N-$V-network-with-pt.xml.gz
+input/before-calibration/output/$N-$V-100pct.plans-initial.xml.gz: input/before-calibration/output/prepare-100pct-with-trips-merged.plans.xml.gz input/before-calibration/output/$N-$V-network-with-pt.xml.gz
 	$(sc) prepare facilities\
     		--input-population $<\
             --network $(word 2,$^)\
