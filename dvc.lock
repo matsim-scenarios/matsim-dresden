@@ -75,6 +75,10 @@ stages:
   population:
     cmd: make prepare
     deps:
+    - path: Makefile
+      hash: md5
+      md5: 2a6ef98f5311bb5884e45cdfbb2c9502
+      size: 17592
     - path: input/20250123_Teilmodell_Hoyerswerda
       hash: md5
       md5: 3272a2301c12051831ba875bcb5641e3.dir
@@ -122,5 +126,5 @@ stages:
     outs:
     - path: input/before-calibration/output/dresden-v1.1-100pct.plans-initial.xml.gz
       hash: md5
-      md5: 392c3b3033e5e5250255ef5946748993
-      size: 121377132
+      md5: 39f02d76a349848d70cfc44cec9727dc
+      size: 114552007
