@@ -25,7 +25,6 @@ import org.matsim.contrib.vsp.pt.fare.DistanceBasedPtFareParams;
 import org.matsim.contrib.vsp.pt.fare.FareZoneBasedPtFareParams;
 import org.matsim.contrib.vsp.pt.fare.PtFareConfigGroup;
 import org.matsim.contrib.vsp.pt.fare.PtFareModule;
-import org.matsim.contrib.vsp.scenario.Activities;
 import org.matsim.contrib.vsp.scenario.SnzActivities;
 import org.matsim.contrib.vsp.scoring.RideScoringParamsFromCarParams;
 import org.matsim.core.config.Config;
@@ -59,7 +58,7 @@ import static org.matsim.run.scenarios.DresdenUtils.*;
 		CreateLandUseShp.class, ResolveGridCoordinates.class, FixSubtourModes.class, AdjustActivityToLinkDistances.class, XYToLinks.class,
 		CleanNetwork.class, PrepareNetwork.class, SplitActivityTypesDuration.class, CreateCountsFromBAStData.class,
 		CutOutDresdenPopulation.class, CreateDataDistributionOfStructureData.class, GenerateSmallScaleCommercialTrafficDemand.class,
-		PreparePopulation.class, CreateFacilitiesFromPopulation.class, CreateSingleTransportModePopulation.class, RemoveVehicleInformationFromPopulation.class,
+		PreparePopulation.class, SplitWrapAroundActivities.class, EndTimeToDuration.class, EncodeTypicalDuration.class, CreateFacilitiesFromPopulation.class, CreateSingleTransportModePopulation.class, RemoveVehicleInformationFromPopulation.class,
 		CreateScenarioCutOut.class
 })
 @MATSimApplication.Analysis({
@@ -122,6 +121,11 @@ public class DresdenModel extends MATSimApplication {
 		scoringConfig.setPerforming_utils_hr( 6.0 );
 		scoringConfig.setWriteExperiencedPlans(true);
 		scoringConfig.setPathSizeLogitBeta(0.);
+
+//		Move the else-branch overnight scoring clamp from 24:00 to 27:00. handleOvernightActivity
+//		scores the (non-wrap-around) last activity from its start to simulationPeriodInDays * 24h;
+//		1.125 * 24h = 27:00.
+		config.scenario().setSimulationPeriodInDays( 1.125 );
 
 		prepareCommercialTrafficConfig(config);
 
@@ -189,9 +193,8 @@ public class DresdenModel extends MATSimApplication {
 //		this happens in the makefile pipeline already, but we do it here anyways, in case somebody uses a preliminary network.
 		PrepareNetwork.prepareFreightNetwork(scenario.getNetwork());
 
-//		switch off wrap around scoring if not done already. The method creates separate _morning and _evening act types for the first and last act if they have the same act type, e.g. home.
-//		Thus, no wrap-around scoring will be performed.
-		Activities.changeWrapAroundActsIntoMorningAndEveningActs(scenario);
+//		Splitting the first and last act of the day into separate _morning and _evening act types (to switch off
+//		wrap-around scoring) is now done during population preparation, see the split-wrap-around-activities step.
 
 //		remove disallowed links. The disallowed links cause many problems and (usually) are not useful in our rather macroscopic view on transport systems.
 		// yyyy I have no idea what this means; could someone please explain?  kai, dec'25

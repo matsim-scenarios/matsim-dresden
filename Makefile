@@ -266,8 +266,19 @@ input/before-calibration/output/prepare-100pct-short-trips.plans.xml.gz: input/b
 		--num-trips 43524\
 		--output $@
 
+# final steps of the person population, before freight traffic is merged in.
+input/before-calibration/output/prepare-100pct-persons.xml.gz: input/before-calibration/output/prepare-100pct-short-trips.plans.xml.gz
+# switch off wrap-around scoring: split first and last act of the day into separate _morning and _evening act types.
+	$(sc) prepare split-wrap-around-activities $< --output $@
+# encode each activity's typical duration as a "typicalDuration" attribute on the activity. Must run after the
+# wrap-around split, so the (now differing) morning/evening types take the non-wrap-around branch.
+# --simulation-period-in-days must match config.scenario().getSimulationPeriodInDays() set in DresdenModel (1.125).
+	$(sc) prepare encode-typical-duration $@ --output $@ --simulation-period-in-days 1.125
+# for short activities, remove the end time and encode the span as a maximum duration instead.
+	$(sc) prepare end-time-to-duration $@ --output $@
+
 #	merge person and freight pops
-input/before-calibration/output/prepare-100pct-with-trips-merged.plans.xml.gz: input/before-calibration/output/prepare-100pct-short-trips.plans.xml.gz input/before-calibration/output/plans-longHaulFreight.xml.gz input/before-calibration/output/dresden-small-scale-commercialTraffic-v1.1-100pct.xml.gz
+input/before-calibration/output/prepare-100pct-with-trips-merged.plans.xml.gz: input/before-calibration/output/prepare-100pct-persons.xml.gz input/before-calibration/output/plans-longHaulFreight.xml.gz input/before-calibration/output/dresden-small-scale-commercialTraffic-v1.1-100pct.xml.gz
 	$(sc) prepare merge-populations $< $(word 2,$^) $(word 3,$^) --output $@
 
 # there should be more detailed algorithms to create activity facilities than the below class. it creates one facility per activity coord.

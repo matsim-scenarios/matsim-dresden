@@ -7,6 +7,21 @@ stages:
       - input/shp
     outs:
       - input/before-calibration/output/dresden-v1.1-network-with-pt.xml.gz
+  persons:
+    cmd: make input/before-calibration/output/prepare-100pct-persons.xml.gz
+    deps:
+      - Makefile
+      - input/20250123_Teilmodell_Hoyerswerda
+      - input/sumo
+      - input/osm
+      - input/landuse
+      - input/20250130_Teilmodell_Hoyerswerda
+      - input/shp
+      - input/gtfs
+      - input/germanWideFreight
+      - input/before-calibration/output/dresden-v1.1-network-with-pt.xml.gz
+    outs:
+      - input/before-calibration/output/prepare-100pct-persons.xml.gz
   population:
     cmd: make prepare
     deps:
@@ -20,6 +35,6 @@ stages:
       - input/gtfs
       - input/germanWideFreight
       - input/before-calibration/output/dresden-v1.1-network-with-pt.xml.gz
-
+      - input/before-calibration/output/prepare-100pct-persons.xml.gz
     outs:
       - input/before-calibration/output/dresden-v1.1-100pct.plans-initial.xml.gz

@@ -77,8 +77,8 @@ stages:
     deps:
     - path: Makefile
       hash: md5
-      md5: 2a6ef98f5311bb5884e45cdfbb2c9502
-      size: 17592
+      md5: 27e281ef56f2f019aa5f8d8484ab7853
+      size: 17969
     - path: input/20250123_Teilmodell_Hoyerswerda
       hash: md5
       md5: 3272a2301c12051831ba875bcb5641e3.dir
@@ -126,5 +126,61 @@ stages:
     outs:
     - path: input/before-calibration/output/dresden-v1.1-100pct.plans-initial.xml.gz
       hash: md5
-      md5: 39f02d76a349848d70cfc44cec9727dc
-      size: 114552007
+      md5: 1f5e0e6981407eb0c9a83239199b78d7
+      size: 116316850
+  persons:
+    cmd: make input/before-calibration/output/prepare-100pct-persons.xml.gz
+    deps:
+    - path: Makefile
+      hash: md5
+      md5: cec0d17d96f24d4251af2b7088c7e404
+      size: 18531
+    - path: input/20250123_Teilmodell_Hoyerswerda
+      hash: md5
+      md5: 3272a2301c12051831ba875bcb5641e3.dir
+      size: 71389250
+      nfiles: 1
+    - path: input/20250130_Teilmodell_Hoyerswerda
+      hash: md5
+      md5: 0e110ab27f923e8fefb85d5f73cf9975.dir
+      size: 10041161
+      nfiles: 2
+    - path: input/before-calibration/output/dresden-v1.1-network-with-pt.xml.gz
+      hash: md5
+      md5: 4c840afa6e0f02c07abb68e823e071f0
+      size: 42866902
+    - path: input/germanWideFreight
+      hash: md5
+      md5: b0322affd41aef6276d7debc61667a99.dir
+      size: 106527099
+      nfiles: 2
+    - path: input/gtfs
+      hash: md5
+      md5: 31f000198d1738d565b89e73733bd9ed.dir
+      size: 197883446
+      nfiles: 3
+    - path: input/landuse
+      hash: md5
+      md5: 4c7811bc5f592b64d44881db1d14b27d.dir
+      size: 1178952097
+      nfiles: 5
+    - path: input/osm
+      hash: md5
+      md5: a9feb92fc645e4a87ddaa273e13e6425.dir
+      size: 4242318247
+      nfiles: 1
+    - path: input/shp
+      hash: md5
+      md5: 580148b3d708f187a6a6b556500b1d3a.dir
+      size: 354474
+      nfiles: 16
+    - path: input/sumo
+      hash: md5
+      md5: 73902fdec1ead0ad2e40b5d6ff5d0c1a.dir
+      size: 8124
+      nfiles: 2
+    outs:
+    - path: input/before-calibration/output/prepare-100pct-persons.xml.gz
+      hash: md5
+      md5: 0291c019d2481cce72b3bbf583ca319d
+      size: 105964656

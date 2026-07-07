@@ -93,7 +93,7 @@ public final class DresdenModelExperiments extends DresdenModel {
 			case none -> {
 			}
 			case splitAndRemoveOpeningTimes -> {
-				org.matsim.contrib.vsp.scenario.Activities.changeWrapAroundActsIntoMorningAndEveningActs( scenario );
+//				splitting into _morning and _evening acts is now done during population preparation (split-wrap-around-activities step).
 			}
 			default -> throw new IllegalStateException("Unexpected value: " + wrapAroundActivitiesHandling);
 		}
