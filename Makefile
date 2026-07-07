@@ -320,7 +320,6 @@ prepare: input/before-calibration/output/$N-$V-100pct.plans-initial.xml.gz input
 run: input/prepare-config.xml
 	$(sc) run --config $<\
 	 --config:controller.lastIteration=$(LAST_IT)
-	 --config:simwrapper.include=none
 
 # Run at 1pct sample.
 run-1pct: input/prepare-config.xml
@@ -333,7 +332,6 @@ run-1pct: input/prepare-config.xml
 	 --config:controller.runId=$N-$V-1pct\
 	 --config:controller.outputDirectory=./output/$N-$V-1pct\
 	 --config:controller.lastIteration=$(LAST_IT)
-	 --config:simwrapper.include=none
 
 # Run at 0.1pct sample (the downsampled population file is named "0pct").
 run-0pct: input/prepare-config.xml
@@ -346,4 +344,3 @@ run-0pct: input/prepare-config.xml
 	 --config:controller.runId=$N-$V-0pct\
 	 --config:controller.outputDirectory=./output/$N-$V-0pct\
 	 --config:controller.lastIteration=$(LAST_IT)
-	 --config:simwrapper.include=none
