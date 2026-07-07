@@ -315,14 +315,14 @@ prepare: input/before-calibration/output/$N-$V-100pct.plans-initial.xml.gz input
 	echo "Done"
 
 # Run the before-calibration scenario with the initial (uncalibrated) config. Assumes the prepare pipeline has
-# produced the inputs referenced by input/prepare-config.yml (run `make prepare` first). The config is set up for
+# produced the inputs referenced by input/prepare-config.xml (run `make prepare` first). The config is set up for
 # the 10pct sample; the run-1pct / run-0pct targets below override the sample-dependent parameters.
-run: input/prepare-config.yml
+run: input/prepare-config.xml
 	$(sc) --config $<\
 	 --config:controller.lastIteration=$(LAST_IT)
 
 # Run at 1pct sample.
-run-1pct: input/prepare-config.yml
+run-1pct: input/prepare-config.xml
 	$(sc) --config $<\
 	 --config:plans.inputPlansFile=before-calibration/output/$N-$V-1pct.plans-initial.xml.gz\
 	 --config:qsim.flowCapacityFactor=0.01\
@@ -334,7 +334,7 @@ run-1pct: input/prepare-config.yml
 	 --config:controller.lastIteration=$(LAST_IT)
 
 # Run at 0.1pct sample (the downsampled population file is named "0pct").
-run-0pct: input/prepare-config.yml
+run-0pct: input/prepare-config.xml
 	$(sc) --config $<\
 	 --config:plans.inputPlansFile=before-calibration/output/$N-$V-0pct.plans-initial.xml.gz\
 	 --config:qsim.flowCapacityFactor=0.001\

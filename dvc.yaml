@@ -2,11 +2,15 @@ stages:
   network:
     cmd: make input/before-calibration/output/dresden-v1.1-network-with-pt.xml.gz
     deps:
+      - Makefile
       - input/sumo
       - input/osm
       - input/shp
+      - input/gtfs
     outs:
       - input/before-calibration/output/dresden-v1.1-network-with-pt.xml.gz
+      - input/before-calibration/output/dresden-v1.1-transitSchedule.xml.gz
+      - input/before-calibration/output/dresden-v1.1-transitVehicles.xml.gz
   persons:
     cmd: make input/before-calibration/output/prepare-100pct-persons.xml.gz
     deps:
@@ -38,3 +42,7 @@ stages:
       - input/before-calibration/output/prepare-100pct-persons.xml.gz
     outs:
       - input/before-calibration/output/dresden-v1.1-100pct.plans-initial.xml.gz
+      - input/before-calibration/output/dresden-v1.1-10pct.plans-initial.xml.gz
+      - input/before-calibration/output/dresden-v1.1-1pct.plans-initial.xml.gz
+      - input/before-calibration/output/dresden-v1.1-0pct.plans-initial.xml.gz
+      - input/before-calibration/output/dresden-v1.1-activity-facilities.xml.gz
