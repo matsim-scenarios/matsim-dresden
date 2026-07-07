@@ -46,6 +46,8 @@ import org.matsim.simwrapper.SimWrapperConfigGroup;
 import org.matsim.simwrapper.SimWrapperModule;
 import org.matsim.smallScaleCommercialTrafficGeneration.GenerateSmallScaleCommercialTrafficDemand;
 import org.matsim.smallScaleCommercialTrafficGeneration.prepare.CreateDataDistributionOfStructureData;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 import playground.vsp.scoring.IncomeDependentUtilityOfMoneyPersonScoringParameters;
 
@@ -75,6 +77,7 @@ public class DresdenModel extends MATSimApplication {
 	 * used for activities that carry no such attribute.
 	 */
 	private static final double FALLBACK_TYPICAL_DURATION = 2 * 3600;
+	private static final Logger log = LoggerFactory.getLogger(DresdenModel.class);
 
 	@CommandLine.Option(names = "--emissions",
 		description = "Define if emission analysis should be performed or not" )
@@ -82,6 +85,9 @@ public class DresdenModel extends MATSimApplication {
 
 	@CommandLine.Option(names="--emissions-from-iteration")
 	private long emissionsFromIteration = 10;
+
+	@CommandLine.Option(names="--with-opening-times")
+	private boolean withOpeningTimes = true;
 
 //	TODO: remove before release
 //	@CommandLine.Option(names="--ride-alpha", description = "alpha value for ride. For calibration only! To be removed before release.")
@@ -110,7 +116,13 @@ public class DresdenModel extends MATSimApplication {
 //		EncodeTypicalDuration / DresdenActivityScoring); the typical duration set here is only a fallback for
 //		activities that lack the attribute.
 		for (SnzActivities value : SnzActivities.values()) {
-			config.scoring().addActivityParams(value.apply(new ScoringConfigGroup.ActivityParams(value.name()).setTypicalDuration(FALLBACK_TYPICAL_DURATION)));
+			if (withOpeningTimes) {
+				log.info("with opening times");
+				config.scoring().addActivityParams(value.apply(new ScoringConfigGroup.ActivityParams(value.name()).setTypicalDuration(FALLBACK_TYPICAL_DURATION)));
+			} else {
+				log.info("without opening times");
+				config.scoring().addActivityParams(new ScoringConfigGroup.ActivityParams(value.name()).setTypicalDuration(FALLBACK_TYPICAL_DURATION));
+			}
 //			morning/evening variants deliberately without opening times, matching SnzActivities.addMorningEveningScoringParams.
 			config.scoring().addActivityParams(new ScoringConfigGroup.ActivityParams(SnzActivities.createMorningActivityType(value.name())).setTypicalDuration(FALLBACK_TYPICAL_DURATION));
 			config.scoring().addActivityParams(new ScoringConfigGroup.ActivityParams(SnzActivities.createEveningActivityType(value.name())).setTypicalDuration(FALLBACK_TYPICAL_DURATION));
