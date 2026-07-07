@@ -52,6 +52,15 @@ stages:
   network:
     cmd: make input/before-calibration/output/dresden-v1.1-network-with-pt.xml.gz
     deps:
+    - path: Makefile
+      hash: md5
+      md5: c3c0a2f0c3123da019849f56436c5376
+      size: 20112
+    - path: input/gtfs
+      hash: md5
+      md5: 31f000198d1738d565b89e73733bd9ed.dir
+      size: 197883446
+      nfiles: 3
     - path: input/osm
       hash: md5
       md5: a9feb92fc645e4a87ddaa273e13e6425.dir
@@ -72,13 +81,21 @@ stages:
       hash: md5
       md5: 4c840afa6e0f02c07abb68e823e071f0
       size: 42866902
+    - path: input/before-calibration/output/dresden-v1.1-transitSchedule.xml.gz
+      hash: md5
+      md5: 8b55bd61a55c21b626d815df4ea248cf
+      size: 5311460
+    - path: input/before-calibration/output/dresden-v1.1-transitVehicles.xml.gz
+      hash: md5
+      md5: 36e549d221040a3091720b702cfea8a9
+      size: 229677
   population:
     cmd: make prepare
     deps:
     - path: Makefile
       hash: md5
-      md5: 27e281ef56f2f019aa5f8d8484ab7853
-      size: 17969
+      md5: c3c0a2f0c3123da019849f56436c5376
+      size: 20112
     - path: input/20250123_Teilmodell_Hoyerswerda
       hash: md5
       md5: 3272a2301c12051831ba875bcb5641e3.dir
@@ -93,6 +110,10 @@ stages:
       hash: md5
       md5: 4c840afa6e0f02c07abb68e823e071f0
       size: 42866902
+    - path: input/before-calibration/output/prepare-100pct-persons.xml.gz
+      hash: md5
+      md5: 0291c019d2481cce72b3bbf583ca319d
+      size: 105964656
     - path: input/germanWideFreight
       hash: md5
       md5: b0322affd41aef6276d7debc61667a99.dir
@@ -124,17 +145,33 @@ stages:
       size: 8124
       nfiles: 2
     outs:
+    - path: input/before-calibration/output/dresden-v1.1-0pct.plans-initial.xml.gz
+      hash: md5
+      md5: 22cd4feafdf098a0dd7a7f518af13f3e
+      size: 145836
     - path: input/before-calibration/output/dresden-v1.1-100pct.plans-initial.xml.gz
       hash: md5
-      md5: 1f5e0e6981407eb0c9a83239199b78d7
-      size: 116316850
+      md5: 3f9c1f4492a1d889394a96693fcf7472
+      size: 129161296
+    - path: input/before-calibration/output/dresden-v1.1-10pct.plans-initial.xml.gz
+      hash: md5
+      md5: 10234848d86cf46a42ad7882d103fda2
+      size: 13416322
+    - path: input/before-calibration/output/dresden-v1.1-1pct.plans-initial.xml.gz
+      hash: md5
+      md5: c7af03e25dcd7361e509049f0dea8d22
+      size: 1402878
+    - path: input/before-calibration/output/dresden-v1.1-activity-facilities.xml.gz
+      hash: md5
+      md5: a1a7c2b70a487f09121c7c9453f6137a
+      size: 41883223
   persons:
     cmd: make input/before-calibration/output/prepare-100pct-persons.xml.gz
     deps:
     - path: Makefile
       hash: md5
-      md5: cec0d17d96f24d4251af2b7088c7e404
-      size: 18531
+      md5: c3c0a2f0c3123da019849f56436c5376
+      size: 20112
     - path: input/20250123_Teilmodell_Hoyerswerda
       hash: md5
       md5: 3272a2301c12051831ba875bcb5641e3.dir
