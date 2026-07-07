@@ -40,6 +40,7 @@ import org.matsim.core.replanning.annealing.ReplanningAnnealerConfigGroup.Anneal
 import org.matsim.core.scoring.functions.ScoringParametersForPerson;
 import org.matsim.dashboards.DresdenDashboardProvider;
 import org.matsim.prepare.*;
+import org.matsim.scoring.DresdenScoringFunctionFactory;
 import org.matsim.simwrapper.DashboardProvider;
 import org.matsim.simwrapper.SimWrapperConfigGroup;
 import org.matsim.simwrapper.SimWrapperModule;
@@ -68,6 +69,13 @@ public class DresdenModel extends MATSimApplication {
 
 	public static final String VERSION = "v1.1";
 
+	/**
+	 * Fallback typical duration (seconds) for the untagged person activity types. Normally overridden per
+	 * activity by the "typicalDuration" attribute (see EncodeTypicalDuration / DresdenActivityScoring); only
+	 * used for activities that carry no such attribute.
+	 */
+	private static final double FALLBACK_TYPICAL_DURATION = 2 * 3600;
+
 	@CommandLine.Option(names = "--emissions",
 		description = "Define if emission analysis should be performed or not" )
 	private EmissionsAnalysisHandling emissions = EmissionsAnalysisHandling.RUN_EMISSIONS_ANALYSIS;
@@ -94,9 +102,19 @@ public class DresdenModel extends MATSimApplication {
 
 	protected void addScoringParams( Config config ) {
 		// yyyy need to find a way to remove the existing scoring params; then this can be programmed without inheritance
-		SnzActivities.addScoringParams(config);
-//		add scoring params for split act types for _morning and _evening. See method prepareScenario.
-		SnzActivities.addMorningEveningScoringParams(config);
+
+//		Register the original, untagged Snz activity types (base types with their opening times) plus the
+//		_morning and _evening variants that switch off wrap-around scoring. Upstream SnzActivities only offers
+//		the duration-tagged variants (one type per duration bin), so we register the untagged types ourselves.
+//		The per-activity typical duration is supplied at scoring time by the "typicalDuration" attribute (see
+//		EncodeTypicalDuration / DresdenActivityScoring); the typical duration set here is only a fallback for
+//		activities that lack the attribute.
+		for (SnzActivities value : SnzActivities.values()) {
+			config.scoring().addActivityParams(value.apply(new ScoringConfigGroup.ActivityParams(value.name()).setTypicalDuration(FALLBACK_TYPICAL_DURATION)));
+//			morning/evening variants deliberately without opening times, matching SnzActivities.addMorningEveningScoringParams.
+			config.scoring().addActivityParams(new ScoringConfigGroup.ActivityParams(SnzActivities.createMorningActivityType(value.name())).setTypicalDuration(FALLBACK_TYPICAL_DURATION));
+			config.scoring().addActivityParams(new ScoringConfigGroup.ActivityParams(SnzActivities.createEveningActivityType(value.name())).setTypicalDuration(FALLBACK_TYPICAL_DURATION));
+		}
 	}
 
 	@Nullable
@@ -232,6 +250,10 @@ public class DresdenModel extends MATSimApplication {
 			public void install() {
 				install(new PtFareModule());
 				bind(ScoringParametersForPerson.class).to(IncomeDependentUtilityOfMoneyPersonScoringParameters.class).in( Singleton.class );
+
+//				score activities against the plan-derived typical duration stored on each activity (see
+//				EncodeTypicalDuration), instead of encoding the typical duration in the activity type.
+				bindScoringFunctionFactory().to(DresdenScoringFunctionFactory.class);
 
 				addTravelTimeBinding(TransportMode.ride).to(carTravelTime());
 				addTravelDisutilityFactoryBinding(TransportMode.ride).to(carTravelDisutilityFactoryKey());
