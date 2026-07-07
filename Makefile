@@ -318,12 +318,13 @@ prepare: input/before-calibration/output/$N-$V-100pct.plans-initial.xml.gz input
 # produced the inputs referenced by input/prepare-config.xml (run `make prepare` first). The config is set up for
 # the 10pct sample; the run-1pct / run-0pct targets below override the sample-dependent parameters.
 run: input/prepare-config.xml
-	$(sc) --config $<\
+	$(sc) run --config $<\
 	 --config:controller.lastIteration=$(LAST_IT)
+	 --config:simwrapper.include=none
 
 # Run at 1pct sample.
 run-1pct: input/prepare-config.xml
-	$(sc) --config $<\
+	$(sc) run --config $<\
 	 --config:plans.inputPlansFile=before-calibration/output/$N-$V-1pct.plans-initial.xml.gz\
 	 --config:qsim.flowCapacityFactor=0.01\
 	 --config:qsim.storageCapacityFactor=0.01\
@@ -332,10 +333,11 @@ run-1pct: input/prepare-config.xml
 	 --config:controller.runId=$N-$V-1pct\
 	 --config:controller.outputDirectory=./output/$N-$V-1pct\
 	 --config:controller.lastIteration=$(LAST_IT)
+	 --config:simwrapper.include=none
 
 # Run at 0.1pct sample (the downsampled population file is named "0pct").
 run-0pct: input/prepare-config.xml
-	$(sc) --config $<\
+	$(sc) run --config $<\
 	 --config:plans.inputPlansFile=before-calibration/output/$N-$V-0pct.plans-initial.xml.gz\
 	 --config:qsim.flowCapacityFactor=0.001\
 	 --config:qsim.storageCapacityFactor=0.001\
@@ -344,3 +346,4 @@ run-0pct: input/prepare-config.xml
 	 --config:controller.runId=$N-$V-0pct\
 	 --config:controller.outputDirectory=./output/$N-$V-0pct\
 	 --config:controller.lastIteration=$(LAST_IT)
+	 --config:simwrapper.include=none
