@@ -57,7 +57,9 @@
 	</module>
 
 	<module name="counts">
-		<param name="inputCountsFile" value="before-calibration/output/dresden-v1.1-counts-bast.xml.gz"/>
+<!--	The v1.1 BAST counts (before-calibration/output/dresden-v1.1-counts-bast.xml.gz) require shared-svn to
+		build; bootstrap from the checked-in v1.0 counts file instead. Path relative to this config's location.-->
+		<param name="inputCountsFile" value="v1.0/dresden-v1.0-counts-bast.xml.gz"/>
 		<param name="countsScaleFactor" value="0.1"/>
 	</module>
 
