@@ -22,7 +22,10 @@ JAR := matsim-$(N)-*.jar
 # Scenario creation tool
 sc := java -Xms$(MEMORY) -Xmx$(MEMORY) -jar $(JAR)
 
-.PHONY: prepare run
+# Last iteration for the run-* targets. Override on the command line, e.g. `make run-1pct LAST_IT=1`.
+LAST_IT ?= 500
+
+.PHONY: prepare run run-1pct run-0pct
 
 $(JAR):
 	./mvnw package -DskipTests
@@ -312,6 +315,32 @@ prepare: input/before-calibration/output/$N-$V-100pct.plans-initial.xml.gz input
 	echo "Done"
 
 # Run the before-calibration scenario with the initial (uncalibrated) config. Assumes the prepare pipeline has
-# produced the inputs referenced by input/prepare-config.yml (run `make prepare` first).
+# produced the inputs referenced by input/prepare-config.yml (run `make prepare` first). The config is set up for
+# the 10pct sample; the run-1pct / run-0pct targets below override the sample-dependent parameters.
 run: input/prepare-config.yml
-	$(sc) --config $<
+	$(sc) --config $<\
+	 --config:controller.lastIteration=$(LAST_IT)
+
+# Run at 1pct sample.
+run-1pct: input/prepare-config.yml
+	$(sc) --config $<\
+	 --config:plans.inputPlansFile=before-calibration/output/$N-$V-1pct.plans-initial.xml.gz\
+	 --config:qsim.flowCapacityFactor=0.01\
+	 --config:qsim.storageCapacityFactor=0.01\
+	 --config:counts.countsScaleFactor=0.01\
+	 --config:simwrapper.sampleSize=0.01\
+	 --config:controller.runId=$N-$V-1pct\
+	 --config:controller.outputDirectory=./output/$N-$V-1pct\
+	 --config:controller.lastIteration=$(LAST_IT)
+
+# Run at 0.1pct sample (the downsampled population file is named "0pct").
+run-0pct: input/prepare-config.yml
+	$(sc) --config $<\
+	 --config:plans.inputPlansFile=before-calibration/output/$N-$V-0pct.plans-initial.xml.gz\
+	 --config:qsim.flowCapacityFactor=0.001\
+	 --config:qsim.storageCapacityFactor=0.001\
+	 --config:counts.countsScaleFactor=0.001\
+	 --config:simwrapper.sampleSize=0.001\
+	 --config:controller.runId=$N-$V-0pct\
+	 --config:controller.outputDirectory=./output/$N-$V-0pct\
+	 --config:controller.lastIteration=$(LAST_IT)
