@@ -22,7 +22,7 @@ JAR := matsim-$(N)-*.jar
 # Scenario creation tool
 sc := java -Xms$(MEMORY) -Xmx$(MEMORY) -jar $(JAR)
 
-.PHONY: prepare
+.PHONY: prepare run
 
 $(JAR):
 	./mvnw package -DskipTests
@@ -310,3 +310,8 @@ check: input/before-calibration/output/$N-$V-100pct.plans-initial.xml.gz
 # Aggregated target
 prepare: input/before-calibration/output/$N-$V-100pct.plans-initial.xml.gz input/before-calibration/output/$N-$V-network-with-pt.xml.gz
 	echo "Done"
+
+# Run the before-calibration scenario with the initial (uncalibrated) config. Assumes the prepare pipeline has
+# produced the inputs referenced by input/prepare-config.yml (run `make prepare` first).
+run: input/prepare-config.yml
+	$(sc) --config $<
