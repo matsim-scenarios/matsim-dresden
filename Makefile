@@ -324,9 +324,10 @@ prepare: input/before-calibration/output/$N-$V-100pct.plans-initial.xml.gz input
 # Run the before-calibration scenario with the initial (uncalibrated) config. Assumes the prepare pipeline has
 # produced the inputs referenced by input/prepare-config.xml (run `make prepare` first). The config is set up for
 # the 10pct sample; the run-1pct / run-0pct targets below override the sample-dependent parameters.
+# Pass extra args to the run command verbatim via ARGS, e.g. `make run ARGS='--with-opening-times=false'`.
 run: input/prepare-config.xml | $(CLASSPATH)
 	$(sc) run --config $<\
-	 --config:controller.lastIteration=$(LAST_IT)
+	 --config:controller.lastIteration=$(LAST_IT) $(ARGS)
 
 # Run at 1pct sample.
 run-1pct: input/prepare-config.xml | $(CLASSPATH)
@@ -338,7 +339,7 @@ run-1pct: input/prepare-config.xml | $(CLASSPATH)
 	 --config:simwrapper.sampleSize=0.01\
 	 --config:controller.runId=$N-$V-1pct\
 	 --config:controller.outputDirectory=./output/$N-$V-1pct\
-	 --config:controller.lastIteration=$(LAST_IT)
+	 --config:controller.lastIteration=$(LAST_IT) $(ARGS)
 
 # Run at 0.1pct sample (the downsampled population file is named "0pct").
 run-0pct: input/prepare-config.xml | $(CLASSPATH)
@@ -350,4 +351,4 @@ run-0pct: input/prepare-config.xml | $(CLASSPATH)
 	 --config:simwrapper.sampleSize=0.001\
 	 --config:controller.runId=$N-$V-0pct\
 	 --config:controller.outputDirectory=./output/$N-$V-0pct\
-	 --config:controller.lastIteration=$(LAST_IT)
+	 --config:controller.lastIteration=$(LAST_IT) $(ARGS)
