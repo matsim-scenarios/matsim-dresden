@@ -9,8 +9,8 @@
 	<module name="controller">
 		<param name="lastIteration" value="500"/>
 		<param name="overwriteFiles" value="failIfDirectoryExists"/>
-		<param name="runId" value="dresden-v1.1-10pct"/>
-		<param name="outputDirectory" value="./output/dresden-v1.1-10pct"/>
+		<param name="runId" value="dresden-v1.1-100pct"/>
+		<param name="outputDirectory" value="./output/dresden-v1.1-100pct"/>
 		<param name="writeEventsInterval" value="100"/>
 		<param name="writePlansInterval" value="100"/>
 		<param name="enableLinkToLinkRouting" value="false"/>
@@ -38,7 +38,7 @@
 	</module>
 
 	<module name="plans">
-		<param name="inputPlansFile" value="before-calibration/output/dresden-v1.1-10pct.plans-initial.xml.gz"/>
+		<param name="inputPlansFile" value="before-calibration/output/dresden-v1.1-100pct.plans-initial.xml.gz"/>
 		<param name="removingUnnecessaryPlanAttributes" value="true"/>
 	</module>
 
@@ -60,7 +60,6 @@
 <!--	The v1.1 BAST counts (before-calibration/output/dresden-v1.1-counts-bast.xml.gz) require shared-svn to
 		build; bootstrap from the checked-in v1.0 counts file instead. Path relative to this config's location.-->
 		<param name="inputCountsFile" value="v1.0/dresden-v1.0-counts-bast.xml.gz"/>
-		<param name="countsScaleFactor" value="0.1"/>
 	</module>
 
 	<module name="routing">
@@ -76,8 +75,6 @@
 
 	<module name="qsim">
 		<param name="endTime" value="36:00:00"/>
-		<param name="flowCapacityFactor" value="0.1"/>
-		<param name="storageCapacityFactor" value="0.1"/>
 		<param name="mainMode" value="car,bike"/>
 		<param name="numberOfThreads" value="12"/>
 		<param name="startTime" value="00:00:00"/>
@@ -150,8 +147,6 @@
 	</module>
 
 	<module name="simwrapper" >
-		<!-- Sample size of the run, which may be required by certain analysis functions. -->
-		<param name="sampleSize" value="0.1" />
 	</module>
 
 	<module name="subtourModeChoice">

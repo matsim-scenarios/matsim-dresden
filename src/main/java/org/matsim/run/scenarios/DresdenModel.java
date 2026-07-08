@@ -255,7 +255,7 @@ public class DresdenModel extends MATSimApplication {
 		//analyse PersonMoneyEvents
 		controler.addOverridingModule(new PersonMoneyEventsAnalysisModule());
 
-		controler.addOverridingModule(new SimWrapperModule());
+		// controler.addOverridingModule(new SimWrapperModule());
 
 		controler.addOverridingModule(new AbstractModule() {
 			@Override
