@@ -357,6 +357,19 @@ run-1pct: input/prepare-config.xml | $(CLASSPATH)
 	 --output output/$N-$V-1pct\
 	 $(ARGS)
 
+# Run at 1pct sample.
+run-1pct-notimes: input/prepare-config.xml | $(CLASSPATH)
+	$(sc) run --config $<\
+	 --config:plans.inputPlansFile=before-calibration/output/$N-$V-1pct.plans-initial.xml.gz\
+	 --config:qsim.flowCapacityFactor=0.01\
+	 --config:qsim.storageCapacityFactor=0.01\
+	 --config:counts.countsScaleFactor=0.01\
+	 --config:simwrapper.sampleSize=0.01\
+	 --runId $N-$V-1pct-notimes\
+	 --output output/$N-$V-1pct-notimes\
+	 --with-opening-times=false\
+	 $(ARGS)
+
 # Run at 0.1pct sample (the downsampled population file is named "0pct").
 run-0pct: input/prepare-config.xml | $(CLASSPATH)
 	$(sc) run --config $<\
