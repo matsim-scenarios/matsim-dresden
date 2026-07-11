@@ -54,8 +54,8 @@ stages:
     deps:
     - path: Makefile
       hash: md5
-      md5: db002b2bf66dec66aa7d1dee82165e1a
-      size: 20124
+      md5: 45ffab4ae3f5d332d8acffdc2b2a2aea
+      size: 22430
     - path: input/gtfs
       hash: md5
       md5: 31f000198d1738d565b89e73733bd9ed.dir
@@ -94,8 +94,8 @@ stages:
     deps:
     - path: Makefile
       hash: md5
-      md5: db002b2bf66dec66aa7d1dee82165e1a
-      size: 20124
+      md5: 45ffab4ae3f5d332d8acffdc2b2a2aea
+      size: 22430
     - path: input/20250123_Teilmodell_Hoyerswerda
       hash: md5
       md5: 3272a2301c12051831ba875bcb5641e3.dir
@@ -112,8 +112,8 @@ stages:
       size: 42866902
     - path: input/before-calibration/output/prepare-100pct-persons.xml.gz
       hash: md5
-      md5: 0291c019d2481cce72b3bbf583ca319d
-      size: 105964656
+      md5: a7df73552a0fe2029afad856444a7cd0
+      size: 103610604
     - path: input/germanWideFreight
       hash: md5
       md5: b0322affd41aef6276d7debc61667a99.dir
@@ -147,20 +147,20 @@ stages:
     outs:
     - path: input/before-calibration/output/dresden-v1.1-0pct.plans-initial.xml.gz
       hash: md5
-      md5: 22cd4feafdf098a0dd7a7f518af13f3e
-      size: 145836
+      md5: 78ef824b2e27db460417a6be57d9c17c
+      size: 143324
     - path: input/before-calibration/output/dresden-v1.1-100pct.plans-initial.xml.gz
       hash: md5
-      md5: 3f9c1f4492a1d889394a96693fcf7472
-      size: 129161296
+      md5: 6d82d48991d2c088255c5cc37b992ec4
+      size: 126741625
     - path: input/before-calibration/output/dresden-v1.1-10pct.plans-initial.xml.gz
       hash: md5
-      md5: 10234848d86cf46a42ad7882d103fda2
-      size: 13416322
+      md5: fc4250b0c6b2555c9b3e42dcef29124f
+      size: 13168260
     - path: input/before-calibration/output/dresden-v1.1-1pct.plans-initial.xml.gz
       hash: md5
-      md5: c7af03e25dcd7361e509049f0dea8d22
-      size: 1402878
+      md5: ba2d5de9c374320fcc85a2a6f8f127df
+      size: 1378414
     - path: input/before-calibration/output/dresden-v1.1-activity-facilities.xml.gz
       hash: md5
       md5: a1a7c2b70a487f09121c7c9453f6137a
@@ -170,8 +170,8 @@ stages:
     deps:
     - path: Makefile
       hash: md5
-      md5: db002b2bf66dec66aa7d1dee82165e1a
-      size: 20124
+      md5: 45ffab4ae3f5d332d8acffdc2b2a2aea
+      size: 22430
     - path: input/20250123_Teilmodell_Hoyerswerda
       hash: md5
       md5: 3272a2301c12051831ba875bcb5641e3.dir
@@ -219,5 +219,7 @@ stages:
     outs:
     - path: input/before-calibration/output/prepare-100pct-persons.xml.gz
       hash: md5
-      md5: 0291c019d2481cce72b3bbf583ca319d
-      size: 105964656
+      md5: a7df73552a0fe2029afad856444a7cd0
+      size: 103610604
+  run:
+    cmd: make run-1pct

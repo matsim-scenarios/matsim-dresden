@@ -46,3 +46,5 @@ stages:
       - input/before-calibration/output/dresden-v1.1-1pct.plans-initial.xml.gz
       - input/before-calibration/output/dresden-v1.1-0pct.plans-initial.xml.gz
       - input/before-calibration/output/dresden-v1.1-activity-facilities.xml.gz
+  run:
+    cmd: make run-1pct

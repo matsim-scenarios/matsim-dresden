@@ -278,8 +278,11 @@ input/before-calibration/output/prepare-100pct-short-trips.plans.xml.gz: input/b
 
 # final steps of the person population, before freight traffic is merged in.
 input/before-calibration/output/prepare-100pct-persons.xml.gz: input/before-calibration/output/prepare-100pct-short-trips.plans.xml.gz | $(CLASSPATH)
+# clean redundant max-duration attributes and reschedule plans whose activities run past the simulation day (27:00),
+# order-preserving, so the last activity keeps a positive window. --simulation-period-in-days must match DresdenModel (1.125).
+	$(sc) prepare reschedule-late-plans $< --output $@ --simulation-period-in-days 1.125
 # switch off wrap-around scoring: split first and last act of the day into separate _morning and _evening act types.
-	$(sc) prepare split-wrap-around-activities $< --output $@
+	$(sc) prepare split-wrap-around-activities $@ --output $@
 # encode each activity's typical duration as a "typicalDuration" attribute on the activity. Must run after the
 # wrap-around split, so the (now differing) morning/evening types take the non-wrap-around branch.
 # --simulation-period-in-days must match config.scenario().getSimulationPeriodInDays() set in DresdenModel (1.125).
