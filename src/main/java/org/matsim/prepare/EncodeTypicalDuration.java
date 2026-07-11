@@ -41,8 +41,11 @@ public class EncodeTypicalDuration implements MATSimAppCommand {
 		"Corresponds to config.scenario().getSimulationPeriodInDays(); pass the same value the scenario uses.")
 	private double simulationPeriodInDays = 1.0;
 
-	@CommandLine.Option(names = "--min-typical-duration", description = "If set (> 0), clamp each activity's typical duration to at least this many seconds. " +
-		"Very small typical durations make the Charypar-Nagel zero-utility duration underflow and the performing utility explode.", defaultValue = "0")
+	@CommandLine.Option(names = "--min-typical-duration", description = "If set (> 0), clamp each activity's typical " +
+		"duration to at least this many seconds, and prolong too-short middle activities to at least this actual " +
+		"duration. Very small typical durations make the Charypar-Nagel zero-utility duration underflow and the " +
+		"performing utility explode; prolonging the actual duration keeps the executed activity consistent with its " +
+		"(clamped) typical duration, since short duration-based activities are never time-mutated.", defaultValue = "0")
 	private double minTypicalDuration = 0;
 
 	public static void main(String[] args) {
@@ -94,7 +97,9 @@ public class EncodeTypicalDuration implements MATSimAppCommand {
 
 			// Middle activities are fully observed: their typical duration is simply their own duration.
 			for (int i = 1; i < activities.size() - 1; i++) {
-				setTypicalDuration(activities.get(i), ownDuration(activities.get(i)));
+				Activity act = activities.get(i);
+				prolongToMinimumDuration(act);
+				setTypicalDuration(act, ownDuration(act));
 			}
 
 			Activity first = activities.get(0);
@@ -130,6 +135,20 @@ public class EncodeTypicalDuration implements MATSimAppCommand {
 			typicalDuration = Math.max(typicalDuration, minTypicalDuration);
 		}
 		act.getAttributes().putAttribute(TYPICAL_DURATION, typicalDuration);
+	}
+
+	/**
+	 * When a minimum typical duration is configured, prolong a too-short (middle) activity so its actual, executed
+	 * duration is at least the minimum, encoded as a maximum duration (the end time is removed). Clamping only the
+	 * typical duration is not enough: {@link EndTimeToDuration} turns short activities into duration-based ones, which
+	 * the TimeAllocationMutator does not mutate, so a short activity would otherwise stay short forever -- performed
+	 * far below its (clamped) typical duration, which is exactly the degenerate scoring input we want to avoid.
+	 */
+	private void prolongToMinimumDuration(Activity act) {
+		if (minTypicalDuration > 0 && ownDuration(act) < minTypicalDuration) {
+			act.setEndTimeUndefined();
+			act.setMaximumDuration(minTypicalDuration);
+		}
 	}
 
 }
