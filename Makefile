@@ -285,7 +285,7 @@ input/before-calibration/output/prepare-100pct-persons.xml.gz: input/before-cali
 # --simulation-period-in-days must match config.scenario().getSimulationPeriodInDays() set in DresdenModel (1.125).
 	$(sc) prepare encode-typical-duration $@ --output $@ --simulation-period-in-days 1.125 --min-typical-duration 300
 # for short activities, remove the end time and encode the span as a maximum duration instead.
-	$(sc) prepare end-time-to-duration $@ --output $@
+	$(sc) prepare end-time-to-duration $@ --output $@ --end-time-to-duration 1800
 
 #	merge person and freight pops
 input/before-calibration/output/prepare-100pct-with-trips-merged.plans.xml.gz: input/before-calibration/output/prepare-100pct-persons.xml.gz input/before-calibration/output/plans-longHaulFreight.xml.gz input/before-calibration/output/dresden-small-scale-commercialTraffic-v1.1-100pct.xml.gz | $(CLASSPATH)

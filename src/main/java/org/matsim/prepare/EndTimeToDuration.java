@@ -29,8 +29,9 @@ public class EndTimeToDuration implements MATSimAppCommand {
 	@CommandLine.Option(names = "--output", description = "Path to output population", required = true)
 	private Path output;
 
-	@CommandLine.Option(names = {"--end-time-to-duration"}, description = "Remove the end time and encode as duration for activities shorter than this value.")
-	private int endTimeToDuration = 1800;
+	@CommandLine.Option(names = {"--end-time-to-duration"}, description = "If set (> 0), remove the end time and encode " +
+		"it as a maximum duration for activities shorter than this value (seconds). Default 0 does nothing.", defaultValue = "0")
+	private int endTimeToDuration = 0;
 
 	public static void main(String[] args) {
 		new EndTimeToDuration().execute(args);
@@ -74,7 +75,7 @@ public class EndTimeToDuration implements MATSimAppCommand {
 					duration = act.getEndTime().orElse(0) - act.getStartTime().orElse(0);
 				}
 
-				if (duration <= endTimeToDuration && act.getEndTime().isDefined()) {
+				if (endTimeToDuration > 0 && duration <= endTimeToDuration && act.getEndTime().isDefined()) {
 					act.setEndTimeUndefined();
 					act.setMaximumDuration(duration);
 				}
