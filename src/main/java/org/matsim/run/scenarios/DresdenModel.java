@@ -12,6 +12,7 @@ import org.matsim.api.core.v01.TransportMode;
 import org.matsim.api.core.v01.network.Link;
 import org.matsim.application.MATSimApplication;
 import org.matsim.application.analysis.CheckPopulation;
+import org.matsim.analysis.vtts.DresdenAddVttsEtcToActivities;
 import org.matsim.application.analysis.traffic.LinkStats;
 import org.matsim.application.prepare.CreateLandUseShp;
 import org.matsim.application.prepare.counts.CreateCountsFromBAStData;
@@ -65,7 +66,7 @@ import static org.matsim.run.scenarios.DresdenUtils.*;
 		CreateScenarioCutOut.class
 })
 @MATSimApplication.Analysis({
-		LinkStats.class, CheckPopulation.class, CheckAndSummarizeLongDistanceFreightPopulation.class, CheckStayHomeAgents.class
+		LinkStats.class, CheckPopulation.class, CheckAndSummarizeLongDistanceFreightPopulation.class, CheckStayHomeAgents.class, DresdenAddVttsEtcToActivities.class
 })
 public class DresdenModel extends MATSimApplication {
 
