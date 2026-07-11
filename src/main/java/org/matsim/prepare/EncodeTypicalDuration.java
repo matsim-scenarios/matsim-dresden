@@ -41,6 +41,10 @@ public class EncodeTypicalDuration implements MATSimAppCommand {
 		"Corresponds to config.scenario().getSimulationPeriodInDays(); pass the same value the scenario uses.")
 	private double simulationPeriodInDays = 1.0;
 
+	@CommandLine.Option(names = "--min-typical-duration", description = "If set (> 0), clamp each activity's typical duration to at least this many seconds. " +
+		"Very small typical durations make the Charypar-Nagel zero-utility duration underflow and the performing utility explode.", defaultValue = "0")
+	private double minTypicalDuration = 0;
+
 	public static void main(String[] args) {
 		new EncodeTypicalDuration().execute(args);
 	}
@@ -121,7 +125,10 @@ public class EncodeTypicalDuration implements MATSimAppCommand {
 		}
 	}
 
-	private static void setTypicalDuration(Activity act, double typicalDuration) {
+	private void setTypicalDuration(Activity act, double typicalDuration) {
+		if (minTypicalDuration > 0) {
+			typicalDuration = Math.max(typicalDuration, minTypicalDuration);
+		}
 		act.getAttributes().putAttribute(TYPICAL_DURATION, typicalDuration);
 	}
 

@@ -283,7 +283,7 @@ input/before-calibration/output/prepare-100pct-persons.xml.gz: input/before-cali
 # encode each activity's typical duration as a "typicalDuration" attribute on the activity. Must run after the
 # wrap-around split, so the (now differing) morning/evening types take the non-wrap-around branch.
 # --simulation-period-in-days must match config.scenario().getSimulationPeriodInDays() set in DresdenModel (1.125).
-	$(sc) prepare encode-typical-duration $@ --output $@ --simulation-period-in-days 1.125
+	$(sc) prepare encode-typical-duration $@ --output $@ --simulation-period-in-days 1.125 --min-typical-duration 300
 # for short activities, remove the end time and encode the span as a maximum duration instead.
 	$(sc) prepare end-time-to-duration $@ --output $@
 
@@ -381,3 +381,6 @@ run-0pct: input/prepare-config.xml | $(CLASSPATH)
 	 --runId $N-$V-0pct\
 	 --output output/$N-$V-0pct\
 	 $(ARGS)
+
+vtts: | $(CLASSPATH)
+	$(sc) analysis run-vtts-analysis --path output/dresden-v1.1-1pct --runId dresden-v1.1-1pct
