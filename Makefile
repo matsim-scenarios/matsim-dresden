@@ -312,7 +312,7 @@ input/before-calibration/output/$N-$V-100pct.plans-initial.xml.gz: input/before-
 	$(sc) prepare fix-subtour-modes --coord-dist 100 --input $@ --output $@
 	$(sc) prepare downsample-population $@\
     	 --sample-size 1\
-    	 --samples 0.25 0.1 0.01 0.001\
+    	 --samples 0.25 0.1 0.01\
 
 # output of check population seems to be ok. -sm0426
 check: input/before-calibration/output/$N-$V-100pct.plans-initial.xml.gz | $(CLASSPATH)
@@ -371,18 +371,6 @@ run-1pct-notimes: input/prepare-config.xml | $(CLASSPATH)
 	 --runId $N-$V-1pct-notimes\
 	 --output output/$N-$V-1pct-notimes\
 	 --with-opening-times=false\
-	 $(ARGS)
-
-# Run at 0.1pct sample (the downsampled population file is named "0pct").
-run-0pct: input/prepare-config.xml | $(CLASSPATH)
-	$(sc) run --config $<\
-	 --config:plans.inputPlansFile=before-calibration/output/$N-$V-0pct.plans-initial.xml.gz\
-	 --config:qsim.flowCapacityFactor=0.001\
-	 --config:qsim.storageCapacityFactor=0.001\
-	 --config:counts.countsScaleFactor=0.001\
-	 --config:simwrapper.sampleSize=0.001\
-	 --runId $N-$V-0pct\
-	 --output output/$N-$V-0pct\
 	 $(ARGS)
 
 vtts: | $(CLASSPATH)
