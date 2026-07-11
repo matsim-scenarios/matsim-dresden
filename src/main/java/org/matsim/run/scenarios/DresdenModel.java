@@ -73,6 +73,15 @@ public class DresdenModel extends MATSimApplication {
 	public static final String VERSION = "v1.1";
 
 	/**
+	 * Length of the simulation period, as a multiple of 24h. Set to 1.125 (= 27:00) so that the non-wrap-around
+	 * overnight scoring clamps the last activity at 27:00 instead of 24:00 (see the setter call and
+	 * {@link org.matsim.scoring.DresdenActivityScoring} / {@link org.matsim.prepare.EncodeTypicalDuration}).
+	 * Exposed so post-hoc analyses (e.g. the VTTS analysis) can reproduce the run's scoring; the value is not
+	 * persisted to the output config (the scenario module is not written there), so it must come from here.
+	 */
+	public static final double SIMULATION_PERIOD_IN_DAYS = 1.125;
+
+	/**
 	 * Fallback typical duration (seconds) for the untagged person activity types. Normally overridden per
 	 * activity by the "typicalDuration" attribute (see EncodeTypicalDuration / DresdenActivityScoring); only
 	 * used for activities that carry no such attribute.
@@ -156,7 +165,7 @@ public class DresdenModel extends MATSimApplication {
 //		Move the else-branch overnight scoring clamp from 24:00 to 27:00. handleOvernightActivity
 //		scores the (non-wrap-around) last activity from its start to simulationPeriodInDays * 24h;
 //		1.125 * 24h = 27:00.
-		config.scenario().setSimulationPeriodInDays( 1.125 );
+		config.scenario().setSimulationPeriodInDays( SIMULATION_PERIOD_IN_DAYS );
 
 		prepareCommercialTrafficConfig(config);
 

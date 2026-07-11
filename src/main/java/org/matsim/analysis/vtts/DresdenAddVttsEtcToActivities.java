@@ -22,6 +22,7 @@ import org.matsim.core.router.TripStructureUtils;
 import org.matsim.core.scenario.ScenarioUtils;
 import org.matsim.core.scoring.functions.ScoringParametersForPerson;
 import org.matsim.prepare.EncodeTypicalDuration;
+import org.matsim.run.scenarios.DresdenModel;
 import org.matsim.utils.tablesaw.TablesawUtils;
 import picocli.CommandLine;
 import playground.vsp.scoring.IncomeDependentUtilityOfMoneyPersonScoringParameters;
@@ -90,6 +91,12 @@ public class DresdenAddVttsEtcToActivities implements MATSimAppCommand {
 		config.eventsManager().setNumberOfThreads(numberOfThreads);
 		config.controller().setOverwriteFileSetting( OutputDirectoryHierarchy.OverwriteFileSetting.overwriteExistingFiles );
 		config.counts().setInputFile( null );
+
+		// The run sets a non-default simulationPeriodInDays (27:00) that controls the non-wrap-around overnight
+		// scoring clamp, but that value is not persisted to the output config, so reloading it here would silently
+		// fall back to the 24:00 default and produce negative last-activity durations (and exploding VTTS) for
+		// agents whose last activity ends between 24:00 and 27:00. Reproduce the run's value from the single source.
+		config.scenario().setSimulationPeriodInDays( DresdenModel.SIMULATION_PERIOD_IN_DAYS );
 
 		// ---
 
