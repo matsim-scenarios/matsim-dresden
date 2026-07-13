@@ -99,6 +99,13 @@ public class DresdenModel extends MATSimApplication {
 	@CommandLine.Option(names="--with-opening-times")
 	private boolean withOpeningTimes = true;
 
+	@CommandLine.Option(names="--mutate-around-initial-end-time-only",
+		description = "If set, the TimeAllocationMutator mutates each activity's end time only around its initial " +
+			"(feasible, post-preprocessing) value rather than random-walking from the current one, so end times " +
+			"cannot drift into -- and get stuck at -- zero-duration corners. Default false (free exploration, which " +
+			"demonstrably traps agents at zero-duration activities).")
+	private boolean mutateAroundInitialEndTimeOnly = false;
+
 //	TODO: remove before release
 //	@CommandLine.Option(names="--ride-alpha", description = "alpha value for ride. For calibration only! To be removed before release.")
 	private final double rideAlpha = 1.;
@@ -152,7 +159,9 @@ public class DresdenModel extends MATSimApplication {
 //		(the tarifzone shp file basically is a dresden shp file with fare prices as additional information)
 
 		config.timeAllocationMutator().setLatestActivityEndTime(String.valueOf(config.qsim().getEndTime().seconds()));
-		config.timeAllocationMutator().setMutateAroundInitialEndTimeOnly(false);
+		// Anchor time mutation to the initial (feasible) end times so it cannot drift activities into zero-duration
+		// corners the mutator can then not climb back out of; see --mutate-around-initial-end-time-only.
+		config.timeAllocationMutator().setMutateAroundInitialEndTimeOnly(mutateAroundInitialEndTimeOnly);
 		config.timeAllocationMutator().setAffectingDuration(false);
 
 //		config.vspExperimental().setVspDefaultsCheckingLevel( VspDefaultsCheckingLevel.abort );
