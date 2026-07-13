@@ -57,6 +57,10 @@ import static tech.tablesaw.aggregate.AggregateFunctions.*;
 public class DresdenAddVttsEtcToActivities implements MATSimAppCommand {
 	private static final Logger log = LogManager.getLogger( DresdenAddVttsEtcToActivities.class );
 
+	/** Plotting window for the VTTS histogram. Outliers beyond this are kept in the stats but excluded from the plot. */
+	private static final double VTTS_HISTOGRAM_MIN = 0.;
+	private static final double VTTS_HISTOGRAM_MAX = 50.;
+
 	@CommandLine.Option(names = "--path", description = "Path to output folder", required = true)
 	private Path path;
 
@@ -236,8 +240,18 @@ public class DresdenAddVttsEtcToActivities implements MATSimAppCommand {
 
 		// all the following would need to be separated by subpopulation
 
-		HistogramTrace histogramTrace = HistogramTrace.builder( okTrips.doubleColumn( HeadersKN.vttsh ) ).build();
-		final Layout.LayoutBuilder layoutBuilder = Layout.builder().width( 1000 );
+		// A handful of residual trips (short middle activities squeezed to near-zero effective duration) have finite
+		// but enormous VTTS -- up to ~7e5 Eu/h -- so they classify as "ok" rather than "degenerate" and are kept in
+		// the stats (where median/quartiles are robust to them). Fed raw into the histogram, though, they stretch the
+		// auto-scaled x-axis to ~7e5 and collapse all real mass (median ~5 Eu/h) into the leftmost bin, rendering an
+		// apparently empty plot. Clip the *plotted* column to a sensible VTTS window so the histogram bins over the
+		// range that actually carries the distribution; the clipped-off trips are logged, not silently dropped.
+		Table plotTrips = okTrips.where( okTrips.doubleColumn( HeadersKN.vttsh ).isBetweenInclusive( VTTS_HISTOGRAM_MIN, VTTS_HISTOGRAM_MAX ) );
+		log.info( "histogram plotted over VTTS in [{}, {}] Eu/h: {} of {} ok trips shown, {} outside the window (excluded from the plot only).",
+			VTTS_HISTOGRAM_MIN, VTTS_HISTOGRAM_MAX, plotTrips.rowCount(), okTrips.rowCount(), okTrips.rowCount() - plotTrips.rowCount() );
+
+		HistogramTrace histogramTrace = HistogramTrace.builder( plotTrips.doubleColumn( HeadersKN.vttsh ) ).build();
+		final Layout.LayoutBuilder layoutBuilder = Layout.builder().width( 1000 ).title( "VTTS [Eu/h]" );
 		Figure figure = new Figure( layoutBuilder.build(), histogramTrace );
 
 		Path htmlPath = outputDir.resolve(runPrefix + "histogram.html" );
