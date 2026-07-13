@@ -375,5 +375,21 @@ run-1pct-notimes-anchored: input/prepare-config.xml | $(CLASSPATH)
 	 --mutate-around-initial-end-time-only\
 	 $(ARGS)
 
+# Smoke test (2 iterations): the best-response scheduling strategy (mockup) replacing the TimeAllocationMutator, on the
+# no-opening-times setup. Just enough to exercise the wiring end to end; not a calibration run.
+run-1pct-bestresponse-smoke: input/prepare-config.xml | $(CLASSPATH)
+	$(sc) run --config $<\
+	 --config:plans.inputPlansFile=before-calibration/output/$N-$V-1pct.plans-initial.xml.gz\
+	 --config:qsim.flowCapacityFactor=0.01\
+	 --config:qsim.storageCapacityFactor=0.01\
+	 --config:counts.countsScaleFactor=0.01\
+	 --config:simwrapper.sampleSize=0.01\
+	 --config:controller.lastIteration=2\
+	 --runId $N-$V-1pct-bestresponse-smoke\
+	 --output output/$N-$V-1pct-bestresponse-smoke\
+	 --with-opening-times=false\
+	 --best-response-scheduling\
+	 $(ARGS)
+
 vtts: | $(CLASSPATH)
 	$(sc) analysis run-vtts-analysis --path output/dresden-v1.1-1pct --runId dresden-v1.1-1pct

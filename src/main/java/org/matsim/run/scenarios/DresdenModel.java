@@ -30,6 +30,8 @@ import org.matsim.contrib.vsp.scenario.SnzActivities;
 import org.matsim.contrib.vsp.scoring.RideScoringParamsFromCarParams;
 import org.matsim.core.config.Config;
 import org.matsim.core.config.ConfigUtils;
+import org.matsim.replanning.bestresponse.BestResponseScheduleConfigGroup;
+import org.matsim.replanning.bestresponse.BestResponseScheduleStrategy;
 import org.matsim.core.config.groups.RoutingConfigGroup.AccessEgressType;
 import org.matsim.core.config.groups.ScoringConfigGroup;
 import org.matsim.core.controler.AbstractModule;
@@ -106,6 +108,17 @@ public class DresdenModel extends MATSimApplication {
 			"demonstrably traps agents at zero-duration activities).")
 	private boolean mutateAroundInitialEndTimeOnly = false;
 
+	@CommandLine.Option(names="--best-response-scheduling",
+		description = "MOCKUP/experimental: replace the random TimeAllocationMutator with a best-response scheduling " +
+			"strategy that re-plans the whole day at once by optimizing a linearized approximation of the activity " +
+			"scoring (see org.matsim.replanning.bestresponse). Default false.")
+	private boolean bestResponseScheduling = false;
+
+	@CommandLine.Option(names="--best-response-sigma",
+		description = "Standard deviation (seconds) of the per-activity random error in the best-response scheduling " +
+			"strategy; >0 makes the best response stochastic (Pougala-style). Only used with --best-response-scheduling.")
+	private double bestResponseSigma = 900.0;
+
 //	TODO: remove before release
 //	@CommandLine.Option(names="--ride-alpha", description = "alpha value for ride. For calibration only! To be removed before release.")
 	private final double rideAlpha = 1.;
@@ -163,6 +176,18 @@ public class DresdenModel extends MATSimApplication {
 		// corners the mutator can then not climb back out of; see --mutate-around-initial-end-time-only.
 		config.timeAllocationMutator().setMutateAroundInitialEndTimeOnly(mutateAroundInitialEndTimeOnly);
 		config.timeAllocationMutator().setAffectingDuration(false);
+
+		// Best-response scheduling (mockup): register its config, and -- when enabled -- replace every
+		// TimeAllocationMutator strategy setting (keeping its weight/subpopulation) with the best-response strategy.
+		// The strategy itself is bound in prepareControler.
+		ConfigUtils.addOrGetModule(config, BestResponseScheduleConfigGroup.class).setRandomErrorSigma(bestResponseSigma);
+		if (bestResponseScheduling) {
+			for (var strategySettings : config.replanning().getStrategySettings()) {
+				if ("TimeAllocationMutator".equals(strategySettings.getStrategyName())) {
+					strategySettings.setStrategyName(BestResponseScheduleStrategy.STRATEGY_NAME);
+				}
+			}
+		}
 
 //		config.vspExperimental().setVspDefaultsCheckingLevel( VspDefaultsCheckingLevel.abort );
 
@@ -285,6 +310,10 @@ public class DresdenModel extends MATSimApplication {
 //				score activities against the plan-derived typical duration stored on each activity (see
 //				EncodeTypicalDuration), instead of encoding the typical duration in the activity type.
 				bindScoringFunctionFactory().to(DresdenScoringFunctionFactory.class);
+
+//				best-response scheduling strategy (mockup), selected via --best-response-scheduling; the binding is
+//				harmless when unused (a strategy is only instantiated if referenced by a strategysettings entry).
+				addPlanStrategyBinding(BestResponseScheduleStrategy.STRATEGY_NAME).toProvider(BestResponseScheduleStrategy.class);
 
 				addTravelTimeBinding(TransportMode.ride).to(carTravelTime());
 				addTravelDisutilityFactoryBinding(TransportMode.ride).to(carTravelDisutilityFactoryKey());
