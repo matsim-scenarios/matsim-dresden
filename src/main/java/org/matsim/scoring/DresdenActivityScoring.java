@@ -23,6 +23,7 @@ package org.matsim.scoring;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.matsim.api.core.v01.population.Activity;
+import org.matsim.core.config.groups.ScoringConfigGroup;
 import org.matsim.core.scoring.ScoringFunction;
 import org.matsim.core.scoring.functions.ActivityTypeOpeningIntervalCalculator;
 import org.matsim.core.scoring.functions.ActivityUtilityParameters;
@@ -40,8 +41,10 @@ import org.matsim.prepare.EncodeTypicalDuration;
  * <p>
  * Because the Charypar-Nagel performing utility depends on both the typical duration and the derived zero-utility
  * duration, the zero-utility duration is recomputed from the per-activity typical duration exactly as
- * {@link ActivityUtilityParameters} does (uniform variant, {@link #DEFAULT_PRIORITY}), so the curve stays
- * self-consistent (peak at the typical duration, zero at the zero-utility duration).
+ * {@link ActivityUtilityParameters} does: using the activity type's configured
+ * {@code typicalDurationScoreComputation} ({@code relative -> SameRelativeScore}, {@code uniform ->
+ * SameAbsoluteScore}) and priority, so the curve stays self-consistent (peak at the typical duration, zero at the
+ * zero-utility duration) and matches the run's configured scoring mode instead of a hardcoded variant.
  * <p>
  * When the attribute is absent (e.g. freight/commercial activities, which never receive it), the activity is
  * scored exactly like the original Charypar-Nagel activity scoring, using the type's config parameters. The base
@@ -51,9 +54,6 @@ import org.matsim.prepare.EncodeTypicalDuration;
  */
 public final class DresdenActivityScoring implements org.matsim.core.scoring.SumScoringFunction.ActivityScoring {
 
-	/** Priority assumed for recomputing the zero-utility duration from the per-activity typical duration. */
-	private static final double DEFAULT_PRIORITY = 1.0;
-
 	private static final double INITIAL_SCORE = 0.0;
 
 	private final Score score = new Score();
@@ -62,18 +62,21 @@ public final class DresdenActivityScoring implements org.matsim.core.scoring.Sum
 	private static short firstLastActOpeningTimesWarning = 0;
 
 	private final ScoringParameters params;
+	/** Config scoring parameters for the person's subpopulation; source of the per-type {@code typicalDurationScoreComputation} and priority used to recompute the zero-utility duration for a per-activity typical duration. */
+	private final ScoringConfigGroup.ScoringParameterSet scoringParameterSet;
 	private final OpeningIntervalCalculator openingIntervalCalculator;
 
 	private Activity firstActivity;
 
 	private static final Logger log = LogManager.getLogger(DresdenActivityScoring.class);
 
-	public DresdenActivityScoring(final ScoringParameters params) {
-		this(params, new ActivityTypeOpeningIntervalCalculator(params));
+	public DresdenActivityScoring(final ScoringParameters params, final ScoringConfigGroup.ScoringParameterSet scoringParameterSet) {
+		this(params, scoringParameterSet, new ActivityTypeOpeningIntervalCalculator(params));
 	}
 
-	public DresdenActivityScoring(final ScoringParameters params, final OpeningIntervalCalculator openingIntervalCalculator) {
+	public DresdenActivityScoring(final ScoringParameters params, final ScoringConfigGroup.ScoringParameterSet scoringParameterSet, final OpeningIntervalCalculator openingIntervalCalculator) {
 		this.params = params;
+		this.scoringParameterSet = scoringParameterSet;
 		this.openingIntervalCalculator = openingIntervalCalculator;
 	}
 
@@ -189,8 +192,7 @@ public final class DresdenActivityScoring implements org.matsim.core.scoring.Sum
 			Object typicalDurationAttribute = act.getAttributes().getAttribute(EncodeTypicalDuration.TYPICAL_DURATION);
 			if (typicalDurationAttribute != null && ((Number) typicalDurationAttribute).doubleValue() > 0) {
 				typicalDuration = ((Number) typicalDurationAttribute).doubleValue();
-				double typicalDuration_h = typicalDuration / 3600.0;
-				zeroUtilityDuration_h = typicalDuration_h * Math.exp(-10.0 / typicalDuration_h / DEFAULT_PRIORITY);
+				zeroUtilityDuration_h = recomputeZeroUtilityDuration_h(act.getType(), typicalDuration);
 			} else {
 				typicalDuration = actParams.getTypicalDuration();
 				zeroUtilityDuration_h = actParams.getZeroUtilityDuration_h();
@@ -259,6 +261,22 @@ public final class DresdenActivityScoring implements org.matsim.core.scoring.Sum
 			}
 		}
 		return tmpScore;
+	}
+
+	/**
+	 * Recompute the Charypar-Nagel zero-utility duration (in hours) for a per-activity typical duration, using the
+	 * same {@link ActivityUtilityParameters.ZeroUtilityComputation} ({@code relative -> SameRelativeScore},
+	 * {@code uniform -> SameAbsoluteScore}) and priority that {@link ActivityUtilityParameters.Builder} selects for
+	 * this activity type from the scoring config. This keeps the per-activity typical duration consistent with the
+	 * run's configured {@code typicalDurationScoreComputation}, instead of hardcoding one variant.
+	 */
+	private double recomputeZeroUtilityDuration_h(String activityType, double typicalDuration_s) {
+		ScoringConfigGroup.ActivityParams activityParams = scoringParameterSet.getActivityParams(activityType);
+		ActivityUtilityParameters.ZeroUtilityComputation computation = switch (activityParams.getTypicalDurationScoreComputation()) {
+			case relative -> new ActivityUtilityParameters.SameRelativeScore();
+			case uniform -> new ActivityUtilityParameters.SameAbsoluteScore();
+		};
+		return computation.computeZeroUtilityDuration_s(activityParams.getPriority(), typicalDuration_s) / 3600.0;
 	}
 
 	private void handleOvernightActivity(Activity lastActivity) {

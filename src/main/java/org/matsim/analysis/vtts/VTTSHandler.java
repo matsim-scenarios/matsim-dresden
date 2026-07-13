@@ -39,6 +39,7 @@ import org.matsim.core.config.groups.ScoringConfigGroup;
 import org.matsim.core.gbl.Gbl;
 import org.matsim.core.population.PopulationUtils;
 import org.matsim.core.router.StageActivityTypeIdentifier;
+import org.matsim.core.scoring.functions.ActivityUtilityParameters;
 import org.matsim.core.scoring.functions.ScoringParameters;
 import org.matsim.core.scoring.functions.ScoringParametersForPerson;
 import org.matsim.core.utils.misc.OptionalTime;
@@ -329,8 +330,9 @@ public final class VTTSHandler implements ActivityStartEventHandler, ActivityEnd
 			Person person = this.scenario.getPopulation().getPersons().get( personId );
 			String subpop = PopulationUtils.getSubpopulation( person );
 
+			final ScoringConfigGroup.ScoringParameterSet scoringParameterSet = scoringConfigGroup.getScoringParameters( subpop );
 			final MarginalSumScoringFunction marginalSumScoringFunction = new MarginalSumScoringFunction(
-							new ScoringParameters.Builder( scoringConfigGroup, scoringConfigGroup.getScoringParameters( subpop ), scenario.getConfig().scenario() ).build() );
+							new ScoringParameters.Builder( scoringConfigGroup, scoringParameterSet, scenario.getConfig().scenario() ).build(), scoringParameterSet );
 			// yyyy it would (presumably) be much better to pull the scoring function from injection.  Rather than self-constructing the
 			// scoring function here, where we need to rely on having the same ("default") scoring function in the model implementation.
 			// Which we almost surely do not have (e.g. bicycle scoring addition, bus penalty addition, ...).  kai, gr, jul'25
@@ -368,7 +370,9 @@ public final class VTTSHandler implements ActivityStartEventHandler, ActivityEnd
 					: this.scenario.getConfig().scenario().getSimulationPeriodInDays() * 24. * 3600.;                    // non-wrap
 				boolean arrivesAtOrAfterDayEnd = simData.currentActivityStartTime >= lastActivityScoringEnd;
 
-				degenerate = arrivesAtOrAfterDayEnd || isDegenerateTypicalDuration( typMorning ) || isDegenerateTypicalDuration( typEvening );
+				degenerate = arrivesAtOrAfterDayEnd
+					|| isDegenerateTypicalDuration( scoringParameterSet, simData.firstActivityType, typMorning )
+					|| isDegenerateTypicalDuration( scoringParameterSet, simData.currentActivityType, typEvening );
 
 				simData.trips.getLast().actDur_h = (simData.firstActivityEndTime + 3600.*24 - simData.currentActivityStartTime)/3600. ;
 
@@ -391,7 +395,7 @@ public final class VTTSHandler implements ActivityStartEventHandler, ActivityEnd
 				int activityIndex = simData.trips.size();
 				double typ = (td != null && activityIndex < td.length) ? td[activityIndex] : Double.NaN;
 				typicalDurationUsed_s = typ;
-				degenerate = isDegenerateTypicalDuration( typ );
+				degenerate = isDegenerateTypicalDuration( scoringParameterSet, simData.currentActivityType, typ );
 
 				simData.trips.getLast().actDur_h = (activityEndTime.seconds() - simData.currentActivityStartTime)/3600. ;
 
@@ -465,19 +469,24 @@ public final class VTTSHandler implements ActivityStartEventHandler, ActivityEnd
 	}
 
 	/**
-	 * Whether a planned typical duration is a degenerate scoring input. The Charypar-Nagel zero-utility duration
-	 * {@code t0 = tTyp * exp(-10/tTyp)} (as recomputed by {@link org.matsim.scoring.DresdenActivityScoring}, priority
-	 * 1) underflows to zero for typical durations below roughly 48 s, after which the logarithmic performing utility
-	 * is undefined ({@code log(duration/0)}) and the marginal utility explodes. Such trips are classified separately
-	 * rather than scored. A non-positive/NaN value means no per-activity typical duration was stamped, so the activity
-	 * is scored with its (normal-sized) config typical duration and is not degenerate.
+	 * Whether a planned typical duration is a degenerate scoring input for the given activity type. The Charypar-Nagel
+	 * zero-utility duration -- computed exactly as {@link org.matsim.scoring.DresdenActivityScoring} does, from the
+	 * type's configured {@code typicalDurationScoreComputation} and priority -- can underflow to zero for a small
+	 * typical duration, after which the logarithmic performing utility is undefined ({@code log(duration/0)}) and the
+	 * marginal utility explodes. Such trips are classified separately rather than scored. A non-positive/NaN value
+	 * means no per-activity typical duration was stamped, so the activity is scored with its (normal-sized) config
+	 * typical duration and is not degenerate.
 	 */
-	private static boolean isDegenerateTypicalDuration( double typicalDuration_s ) {
+	private static boolean isDegenerateTypicalDuration( ScoringConfigGroup.ScoringParameterSet scoringParameterSet, String activityType, double typicalDuration_s ) {
 		if ( !(typicalDuration_s > 0) ) {
 			return false;
 		}
-		double typicalDuration_h = typicalDuration_s / 3600.0;
-		double zeroUtilityDuration_h = typicalDuration_h * Math.exp( -10.0 / typicalDuration_h );
+		ScoringConfigGroup.ActivityParams activityParams = scoringParameterSet.getActivityParams( activityType );
+		ActivityUtilityParameters.ZeroUtilityComputation computation = switch ( activityParams.getTypicalDurationScoreComputation() ) {
+			case relative -> new ActivityUtilityParameters.SameRelativeScore();
+			case uniform -> new ActivityUtilityParameters.SameAbsoluteScore();
+		};
+		double zeroUtilityDuration_h = computation.computeZeroUtilityDuration_s( activityParams.getPriority(), typicalDuration_s ) / 3600.0;
 		return !(zeroUtilityDuration_h > 0);
 	}
 

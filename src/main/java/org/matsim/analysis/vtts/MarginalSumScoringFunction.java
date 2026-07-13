@@ -23,6 +23,7 @@ import org.apache.logging.log4j.Logger;
 import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.population.Activity;
 import org.matsim.api.core.v01.population.Person;
+import org.matsim.core.config.groups.ScoringConfigGroup;
 import org.matsim.core.gbl.Gbl;
 import org.matsim.core.population.PopulationUtils;
 import org.matsim.core.scoring.SumScoringFunction;
@@ -47,10 +48,10 @@ public final class MarginalSumScoringFunction {
 	SumScoringFunction.ActivityScoring activityScoringA;
 	SumScoringFunction.ActivityScoring activityScoringB;
 
-	public MarginalSumScoringFunction(ScoringParameters params) {
+	public MarginalSumScoringFunction(ScoringParameters params, ScoringConfigGroup.ScoringParameterSet scoringParameterSet) {
 		this.params = params;
-		activityScoringA = new DresdenActivityScoring(params);
-		activityScoringB = new DresdenActivityScoring(params);
+		activityScoringA = new DresdenActivityScoring(params, scoringParameterSet);
+		activityScoringB = new DresdenActivityScoring(params, scoringParameterSet);
 	}
 
 	private static int deltaScoreZeroWrnCnt = 0;
