@@ -355,7 +355,20 @@ public final class VTTSHandler implements ActivityStartEventHandler, ActivityEnd
 				double typMorning = (td != null && td.length > 0) ? td[0] : Double.NaN;
 				double typEvening = (td != null && td.length > 0) ? td[td.length - 1] : Double.NaN;
 				typicalDurationUsed_s = typEvening; // currentActivityType is the evening (last) activity
-				degenerate = isDegenerateTypicalDuration( typMorning ) || isDegenerateTypicalDuration( typEvening );
+
+				// Effective-window criterion: the last activity is scored from its arrival to the end of the day
+				// (the wrap-around end for a wrap plan, otherwise simulationPeriodInDays*24h). If the agent arrives
+				// at or after that end -- e.g. an ultra-long final trip that overshoots the day -- the performing
+				// window is <= 0. That is a corner where the day-end constraint binds: the marginal the score yields
+				// is the shadow price of "the day is over", not a value of travel time savings, so VTTS is undefined
+				// there. Classify such trips as degenerate rather than letting the (correct but out-of-domain) score
+				// produce an absurd VTTS.
+				double lastActivityScoringEnd = simData.firstActivityType.equals( simData.currentActivityType )
+					? simData.firstActivityEndTime + 24. * 3600.                                                         // wrap-around
+					: this.scenario.getConfig().scenario().getSimulationPeriodInDays() * 24. * 3600.;                    // non-wrap
+				boolean arrivesAtOrAfterDayEnd = simData.currentActivityStartTime >= lastActivityScoringEnd;
+
+				degenerate = arrivesAtOrAfterDayEnd || isDegenerateTypicalDuration( typMorning ) || isDegenerateTypicalDuration( typEvening );
 
 				simData.trips.getLast().actDur_h = (simData.firstActivityEndTime + 3600.*24 - simData.currentActivityStartTime)/3600. ;
 
