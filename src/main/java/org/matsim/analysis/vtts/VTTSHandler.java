@@ -43,7 +43,10 @@ import org.matsim.core.scoring.functions.ActivityUtilityParameters;
 import org.matsim.core.scoring.functions.ScoringParameters;
 import org.matsim.core.scoring.functions.ScoringParametersForPerson;
 import org.matsim.core.utils.misc.OptionalTime;
+import org.matsim.core.population.algorithms.MutateActivityTimeAllocation;
 import org.matsim.prepare.EncodeTypicalDuration;
+import org.matsim.scoring.DresdenActivityScoring;
+import tech.tablesaw.api.BooleanColumn;
 import tech.tablesaw.api.DoubleColumn;
 import tech.tablesaw.api.IntColumn;
 import tech.tablesaw.api.StringColumn;
@@ -81,13 +84,31 @@ public final class VTTSHandler implements ActivityStartEventHandler, ActivityEnd
 		/** NaN until the activity following this trip has been seen, so an unscored trip is not reported as a zero-duration activity. */
 		public double actDur_h = Double.NaN;
 		public double actScore;
-		/** True if the activity scoring got a degenerate input (see {@link MarginalSumScoringFunction.Scores}); the VTTS/mUTTS/mUSL values are then NaN and this trip is reported in a separate class. */
-		public boolean degenerateScoringInput;
+		/**
+		 * Scoring-domain class of the activity following this trip:
+		 * <ul>
+		 *   <li>{@code ok} -- realized duration on the logarithmic Charypar-Nagel branch; the marginal is a meaningful
+		 *   value of time and enters the summary statistics;</li>
+		 *   <li>{@code extrapolated} -- realized duration below the zero-utility duration, so the score sits on the
+		 *   linear extension whose slope is a property of the extrapolation (beta*e^(10h/t*), explosive for short
+		 *   typicals), not of preferences; finite, reported separately, excluded from means;</li>
+		 *   <li>{@code degenerate} -- not computable at all (zero-utility duration underflow for a pathologically small
+		 *   typical duration, or a non-finite score); expected ~0 after the preprocessing fixes, i.e. a pipeline alarm.</li>
+		 * </ul>
+		 */
+		public String scoringInputClass;
+		/** Last activity arrived at/after its scoring window end (wrap: first end + 24h, else simulationPeriodInDays*24h).
+		 * Informational indicator only -- such trips are still scored and classified by the rules above. */
+		public boolean afterDayEnd;
 		double VTTSh;
 		double musl_h;
 		String mode;
 		double departureTime = Double.NaN;
 	}
+
+	/** Per-person planned per-activity scoring inputs, in selected-plan activity order (NaN where the plan carries no
+	 * attribute): typical durations plus the schedule-delay anchors, all read from the output population. */
+	public record PlannedActivities(double[] typicalDurations, double[] initialStartTimes, double[] initialEndTimes) {}
 
 	private static class SimData {
 		public double margUtlOfMoney;
@@ -121,10 +142,14 @@ public final class VTTSHandler implements ActivityStartEventHandler, ActivityEnd
 	 * Per-person planned typical durations (seconds), in selected-plan activity order (ExcludeStageActivities), read
 	 * from the run's output population; {@code NaN} where the run did not assign one (e.g. freight/commercial acts).
 	 */
-	private final Map<Id<Person>, double[]> plannedTypicalDurations;
+	private final Map<Id<Person>, PlannedActivities> plannedActivities;
+	/** Whether the run scored with the schedule-delay corridor armed (from the output config's dresdenScoring group);
+	 * the offline scoring must mirror it so the marginals include the schedule-delay components the agents experienced. */
+	private final boolean scheduleDelayScoring;
 
 
-	VTTSHandler( Scenario scenario, ScoringParametersForPerson scoringParametersForPerson, Map<Id<Person>, double[]> plannedTypicalDurations ) {
+	VTTSHandler( Scenario scenario, ScoringParametersForPerson scoringParametersForPerson,
+				 Map<Id<Person>, PlannedActivities> plannedActivities, boolean scheduleDelayScoring ) {
 		// yyyy it would (presumably) be much better to pull the scoring function from injection.  Rather than self-constructing the
 		// scoring function here, where we need to rely on having the same ("default") scoring function in the model implementation.
 		// Which we almost surely do not have (e.g. bicycle scoring addition, bus penalty addition, ...).  Also see a similar comment further
@@ -136,7 +161,8 @@ public final class VTTSHandler implements ActivityStartEventHandler, ActivityEnd
 
 		this.scenario = scenario;
 		this.scoringParametersForPerson = scoringParametersForPerson;
-		this.plannedTypicalDurations = plannedTypicalDurations;
+		this.plannedActivities = plannedActivities;
+		this.scheduleDelayScoring = scheduleDelayScoring;
 		this.currentIteration = Integer.MIN_VALUE;
 		this.defaultVTTS_moneyPerHour =
 				(this.scenario.getConfig().scoring().getPerforming_utils_hr()
@@ -280,7 +306,8 @@ public final class VTTSHandler implements ActivityStartEventHandler, ActivityEnd
 		DoubleColumn vttsValues = DoubleColumn.create( HeadersKN.vttsh );
 		DoubleColumn mUoMs = DoubleColumn.create( HeadersKN.mUoM );
 		StringColumn scoringInputClasses = StringColumn.create( HeadersKN.scoringInputClass );
-		Table table = Table.create( personIds, mUoMs, tripIndices, modes, acts, actDurs, typDurs, muslValues, muttsValues, vttsValues, scoringInputClasses );
+		BooleanColumn afterDayEnds = BooleanColumn.create( HeadersKN.afterDayEnd );
+		Table table = Table.create( personIds, mUoMs, tripIndices, modes, acts, actDurs, typDurs, muslValues, muttsValues, vttsValues, scoringInputClasses, afterDayEnds );
 
 		for( Map.Entry<Id<Person>, SimData> entry : simDataMap.entrySet() ){
 			Id<Person> personId = entry.getKey();
@@ -297,7 +324,8 @@ public final class VTTSHandler implements ActivityStartEventHandler, ActivityEnd
 				typDurs.append( trip.actTypDur_h );
 				mUoMs.append( simData.margUtlOfMoney );
 				muslValues.append( trip.musl_h );
-				scoringInputClasses.append( trip.degenerateScoringInput ? "degenerate" : "ok" );
+				scoringInputClasses.append( trip.scoringInputClass != null ? trip.scoringInputClass : "degenerate" );
+				afterDayEnds.append( trip.afterDayEnd );
 			}
 		}
 
@@ -337,14 +365,17 @@ public final class VTTSHandler implements ActivityStartEventHandler, ActivityEnd
 
 			final ScoringConfigGroup.ScoringParameterSet scoringParameterSet = scoringConfigGroup.getScoringParameters( subpop );
 			final MarginalSumScoringFunction marginalSumScoringFunction = new MarginalSumScoringFunction(
-							new ScoringParameters.Builder( scoringConfigGroup, scoringParameterSet, scenario.getConfig().scenario() ).build(), scoringParameterSet );
+							new ScoringParameters.Builder( scoringConfigGroup, scoringParameterSet, scenario.getConfig().scenario() ).build(),
+							scoringParameterSet, scheduleDelayScoring );
 			// yyyy it would (presumably) be much better to pull the scoring function from injection.  Rather than self-constructing the
 			// scoring function here, where we need to rely on having the same ("default") scoring function in the model implementation.
 			// Which we almost surely do not have (e.g. bicycle scoring addition, bus penalty addition, ...).  kai, gr, jul'25
 
-			double[] td = this.plannedTypicalDurations.get( personId );
-			boolean degenerate;
+			PlannedActivities planned = this.plannedActivities.get( personId );
+			boolean underflow;
+			double scoringWindow_s; // realized duration as the scoring sees it; the classification input
 			MarginalSumScoringFunction.Scores scores = null;
+			simData.trips.getLast().afterDayEnd = false;
 			if( activityEndTime.isUndefined() ){
 				// The end time is undefined...
 
@@ -359,31 +390,36 @@ public final class VTTSHandler implements ActivityStartEventHandler, ActivityEnd
 				// Dresden: the first and last activity are activity index 0 and n-1 of the plan; their planned typical
 				// durations (already encoding EncodeTypicalDuration's wrap-around / end-of-period rules) come straight
 				// from the output population, so DresdenActivityScoring scores this first/last pair as the run did.
-				double typMorning = (td != null && td.length > 0) ? td[0] : Double.NaN;
-				double typEvening = (td != null && td.length > 0) ? td[td.length - 1] : Double.NaN;
+				double typMorning = plannedValue( planned == null ? null : planned.typicalDurations(), 0 );
+				int lastIndex = planned == null ? -1 : planned.typicalDurations().length - 1;
+				double typEvening = plannedValue( planned == null ? null : planned.typicalDurations(), lastIndex );
 				typicalDurationUsed_s = typEvening; // currentActivityType is the evening (last) activity
 
-				// Effective-window criterion: the last activity is scored from its arrival to the end of the day
-				// (the wrap-around end for a wrap plan, otherwise simulationPeriodInDays*24h). If the agent arrives
-				// at or after that end -- e.g. an ultra-long final trip that overshoots the day -- the performing
-				// window is <= 0. That is a corner where the day-end constraint binds: the marginal the score yields
-				// is the shadow price of "the day is over", not a value of travel time savings, so VTTS is undefined
-				// there. Classify such trips as degenerate rather than letting the (correct but out-of-domain) score
-				// produce an absurd VTTS.
+				// The last activity is scored from its arrival to the end of the day (the wrap-around end for a wrap
+				// plan, otherwise simulationPeriodInDays*24h). Arriving at or after that end (window <= 0) is flagged
+				// as an indicator -- the day-end constraint binds there -- but the trip is still scored: middle
+				// activities never involve the day end, and for the last activity the (finite) linear-extension
+				// marginal is classified by the same below-zero-utility rule as everything else.
 				double lastActivityScoringEnd = simData.firstActivityType.equals( simData.currentActivityType )
 					? simData.firstActivityEndTime + 24. * 3600.                                                         // wrap-around
 					: this.scenario.getConfig().scenario().getSimulationPeriodInDays() * 24. * 3600.;                    // non-wrap
-				boolean arrivesAtOrAfterDayEnd = simData.currentActivityStartTime >= lastActivityScoringEnd;
+				simData.trips.getLast().afterDayEnd = simData.currentActivityStartTime >= lastActivityScoringEnd;
+				// classification window: the evening side (the marginal shifts the evening arrival; the morning
+				// activity contributes equally to both variants and cancels out of the delta)
+				scoringWindow_s = lastActivityScoringEnd - simData.currentActivityStartTime;
 
-				degenerate = arrivesAtOrAfterDayEnd
-					|| isDegenerateTypicalDuration( scoringParameterSet, simData.firstActivityType, typMorning )
-					|| isDegenerateTypicalDuration( scoringParameterSet, simData.currentActivityType, typEvening );
+				underflow = isUnderflowingTypicalDuration( scoringParameterSet, simData.firstActivityType, typMorning )
+					|| isUnderflowingTypicalDuration( scoringParameterSet, simData.currentActivityType, typEvening );
 
 				simData.trips.getLast().actDur_h = (simData.firstActivityEndTime + 3600.*24 - simData.currentActivityStartTime)/3600. ;
 
-				if ( !degenerate ) {
+				if ( !underflow ) {
 					stampTypicalDuration( activityMorning, typMorning );
 					stampTypicalDuration( activityEvening, typEvening );
+					if ( planned != null ) {
+						stampAnchors( activityMorning, planned, 0 );
+						stampAnchors( activityEvening, planned, lastIndex );
+					}
 					scores = marginalSumScoringFunction.getOvernightActivityDelayDisutility( activityMorning, activityEvening, 1.0 );
 				}
 
@@ -398,29 +434,38 @@ public final class VTTSHandler implements ActivityStartEventHandler, ActivityEnd
 				// activity from index 1 on); its planned typical duration comes from the output population, so
 				// DresdenActivityScoring uses it instead of the activity type's config typical duration.
 				int activityIndex = simData.trips.size();
-				double typ = (td != null && activityIndex < td.length) ? td[activityIndex] : Double.NaN;
+				double typ = plannedValue( planned == null ? null : planned.typicalDurations(), activityIndex );
 				typicalDurationUsed_s = typ;
-				degenerate = isDegenerateTypicalDuration( scoringParameterSet, simData.currentActivityType, typ );
+				underflow = isUnderflowingTypicalDuration( scoringParameterSet, simData.currentActivityType, typ );
+				scoringWindow_s = activityEndTime.seconds() - simData.currentActivityStartTime;
 
 				simData.trips.getLast().actDur_h = (activityEndTime.seconds() - simData.currentActivityStartTime)/3600. ;
 
-				if ( !degenerate ) {
+				if ( !underflow ) {
 					stampTypicalDuration( activity, typ );
+					if ( planned != null ) {
+						stampAnchors( activity, planned, activityIndex );
+					}
 					scores = marginalSumScoringFunction.getNormalActivityDelayDisutility( personId, activity, 1.0 );
 				}
 			}
 
-			// A degenerate scoring input (a pathologically small typical duration; scores==null) is not scored at all;
-			// the defensive isDegenerate() fallback also catches any non-finite result. Such trips are flagged so they
-			// are reported in a separate class, with NaN marginal quantities, rather than aborting the whole analysis.
-			if ( degenerate || scores == null || scores.isDegenerate() ) {
+			// Classify the scoring input (see TripData.scoringInputClass): "degenerate" = not computable (zero-utility
+			// underflow or a non-finite score; a pipeline alarm, expected ~0); "extrapolated" = realized duration below
+			// the zero-utility duration, i.e. the score sits on the linear extension and the marginal reflects the
+			// extrapolation slope rather than preferences (excluded from means, reported separately); "ok" = the
+			// logarithmic branch, where the marginal is a meaningful value of time.
+			if ( underflow || scores == null || scores.isDegenerate() ) {
 				activityDelayDisutility_h = Double.NaN;
 				simData.trips.getLast().actScore = Double.NaN;
-				simData.trips.getLast().degenerateScoringInput = true;
+				simData.trips.getLast().scoringInputClass = "degenerate";
 			} else {
 				activityDelayDisutility_h = 3600. * scores.deltaScore();
 				simData.trips.getLast().actScore = scores.scoreNormal();
-				simData.trips.getLast().degenerateScoringInput = false;
+				double effectiveTypical_s = typicalDurationUsed_s > 0 ? typicalDurationUsed_s
+					: scoringConfigGroup.getActivityParams( simData.currentActivityType ).getTypicalDuration().seconds();
+				double zeroUtilityDuration_s = zeroUtilityDuration_h( scoringParameterSet, simData.currentActivityType, effectiveTypical_s ) * 3600.;
+				simData.trips.getLast().scoringInputClass = scoringWindow_s < zeroUtilityDuration_s ? "extrapolated" : "ok";
 			}
 		}
 
@@ -473,26 +518,45 @@ public final class VTTSHandler implements ActivityStartEventHandler, ActivityEnd
 		}
 	}
 
+	/** Put the planned schedule-delay anchors onto the analysis activity where the run's population carries them, so an
+	 * armed {@link org.matsim.scoring.DresdenActivityScoring} reproduces the run's corridor terms. Harmless disarmed. */
+	private static void stampAnchors( Activity activity, PlannedActivities planned, int index ) {
+		double start = plannedValue( planned.initialStartTimes(), index );
+		if ( !Double.isNaN( start ) ) {
+			activity.getAttributes().putAttribute( DresdenActivityScoring.INITIAL_START_TIME_ATTRIBUTE, start );
+		}
+		double end = plannedValue( planned.initialEndTimes(), index );
+		if ( !Double.isNaN( end ) ) {
+			activity.getAttributes().putAttribute( MutateActivityTimeAllocation.INITIAL_END_TIME_ATTRIBUTE, end );
+		}
+	}
+
+	private static double plannedValue( double[] values, int index ) {
+		return ( values != null && index >= 0 && index < values.length ) ? values[index] : Double.NaN;
+	}
+
 	/**
-	 * Whether a planned typical duration is a degenerate scoring input for the given activity type. The Charypar-Nagel
-	 * zero-utility duration -- computed exactly as {@link org.matsim.scoring.DresdenActivityScoring} does, from the
-	 * type's configured {@code typicalDurationScoreComputation} and priority -- can underflow to zero for a small
-	 * typical duration, after which the logarithmic performing utility is undefined ({@code log(duration/0)}) and the
-	 * marginal utility explodes. Such trips are classified separately rather than scored. A non-positive/NaN value
-	 * means no per-activity typical duration was stamped, so the activity is scored with its (normal-sized) config
-	 * typical duration and is not degenerate.
+	 * Whether a planned typical duration makes the scoring input non-computable for the given activity type: the
+	 * Charypar-Nagel zero-utility duration -- computed exactly as {@link org.matsim.scoring.DresdenActivityScoring}
+	 * does -- underflows to zero for a pathologically small typical duration, after which the logarithmic performing
+	 * utility is undefined ({@code log(duration/0)}). A non-positive/NaN value means no per-activity typical duration
+	 * was stamped, so the activity is scored with its (normal-sized) config typical duration and does not underflow.
 	 */
-	private static boolean isDegenerateTypicalDuration( ScoringConfigGroup.ScoringParameterSet scoringParameterSet, String activityType, double typicalDuration_s ) {
+	private static boolean isUnderflowingTypicalDuration( ScoringConfigGroup.ScoringParameterSet scoringParameterSet, String activityType, double typicalDuration_s ) {
 		if ( !(typicalDuration_s > 0) ) {
 			return false;
 		}
+		return !(zeroUtilityDuration_h( scoringParameterSet, activityType, typicalDuration_s ) > 0);
+	}
+
+	/** The Charypar-Nagel zero-utility duration (hours), computed exactly as {@link org.matsim.scoring.DresdenActivityScoring} does. */
+	private static double zeroUtilityDuration_h( ScoringConfigGroup.ScoringParameterSet scoringParameterSet, String activityType, double typicalDuration_s ) {
 		ScoringConfigGroup.ActivityParams activityParams = scoringParameterSet.getActivityParams( activityType );
 		ActivityUtilityParameters.ZeroUtilityComputation computation = switch ( activityParams.getTypicalDurationScoreComputation() ) {
 			case relative -> new ActivityUtilityParameters.SameRelativeScore();
 			case uniform -> new ActivityUtilityParameters.SameAbsoluteScore();
 		};
-		double zeroUtilityDuration_h = computation.computeZeroUtilityDuration_s( activityParams.getPriority(), typicalDuration_s ) / 3600.0;
-		return !(zeroUtilityDuration_h > 0);
+		return computation.computeZeroUtilityDuration_s( activityParams.getPriority(), typicalDuration_s ) / 3600.0;
 	}
 
 	private static double handleIncompletePlan( Id<Person> personId, double performing_utils_hr ){

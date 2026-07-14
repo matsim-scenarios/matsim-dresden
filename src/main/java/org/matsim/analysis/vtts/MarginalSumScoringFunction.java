@@ -48,10 +48,14 @@ public final class MarginalSumScoringFunction {
 	SumScoringFunction.ActivityScoring activityScoringA;
 	SumScoringFunction.ActivityScoring activityScoringB;
 
-	public MarginalSumScoringFunction(ScoringParameters params, ScoringConfigGroup.ScoringParameterSet scoringParameterSet) {
+	public MarginalSumScoringFunction(ScoringParameters params, ScoringConfigGroup.ScoringParameterSet scoringParameterSet,
+									  boolean scheduleDelayScoring) {
 		this.params = params;
-		activityScoringA = new DresdenActivityScoring(params, scoringParameterSet);
-		activityScoringB = new DresdenActivityScoring(params, scoringParameterSet);
+		// no plan cursor: the caller hands in activities that carry their attributes directly; the schedule-delay
+		// corridor is armed iff the analyzed run scored with it armed, so the marginals include the same
+		// schedule-delay components the agents experienced.
+		activityScoringA = new DresdenActivityScoring(params, scoringParameterSet, null, scheduleDelayScoring);
+		activityScoringB = new DresdenActivityScoring(params, scoringParameterSet, null, scheduleDelayScoring);
 	}
 
 	private static int deltaScoreZeroWrnCnt = 0;

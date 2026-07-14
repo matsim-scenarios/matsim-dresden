@@ -24,7 +24,10 @@ import org.matsim.core.scoring.functions.ScoringParametersForPerson;
 import org.matsim.prepare.EncodeTypicalDuration;
 import org.matsim.replanning.bestresponse.BestResponseScheduleConfigGroup;
 import org.matsim.replanning.bestresponse.BestResponseScheduleStrategy;
+import org.matsim.core.population.algorithms.MutateActivityTimeAllocation;
 import org.matsim.run.scenarios.DresdenModel;
+import org.matsim.scoring.DresdenActivityScoring;
+import org.matsim.scoring.DresdenScoringConfigGroup;
 import org.matsim.utils.tablesaw.TablesawUtils;
 import picocli.CommandLine;
 import playground.vsp.scoring.IncomeDependentUtilityOfMoneyPersonScoringParameters;
@@ -78,6 +81,11 @@ public class DresdenAddVttsEtcToActivities implements MATSimAppCommand {
 	@CommandLine.Option(names = "--threads", description = "Number of threads to use for processing events", defaultValue = "1")
 	private int numberOfThreads = 1;
 
+	@CommandLine.Option(names = "--simulation-period-in-days", description = "Effective end of day for the non-wrap-" +
+		"around last-activity scoring, as a multiple of 24h. NOT persisted to the output config, so it must be " +
+		"supplied to match the analyzed run: current runs use 1.125 (27:00, the default here); v1.1 used 1.0 (24:00).")
+	private double simulationPeriodInDays = DresdenModel.SIMULATION_PERIOD_IN_DAYS;
+
 	public static void main(String[] args) {
 		new DresdenAddVttsEtcToActivities().execute(args );
 	}
@@ -101,8 +109,9 @@ public class DresdenAddVttsEtcToActivities implements MATSimAppCommand {
 		// The run sets a non-default simulationPeriodInDays (27:00) that controls the non-wrap-around overnight
 		// scoring clamp, but that value is not persisted to the output config, so reloading it here would silently
 		// fall back to the 24:00 default and produce negative last-activity durations (and exploding VTTS) for
-		// agents whose last activity ends between 24:00 and 27:00. Reproduce the run's value from the single source.
-		config.scenario().setSimulationPeriodInDays( DresdenModel.SIMULATION_PERIOD_IN_DAYS );
+		// agents whose last activity ends between 24:00 and 27:00. It must be supplied per analyzed run (see the
+		// --simulation-period-in-days option); the default matches the current runs, v1.1 needs 1.0.
+		config.scenario().setSimulationPeriodInDays( simulationPeriodInDays );
 
 		// ---
 
@@ -154,15 +163,21 @@ public class DresdenAddVttsEtcToActivities implements MATSimAppCommand {
 		// them into the initial population and they are threaded (never updated) through the iterations into the
 		// output population; the experienced plans do not carry them (there is no feature to thread them there yet).
 		Path outputPlansFile = globFile( path, runPrefix + "*output_" + Controler.DefaultFiles.population.getFilename() + "*" );
-		log.info("Reading planned typical durations from output population: {}", outputPlansFile);
+		log.info("Reading planned typical durations and schedule-delay anchors from output population: {}", outputPlansFile);
 		Population outputPopulation = PopulationUtils.readPopulation( outputPlansFile.toString() );
-		Map<Id<Person>, double[]> plannedTypicalDurations = extractPlannedTypicalDurations( outputPopulation );
+		Map<Id<Person>, VTTSHandler.PlannedActivities> plannedActivities = extractPlannedActivities( outputPopulation );
+
+		// Whether the run scored with the schedule-delay corridor armed; recorded in the output config's
+		// dresdenScoring group (absent in older runs => default false). The offline scoring mirrors it so the
+		// marginals include the same schedule-delay components the agents experienced.
+		boolean scheduleDelayScoring = ConfigUtils.addOrGetModule( config, DresdenScoringConfigGroup.class ).isScheduleDelayScoring();
+		log.info( "schedule-delay corridor in the analyzed run: {}", scheduleDelayScoring ? "armed" : "off" );
 
 		// ===
 
 		EventsManager eventsManager = EventsUtils.createEventsManager(config);
 
-		VTTSHandler vttsHandler = new VTTSHandler( scenario, scoringParametersForPerson, plannedTypicalDurations );
+		VTTSHandler vttsHandler = new VTTSHandler( scenario, scoringParametersForPerson, plannedActivities, scheduleDelayScoring );
 		eventsManager.addHandler( vttsHandler );
 
 		eventsManager.initProcessing();
@@ -232,14 +247,24 @@ public class DresdenAddVttsEtcToActivities implements MATSimAppCommand {
 			tripsTable.write().usingOptions( options.build() );
 		}
 
-		// Split off trips whose activity scoring got a degenerate input (non-finite VTTS/mUTTS/mUSL, e.g. from a
-		// pathologically small typical duration). They are kept in the full tablesaw.tsv (via the "scoringInput"
-		// column) and written out separately, but excluded from the histogram and summary statistics so their NaNs
-		// do not poison the aggregates.
+		// Split the trips by scoring-input class (see VTTSHandler.TripData#scoringInputClass): "ok" (logarithmic
+		// branch, meaningful marginals -> the summary statistics), "extrapolated" (realized duration below the
+		// zero-utility duration: the finite marginal reflects the linear-extension slope, explosive for short
+		// typicals, and would poison the mean), "degenerate" (not computable; a pipeline alarm, expected ~0). All
+		// classes stay in the full tablesaw.tsv via the "scoringInput" column; the non-ok classes are also written
+		// out separately. "afterDayEnd" (last activity arriving after its scoring window) is an indicator column,
+		// not a class: those trips classify by the same rules as everything else.
 		Table okTrips = tripsTable.where( tripsTable.stringColumn( HeadersKN.scoringInputClass ).isEqualTo( "ok" ) );
+		Table extrapolatedTrips = tripsTable.where( tripsTable.stringColumn( HeadersKN.scoringInputClass ).isEqualTo( "extrapolated" ) );
 		Table degenerateTrips = tripsTable.where( tripsTable.stringColumn( HeadersKN.scoringInputClass ).isEqualTo( "degenerate" ) );
-		log.info( "trips with usable (finite) scoring: {}; trips with degenerate scoring input (reported separately): {}",
-			okTrips.rowCount(), degenerateTrips.rowCount() );
+		int afterDayEndCount = tripsTable.booleanColumn( HeadersKN.afterDayEnd ).countTrue();
+		log.info( "scoring-input classes: ok={}, extrapolated (below zero-utility duration, excluded from means)={}, "
+				+ "degenerate (not computable)={}; afterDayEnd indicator: {}",
+			okTrips.rowCount(), extrapolatedTrips.rowCount(), degenerateTrips.rowCount(), afterDayEndCount );
+		{
+			var options = CsvWriteOptions.builder( outputDir.resolve( config.controller().getRunId() + ".extrapolatedScoringTrips.tsv" ).toString() ).separator( '\t' );
+			extrapolatedTrips.write().usingOptions( options.build() );
+		}
 		{
 			var options = CsvWriteOptions.builder( outputDir.resolve( config.controller().getRunId() + ".degenerateScoringTrips.tsv" ).toString() ).separator( '\t' );
 			degenerateTrips.write().usingOptions( options.build() );
@@ -247,12 +272,10 @@ public class DresdenAddVttsEtcToActivities implements MATSimAppCommand {
 
 		// (the following does not need to be separated by subpopulation: only ANALYZED_SUBPOPULATION is in here)
 
-		// A handful of residual trips (short middle activities squeezed to near-zero effective duration) have finite
-		// but enormous VTTS -- up to ~7e5 Eu/h -- so they classify as "ok" rather than "degenerate" and are kept in
-		// the stats (where median/quartiles are robust to them). Fed raw into the histogram, though, they stretch the
-		// auto-scaled x-axis to ~7e5 and collapse all real mass (median ~5 Eu/h) into the leftmost bin, rendering an
-		// apparently empty plot. Clip the *plotted* column to a sensible VTTS window so the histogram bins over the
-		// range that actually carries the distribution; the clipped-off trips are logged, not silently dropped.
+		// The explosive linear-extension marginals now live in the "extrapolated" class, but the branch boundary is
+		// about the scoring's domain, not magnitude: "ok" trips just above their zero-utility duration carry marginals
+		// up to beta*typ/t0, which can still dwarf the plotting window. The clip therefore stays for the histogram's
+		// auto-scaled x-axis; clipped-off trips are logged, not silently dropped.
 		Table plotTrips = okTrips.where( okTrips.doubleColumn( HeadersKN.vttsh ).isBetweenInclusive( VTTS_HISTOGRAM_MIN, VTTS_HISTOGRAM_MAX ) );
 		log.info( "histogram plotted over VTTS in [{}, {}] Eu/h: {} of {} ok trips shown, {} outside the window (excluded from the plot only).",
 			VTTS_HISTOGRAM_MIN, VTTS_HISTOGRAM_MAX, plotTrips.rowCount(), okTrips.rowCount(), okTrips.rowCount() - plotTrips.rowCount() );
@@ -315,24 +338,33 @@ public class DresdenAddVttsEtcToActivities implements MATSimAppCommand {
 	}
 
 	/**
-	 * For every person, the planned typical duration (seconds) of each selected-plan activity (excluding stage
-	 * activities), in order, as threaded through the run into the output population. Slots for which the run did not
-	 * assign a typical duration (e.g. freight/commercial activities) are {@link Double#NaN}. The order matches the
-	 * activity order the {@link VTTSHandler} sees in the events, so it can be indexed by activity position.
+	 * For every person, the planned per-activity scoring inputs of each selected-plan activity (excluding stage
+	 * activities), in order, as threaded through the run into the output population: the typical duration plus the
+	 * schedule-delay anchors (initialStartTime/initialEndTime). Slots for which the run did not assign a value
+	 * (e.g. freight/commercial activities, or runs predating the anchors) are {@link Double#NaN}. The order matches
+	 * the activity order the {@link VTTSHandler} sees in the events, so it can be indexed by activity position.
 	 */
-	private static Map<Id<Person>, double[]> extractPlannedTypicalDurations( Population outputPopulation ) {
-		Map<Id<Person>, double[]> result = new HashMap<>();
+	private static Map<Id<Person>, VTTSHandler.PlannedActivities> extractPlannedActivities( Population outputPopulation ) {
+		Map<Id<Person>, VTTSHandler.PlannedActivities> result = new HashMap<>();
 		for ( Person person : outputPopulation.getPersons().values() ) {
 			List<Activity> activities = TripStructureUtils.getActivities( person.getSelectedPlan(),
 				TripStructureUtils.StageActivityHandling.ExcludeStageActivities );
 			double[] typicalDurations = new double[activities.size()];
+			double[] initialStartTimes = new double[activities.size()];
+			double[] initialEndTimes = new double[activities.size()];
 			for ( int i = 0; i < activities.size(); i++ ) {
-				Object attribute = activities.get( i ).getAttributes().getAttribute( EncodeTypicalDuration.TYPICAL_DURATION );
-				typicalDurations[i] = (attribute instanceof Number) ? ((Number) attribute).doubleValue() : Double.NaN;
+				var attributes = activities.get( i ).getAttributes();
+				typicalDurations[i] = asDouble( attributes.getAttribute( EncodeTypicalDuration.TYPICAL_DURATION ) );
+				initialStartTimes[i] = asDouble( attributes.getAttribute( DresdenActivityScoring.INITIAL_START_TIME_ATTRIBUTE ) );
+				initialEndTimes[i] = asDouble( attributes.getAttribute( MutateActivityTimeAllocation.INITIAL_END_TIME_ATTRIBUTE ) );
 			}
-			result.put( person.getId(), typicalDurations );
+			result.put( person.getId(), new VTTSHandler.PlannedActivities( typicalDurations, initialStartTimes, initialEndTimes ) );
 		}
 		return result;
+	}
+
+	private static double asDouble( Object attribute ) {
+		return (attribute instanceof Number number) ? number.doubleValue() : Double.NaN;
 	}
 
 	private static final String MUTTS_H = "mUTTS_h (incoming trip)";

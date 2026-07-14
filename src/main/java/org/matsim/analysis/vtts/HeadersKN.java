@@ -15,6 +15,7 @@ class HeadersKN {
 	public static final String mUoM = "mUoM";
 	public static final String muslh = "mUSL_[u/h]";
 	public static final String scoringInputClass = "scoringInput";
+	public static final String afterDayEnd = "afterDayEnd";
 
 	// do not instantiate
 	private HeadersKN() {}
