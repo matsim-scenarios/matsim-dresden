@@ -16,16 +16,19 @@ public final class BestResponseScheduleModule extends AbstractMultithreadedModul
 
 	private final ScoringConfigGroup scoringConfigGroup;
 	private final double randomErrorSigma;
-	private final ScheduleSolver solver = new SeparableDurationScheduleSolver();
+	private final double dayEnd;
+	private final ScheduleSolver solver = new LpScheduleSolver();
 
-	public BestResponseScheduleModule( GlobalConfigGroup globalConfigGroup, ScoringConfigGroup scoringConfigGroup, double randomErrorSigma ) {
+	public BestResponseScheduleModule( GlobalConfigGroup globalConfigGroup, ScoringConfigGroup scoringConfigGroup,
+									   double randomErrorSigma, double dayEnd ) {
 		super( globalConfigGroup );
 		this.scoringConfigGroup = scoringConfigGroup;
 		this.randomErrorSigma = randomErrorSigma;
+		this.dayEnd = dayEnd;
 	}
 
 	@Override
 	public PlanAlgorithm getPlanAlgoInstance() {
-		return new BestResponseSchedulePlanAlgorithm( scoringConfigGroup, solver, randomErrorSigma, MatsimRandom.getLocalInstance() );
+		return new BestResponseSchedulePlanAlgorithm( scoringConfigGroup, solver, randomErrorSigma, dayEnd, MatsimRandom.getLocalInstance() );
 	}
 }

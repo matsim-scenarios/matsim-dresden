@@ -375,9 +375,11 @@ run-1pct-notimes-anchored: input/prepare-config.xml | $(CLASSPATH)
 	 --mutate-around-initial-end-time-only\
 	 $(ARGS)
 
-# Smoke test: the best-response scheduling strategy (mockup) replacing the TimeAllocationMutator, on the
-# no-opening-times setup. lastIteration=1 -- iteration 0 (initial plans) plus one round of best-response replanning;
-# the best response is a one-shot construction, so further iterations add nothing. Exercises the wiring end to end.
+# Smoke test: the best-response scheduling strategy replacing the TimeAllocationMutator, on the
+# no-opening-times setup. lastIteration=2 -- iteration 0 (initial plans), one live round of best-response replanning
+# in iteration 1, and iteration 2 with innovation already disabled (fractionOfIterationsToDisableInnovation 0.9 kills
+# innovation at ceil(0.9*lastIteration), so with lastIteration=1 the only replanning round would handle 0 plans).
+# The best response is a one-shot construction, so further live iterations add nothing. Exercises the wiring end to end.
 run-1pct-bestresponse-smoke: input/prepare-config.xml | $(CLASSPATH)
 	$(sc) run --config $<\
 	 --config:plans.inputPlansFile=before-calibration/output/$N-$V-1pct.plans-initial.xml.gz\
@@ -385,7 +387,7 @@ run-1pct-bestresponse-smoke: input/prepare-config.xml | $(CLASSPATH)
 	 --config:qsim.storageCapacityFactor=0.01\
 	 --config:counts.countsScaleFactor=0.01\
 	 --config:simwrapper.sampleSize=0.01\
-	 --config:controller.lastIteration=1\
+	 --config:controller.lastIteration=2\
 	 --runId $N-$V-1pct-bestresponse-smoke\
 	 --output output/$N-$V-1pct-bestresponse-smoke\
 	 --with-opening-times=false\

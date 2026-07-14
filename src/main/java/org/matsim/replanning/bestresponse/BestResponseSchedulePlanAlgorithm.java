@@ -36,22 +36,36 @@ public final class BestResponseSchedulePlanAlgorithm implements PlanAlgorithm {
 	private final ScoringConfigGroup scoringConfigGroup;
 	private final ScheduleSolver solver;
 	private final double randomErrorSigma;
+	private final double dayEnd;
 	private final Random random;
 
 	// Charypar-Nagel slopes translated to utils/second, computed once.
-	private final double durSlope;       // marginal utility of performing (beta_perf); used for both under- and over-run in the mockup
-	private final double endLateSlope;   // |late arrival| penalty
-	private final double endEarlySlope;  // |early departure| penalty
+	private final double durSlope;          // marginal utility of performing (beta_perf); used for both under- and over-run
+	private final double durVeryShortSlope; // shortfall beyond half the typical duration, see constructor
+	private final double endLateSlope;      // |late arrival| penalty
+	private final double endEarlySlope;     // early side of the end-time anchor, see constructor
 
 	public BestResponseSchedulePlanAlgorithm( ScoringConfigGroup scoringConfigGroup, ScheduleSolver solver,
-											  double randomErrorSigma, Random random ) {
+											  double randomErrorSigma, double dayEnd, Random random ) {
 		this.scoringConfigGroup = scoringConfigGroup;
 		this.solver = solver;
 		this.randomErrorSigma = randomErrorSigma;
+		this.dayEnd = dayEnd;
 		this.random = random;
 		this.durSlope = scoringConfigGroup.getPerforming_utils_hr() / 3600.;
+		// The concave Charypar-Nagel performing term has increasing marginal utility at short durations (beta*t*/t; at
+		// t*/4 four times the marginal at t*), so shortfall beyond half the typical duration gets a steeper, second
+		// penalty segment. Being above the late-arrival slope (3x performing in the Dresden setup), it makes squeezing
+		// an activity toward zero a last resort rather than a free tie-breaking vertex among equal-slope duration terms.
+		this.durVeryShortSlope = 4. * scoringConfigGroup.getPerforming_utils_hr() / 3600.;
 		this.endLateSlope = Math.abs( scoringConfigGroup.getLateArrival_utils_hr() ) / 3600.;
-		this.endEarlySlope = Math.abs( scoringConfigGroup.getEarlyDeparture_utils_hr() ) / 3600.;
+		// The early side of the anchor is floored at the performing rate: the configured earlyDeparture is typically 0,
+		// and a zero early slope would let the whole day drift arbitrarily early (Charypar-Nagel scoring without opening
+		// times really is indifferent to that shift, but holding the day in place is the anchor's entire purpose).
+		// Ending earlier than the anchored schedule means waiting/untyped time instead of performing, so the performing
+		// rate is the natural opportunity cost.
+		this.endEarlySlope = Math.max( Math.abs( scoringConfigGroup.getEarlyDeparture_utils_hr() ),
+			scoringConfigGroup.getPerforming_utils_hr() ) / 3600.;
 	}
 
 	@Override
@@ -84,6 +98,8 @@ public final class BestResponseSchedulePlanAlgorithm implements PlanAlgorithm {
 	}
 
 	private ScheduleProblem extractProblem( List<Activity> activities, double[] travelBefore ) {
+		boolean wrapAround = activities.get( 0 ).getType().equals( activities.get( activities.size() - 1 ).getType() );
+
 		List<ScheduleProblem.Act> acts = new ArrayList<>( activities.size() );
 		for ( int i = 0; i < activities.size(); i++ ) {
 			Activity activity = activities.get( i );
@@ -91,20 +107,33 @@ public final class BestResponseSchedulePlanAlgorithm implements PlanAlgorithm {
 			boolean endTimeBased = activity.getEndTime().isDefined() ||
 				( !activity.getMaximumDuration().isDefined() && !lastActivity );
 
-			double typicalDuration = typicalDuration( activity );
+			// Random utility: the scheduling anchors (typical duration t*, target end time e*) are each perturbed by
+			// an independent draw ~ N(0, sigma) [seconds] -- the kink positions move, not the slopes. (An additive
+			// error *term* would be constant w.r.t. the timing and thus inert in this continuous problem; a slope
+			// perturbation would risk negative coefficients, which break the piecewise-linear split.)
+			double typicalDuration = Math.max( 0., perturb( typicalDuration( activity ) ) );
 
-			// Random utility (Pougala): the additive error goes on the penalty slopes (the utility coefficients), each
-			// perturbed by an independent draw ~ N(0, sigma) [utils/s], not on the durations or times.
+			OptionalTime targetEndTime = targetEndTime( activity );
+			if ( i == 0 && wrapAround && targetEndTime.isUndefined() && activity.getMaximumDuration().isDefined() ) {
+				// A wrap-around first activity appears in the objective only through its anchor (its duration cancels
+				// out of the joint wrap-around term); without one its duration would be arbitrary. Anchor it at its
+				// current position.
+				targetEndTime = OptionalTime.defined( activity.getMaximumDuration().seconds() );
+			}
+			if ( targetEndTime.isDefined() ) {
+				targetEndTime = OptionalTime.defined( Math.max( 0., perturb( targetEndTime.seconds() ) ) );
+			}
+
 			acts.add( new ScheduleProblem.Act(
 				activity.getType(), endTimeBased, lastActivity, travelBefore[i], typicalDuration,
-				perturb( durSlope ), perturb( durSlope ), targetEndTime( activity ), perturb( endEarlySlope ), perturb( endLateSlope ) ) );
+				durSlope, durVeryShortSlope, durSlope, targetEndTime, endEarlySlope, endLateSlope ) );
 		}
-		return new ScheduleProblem( acts, 0. );
+		return new ScheduleProblem( acts, 0., dayEnd, wrapAround );
 	}
 
-	/** A penalty slope (utils/s) with its additive random-utility perturbation. */
-	private double perturb( double baseSlope ) {
-		return baseSlope + random.nextGaussian() * randomErrorSigma;
+	/** A scheduling anchor (seconds) with its additive random-utility perturbation. */
+	private double perturb( double seconds ) {
+		return seconds + random.nextGaussian() * randomErrorSigma;
 	}
 
 	/** Preferred duration: the per-activity typical-duration attribute (see {@link EncodeTypicalDuration}), else the type's config value, else a fallback. */

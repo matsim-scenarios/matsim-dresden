@@ -111,15 +111,15 @@ public class DresdenModel extends MATSimApplication {
 	private boolean mutateAroundInitialEndTimeOnly = false;
 
 	@CommandLine.Option(names="--best-response-scheduling",
-		description = "MOCKUP/experimental: replace the random TimeAllocationMutator with a best-response scheduling " +
+		description = "Experimental: replace the random TimeAllocationMutator with a best-response scheduling " +
 			"strategy that re-plans the whole day at once by optimizing a linearized approximation of the activity " +
 			"scoring (see org.matsim.replanning.bestresponse). Default false.")
 	private boolean bestResponseScheduling = false;
 
 	@CommandLine.Option(names="--best-response-sigma",
-		description = "Standard deviation (utils/second) of the random perturbation added to the penalty slopes in the " +
-			"best-response scheduling strategy; >0 makes the best response stochastic (Pougala-style random utility on " +
-			"the coefficients). Default 0. Only used with --best-response-scheduling.")
+		description = "Standard deviation (seconds) of the random perturbation added to the scheduling anchors " +
+			"(typical durations and target end times) in the best-response scheduling strategy; >0 makes the best " +
+			"response stochastic. Default 0. Only used with --best-response-scheduling.")
 	private double bestResponseSigma = 0.0;
 
 //	TODO: remove before release
@@ -180,7 +180,7 @@ public class DresdenModel extends MATSimApplication {
 		config.timeAllocationMutator().setMutateAroundInitialEndTimeOnly(mutateAroundInitialEndTimeOnly);
 		config.timeAllocationMutator().setAffectingDuration(false);
 
-		// Best-response scheduling (mockup): register its config, and -- when enabled -- replace every
+		// Best-response scheduling: register its config, and -- when enabled -- replace every
 		// TimeAllocationMutator strategy setting (keeping its weight/subpopulation) with the best-response strategy.
 		// The strategy itself is bound in prepareControler.
 		ConfigUtils.addOrGetModule(config, BestResponseScheduleConfigGroup.class).setRandomErrorSigma(bestResponseSigma);
@@ -314,7 +314,7 @@ public class DresdenModel extends MATSimApplication {
 //				EncodeTypicalDuration), instead of encoding the typical duration in the activity type.
 				bindScoringFunctionFactory().to(DresdenScoringFunctionFactory.class);
 
-//				best-response scheduling strategy (mockup), selected via --best-response-scheduling; the binding is
+//				best-response scheduling strategy, selected via --best-response-scheduling; the binding is
 //				harmless when unused (a strategy is only instantiated if referenced by a strategysettings entry).
 				addPlanStrategyBinding(BestResponseScheduleStrategy.STRATEGY_NAME).toProvider(BestResponseScheduleStrategy.class);
 

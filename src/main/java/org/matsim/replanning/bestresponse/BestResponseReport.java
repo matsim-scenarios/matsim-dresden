@@ -42,10 +42,18 @@ public final class BestResponseReport implements MATSimAppCommand {
 	@CommandLine.Option(names = "--output", description = "Optional path to write the optimized population to.")
 	private Path output;
 
-	@CommandLine.Option(names = "--sigma", description = "Standard deviation (utils/second) of the random perturbation " +
-		"added to the penalty slopes. Default 0 gives the deterministic best response (durations = typical), which is " +
-		"easiest to interpret; note the mockup solver ignores the slopes, so only 0 is meaningful until the LP lands.", defaultValue = "0")
+	@CommandLine.Option(names = "--sigma", description = "Standard deviation (seconds) of the random perturbation " +
+		"added to the scheduling anchors (typical durations and target end times). Default 0 gives the deterministic " +
+		"best response, which is easiest to interpret.", defaultValue = "0")
 	private double sigma;
+
+	@CommandLine.Option(names = "--simulation-period-in-days", description = "Effective end of day, as a multiple of " +
+		"24h; reference point for the last activity's wrap-around share. Pass the same value the scenario uses.", defaultValue = "1.0")
+	private double simulationPeriodInDays;
+
+	@CommandLine.Option(names = "--subpopulation", description = "Only process persons of this subpopulation, " +
+		"mirroring the strategysettings the replanning strategy runs under; empty = all.", defaultValue = "person")
+	private String subpopulation;
 
 	@CommandLine.Option(names = "--seed", description = "RNG seed (only matters when --sigma > 0).", defaultValue = "4711")
 	private long seed;
@@ -77,7 +85,7 @@ public final class BestResponseReport implements MATSimAppCommand {
 		Config config = ConfigUtils.createConfig();
 		config.scoring().setPerforming_utils_hr( performing );
 		BestResponseSchedulePlanAlgorithm optimizer = new BestResponseSchedulePlanAlgorithm(
-			config.scoring(), new SeparableDurationScheduleSolver(), sigma, new Random( seed ) );
+			config.scoring(), new LpScheduleSolver(), sigma, simulationPeriodInDays * 24. * 3600., new Random( seed ) );
 
 		List<Double> endMoveMin = new ArrayList<>();
 		List<Double> durChangeMin = new ArrayList<>();
@@ -87,6 +95,9 @@ public final class BestResponseReport implements MATSimAppCommand {
 		int processed = 0, skipped = 0;
 
 		for ( Person person : population.getPersons().values() ) {
+			if ( !subpopulation.isEmpty() && !subpopulation.equals( PopulationUtils.getSubpopulation( person ) ) ) {
+				continue;
+			}
 			Plan plan = person.getSelectedPlan();
 			List<Activity> activities = TripStructureUtils.getActivities( plan, TripStructureUtils.StageActivityHandling.ExcludeStageActivities );
 			if ( activities.size() < 2 ) {
@@ -118,8 +129,9 @@ public final class BestResponseReport implements MATSimAppCommand {
 		StringBuilder sb = new StringBuilder( System.lineSeparator() );
 		sb.append( "=== Best-response optimizer report ===" ).append( System.lineSeparator() );
 		sb.append( "input:            " ).append( input ).append( System.lineSeparator() );
-		sb.append( String.format( "persons:          %d processed, %d skipped (stay-home / single activity)%n", processed, skipped ) );
-		sb.append( String.format( "sigma:            %.4f u/s (slope perturbation)   seed: %d   performing: %.1f u/h%n", sigma, seed, performing ) );
+		sb.append( String.format( "persons:          %d processed, %d skipped (stay-home / single activity), subpopulation: %s%n",
+			processed, skipped, subpopulation.isEmpty() ? "all" : subpopulation ) );
+		sb.append( String.format( "sigma:            %.0f s (anchor perturbation)   seed: %d   performing: %.1f u/h%n", sigma, seed, performing ) );
 		sb.append( System.lineSeparator() );
 		sb.append( "Activity end-time movement (min):  " ).append( stats( endMoveMin ) ).append( System.lineSeparator() );
 		sb.append( "Activity duration change  (min):   " ).append( stats( durChangeMin ) ).append( System.lineSeparator() );

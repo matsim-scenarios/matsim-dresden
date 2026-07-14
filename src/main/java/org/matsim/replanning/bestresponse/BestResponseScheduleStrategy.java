@@ -3,6 +3,7 @@ package org.matsim.replanning.bestresponse;
 import com.google.inject.Inject;
 import com.google.inject.Provider;
 import org.matsim.core.config.groups.GlobalConfigGroup;
+import org.matsim.core.config.groups.ScenarioConfigGroup;
 import org.matsim.core.config.groups.ScoringConfigGroup;
 import org.matsim.core.replanning.PlanStrategy;
 import org.matsim.core.replanning.PlanStrategyImpl;
@@ -29,13 +30,15 @@ public final class BestResponseScheduleStrategy implements Provider<PlanStrategy
 
 	@Inject private GlobalConfigGroup globalConfigGroup;
 	@Inject private ScoringConfigGroup scoringConfigGroup;
+	@Inject private ScenarioConfigGroup scenarioConfigGroup;
 	@Inject private BestResponseScheduleConfigGroup bestResponseScheduleConfigGroup;
 
 	@Override
 	public PlanStrategy get() {
 		PlanStrategyImpl strategy = new PlanStrategyImpl( new RandomPlanSelector<>() );
+		double dayEnd = scenarioConfigGroup.getSimulationPeriodInDays() * 24. * 3600.;
 		strategy.addStrategyModule( new BestResponseScheduleModule(
-			globalConfigGroup, scoringConfigGroup, bestResponseScheduleConfigGroup.getRandomErrorSigma() ) );
+			globalConfigGroup, scoringConfigGroup, bestResponseScheduleConfigGroup.getRandomErrorSigma(), dayEnd ) );
 		return strategy;
 	}
 }
