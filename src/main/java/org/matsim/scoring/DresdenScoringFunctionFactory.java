@@ -5,6 +5,7 @@ import org.matsim.api.core.v01.Scenario;
 import org.matsim.api.core.v01.network.Network;
 import org.matsim.api.core.v01.population.Person;
 import org.matsim.core.config.Config;
+import org.matsim.core.config.ConfigUtils;
 import org.matsim.core.population.PopulationUtils;
 import org.matsim.core.scoring.ScoringFunction;
 import org.matsim.core.scoring.ScoringFunctionFactory;
@@ -53,8 +54,12 @@ public final class DresdenScoringFunctionFactory implements ScoringFunctionFacto
 		final ScoringParameters parameters = params.getScoringParameters(person);
 
 		SumScoringFunction sumScoringFunction = new SumScoringFunction();
+		// The selected plan is the attribute source: the activities the events machinery hands to the scoring carry
+		// no attributes (see DresdenActivityScoring's class javadoc).
 		sumScoringFunction.addScoringFunction(new DresdenActivityScoring(parameters,
-			config.scoring().getScoringParameters(PopulationUtils.getSubpopulation(person))));
+			config.scoring().getScoringParameters(PopulationUtils.getSubpopulation(person)),
+			person.getSelectedPlan(),
+			ConfigUtils.addOrGetModule(config, DresdenScoringConfigGroup.class).isScheduleDelayScoring()));
 		sumScoringFunction.addScoringFunction(new CharyparNagelLegScoring(parameters, config.transit().getTransitModes()));
 		sumScoringFunction.addScoringFunction(new CharyparNagelMoneyScoring(parameters));
 		sumScoringFunction.addScoringFunction(new CharyparNagelAgentStuckScoring(parameters));

@@ -23,14 +23,20 @@ package org.matsim.scoring;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.matsim.api.core.v01.population.Activity;
+import org.matsim.api.core.v01.population.Plan;
+import org.matsim.api.core.v01.population.PlanElement;
 import org.matsim.core.config.groups.ScoringConfigGroup;
 import org.matsim.core.scoring.ScoringFunction;
 import org.matsim.core.scoring.functions.ActivityTypeOpeningIntervalCalculator;
 import org.matsim.core.scoring.functions.ActivityUtilityParameters;
 import org.matsim.core.scoring.functions.OpeningIntervalCalculator;
+import org.matsim.core.population.algorithms.MutateActivityTimeAllocation;
 import org.matsim.core.scoring.functions.ScoringParameters;
 import org.matsim.core.utils.misc.OptionalTime;
 import org.matsim.prepare.EncodeTypicalDuration;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * A copy of {@link org.matsim.core.scoring.functions.CharyparNagelActivityScoring} that, for each activity,
@@ -50,9 +56,37 @@ import org.matsim.prepare.EncodeTypicalDuration;
  * scored exactly like the original Charypar-Nagel activity scoring, using the type's config parameters. The base
  * class is {@code final}, so this is a copy with a modified {@code calcActScore} rather than a subclass.
  *
- * @author rashid_waraich (original); adapted for per-activity typical duration
+ * <h3>Where the attributes come from</h3>
+ * At runtime, scoring is event-driven: {@code EventsToActivities} rebuilds each activity from events
+ * ({@code PopulationUtils.createActivityFromLinkId}) and those reconstructions carry <em>no attributes</em> -- reading
+ * attributes off the handed activity silently falls back to the config values for every activity (which is exactly
+ * what happened until this was discovered: every run scored against the uniform config typical durations). The
+ * selected plan's activity sequence is, however, a 1:1 template for the realized sequence (the realized one is a
+ * prefix of it, including stage activities), so when constructed with the person's selected {@link Plan} this class
+ * walks a cursor over the plan's activities and reads the attributes from the aligned <em>plan</em> activity, while
+ * all times still come from the realized one. Activity types are compared as a safety net; on a mismatch the cursor
+ * is abandoned and scoring falls back to the handed activity (i.e. to config values). Offline consumers (the VTTS
+ * analysis) construct this class without a plan and hand in plan activities that carry their attributes directly.
+ *
+ * <h3>Schedule-delay corridor</h3>
+ * When armed ({@code scheduleDelayScoring}), the per-activity anchor attributes {@code initialStartTime} /
+ * {@code initialEndTime} (stamped in {@code DresdenModel.stampScheduleAnchors}) act as the per-activity
+ * {@code latestStartTime} / {@code earliestEndTime}: starting later than the anchored start is penalized at the
+ * lateArrival rate, ending earlier than the anchored end at the earlyDeparture rate. Disarmed (the default), only
+ * the type-level config values apply -- which are undefined in this scenario, so the terms are dead, exactly as
+ * before. The gate sits here rather than in the config slopes because zeroing lateArrival would also soften the
+ * stuck-agent penalty ({@code abortedPlanScore} derives from it) and the best-response scheduler's slopes.
+ *
+ * @author rashid_waraich (original); adapted for per-activity typical duration and schedule-delay anchors
  */
 public final class DresdenActivityScoring implements org.matsim.core.scoring.SumScoringFunction.ActivityScoring {
+
+	/**
+	 * Attribute key under which the initial (surveyed) start time is stored on each activity (see
+	 * {@code DresdenModel.stampScheduleAnchors}); the per-activity counterpart of the type-level
+	 * {@code latestStartTime}, named after {@code MutateActivityTimeAllocation#INITIAL_END_TIME_ATTRIBUTE}.
+	 */
+	public static final String INITIAL_START_TIME_ATTRIBUTE = "initialStartTime";
 
 	private static final double INITIAL_SCORE = 0.0;
 
@@ -65,19 +99,71 @@ public final class DresdenActivityScoring implements org.matsim.core.scoring.Sum
 	/** Config scoring parameters for the person's subpopulation; source of the per-type {@code typicalDurationScoreComputation} and priority used to recompute the zero-utility duration for a per-activity typical duration. */
 	private final ScoringConfigGroup.ScoringParameterSet scoringParameterSet;
 	private final OpeningIntervalCalculator openingIntervalCalculator;
+	/** Whether the schedule-delay corridor (per-activity anchor attributes) is armed; see class javadoc. */
+	private final boolean scheduleDelayScoring;
+
+	/** The selected plan's activities in order (incl. stage activities), the attribute source for the realized
+	 * activities handed in by the events machinery; null => read attributes off the handed activities themselves. */
+	private final List<Activity> planActivities;
+	private int planActivityIndex = 0;
+	private boolean cursorAbandoned = false;
 
 	private Activity firstActivity;
+	/** Attribute source aligned with {@link #firstActivity}; the first activity is only scored at {@link #finish()}. */
+	private Activity firstActivitySource;
 
 	private static final Logger log = LogManager.getLogger(DresdenActivityScoring.class);
 
+	/** Attribute-carrying activities are handed in directly (offline use, e.g. the VTTS analysis); no plan cursor. */
 	public DresdenActivityScoring(final ScoringParameters params, final ScoringConfigGroup.ScoringParameterSet scoringParameterSet) {
-		this(params, scoringParameterSet, new ActivityTypeOpeningIntervalCalculator(params));
+		this(params, scoringParameterSet, null, false, new ActivityTypeOpeningIntervalCalculator(params));
 	}
 
-	public DresdenActivityScoring(final ScoringParameters params, final ScoringConfigGroup.ScoringParameterSet scoringParameterSet, final OpeningIntervalCalculator openingIntervalCalculator) {
+	public DresdenActivityScoring(final ScoringParameters params, final ScoringConfigGroup.ScoringParameterSet scoringParameterSet,
+								  final Plan selectedPlan, final boolean scheduleDelayScoring) {
+		this(params, scoringParameterSet, selectedPlan, scheduleDelayScoring, new ActivityTypeOpeningIntervalCalculator(params));
+	}
+
+	public DresdenActivityScoring(final ScoringParameters params, final ScoringConfigGroup.ScoringParameterSet scoringParameterSet,
+								  final Plan selectedPlan, final boolean scheduleDelayScoring,
+								  final OpeningIntervalCalculator openingIntervalCalculator) {
 		this.params = params;
 		this.scoringParameterSet = scoringParameterSet;
 		this.openingIntervalCalculator = openingIntervalCalculator;
+		this.scheduleDelayScoring = scheduleDelayScoring;
+		if (selectedPlan == null) {
+			this.planActivities = null;
+		} else {
+			this.planActivities = new ArrayList<>();
+			for (PlanElement element : selectedPlan.getPlanElements()) {
+				if (element instanceof Activity activity) {
+					this.planActivities.add(activity);
+				}
+			}
+		}
+	}
+
+	/**
+	 * The attribute source for a realized activity: the aligned plan activity when a plan was given (advancing the
+	 * cursor), otherwise the realized activity itself. A type mismatch abandons the cursor for the rest of the day --
+	 * scoring then falls back to config values, which is the pre-cursor behavior.
+	 */
+	private Activity attributeSource(Activity realized) {
+		if (planActivities == null || cursorAbandoned) {
+			return realized;
+		}
+		if (planActivityIndex < planActivities.size()) {
+			Activity planned = planActivities.get(planActivityIndex++);
+			if (planned.getType().equals(realized.getType())) {
+				return planned;
+			}
+			log.warn("Realized activity sequence diverged from the selected plan (plan: {}, realized: {}); " +
+				"falling back to config values for the rest of this person's day.", planned.getType(), realized.getType());
+		} else {
+			log.warn("More realized activities than the selected plan contains; falling back to config values.");
+		}
+		cursorAbandoned = true;
+		return realized;
 	}
 
 	@Override
@@ -176,8 +262,11 @@ public final class DresdenActivityScoring implements org.matsim.core.scoring.Sum
 				tmpScore.actWaiting_util += this.params.marginalUtilityOfWaiting_s * waitTime;
 			}
 
-			// disutility if too late:
-			OptionalTime latestStartTime = actParams.getLatestStartTime();
+			// disutility if too late: when the schedule-delay corridor is armed, the per-activity initial (surveyed)
+			// start time replaces the type-level latestStartTime (like the typical duration below).
+			OptionalTime latestStartTime = scheduleDelayScoring
+				? anchorTime(act, INITIAL_START_TIME_ATTRIBUTE, actParams.getLatestStartTime())
+				: actParams.getLatestStartTime();
 			if (latestStartTime.isDefined() && (activityStart > latestStartTime.seconds())) {
 				double lateTime = activityStart - latestStartTime.seconds();
 				tmpScore.actLateArrival_s += lateTime;
@@ -237,8 +326,11 @@ public final class DresdenActivityScoring implements org.matsim.core.scoring.Sum
 
 			}
 
-			// disutility if stopping too early
-			OptionalTime earliestEndTime = actParams.getEarliestEndTime();
+			// disutility if stopping too early: when the schedule-delay corridor is armed, the per-activity initial
+			// (surveyed) end time replaces the type-level earliestEndTime.
+			OptionalTime earliestEndTime = scheduleDelayScoring
+				? anchorTime(act, MutateActivityTimeAllocation.INITIAL_END_TIME_ATTRIBUTE, actParams.getEarliestEndTime())
+				: actParams.getEarliestEndTime();
 			if ((earliestEndTime.isDefined()) && (activityEnd < earliestEndTime.seconds())) {
 				double earlyDeparture = earliestEndTime.seconds() - activityEnd;
 				tmpScore.actEarlyDeparture_s += earlyDeparture;
@@ -263,6 +355,15 @@ public final class DresdenActivityScoring implements org.matsim.core.scoring.Sum
 		return tmpScore;
 	}
 
+	/** The per-activity schedule-delay anchor from the given attribute, or the type-level fallback where not stamped. */
+	private static OptionalTime anchorTime(Activity act, String attribute, OptionalTime typeLevelFallback) {
+		Object value = act.getAttributes().getAttribute(attribute);
+		if (value instanceof Number number) {
+			return OptionalTime.defined(number.doubleValue());
+		}
+		return typeLevelFallback;
+	}
+
 	/**
 	 * Recompute the Charypar-Nagel zero-utility duration (in hours) for a per-activity typical duration, using the
 	 * same {@link ActivityUtilityParameters.ZeroUtilityComputation} ({@code relative -> SameRelativeScore},
@@ -279,7 +380,7 @@ public final class DresdenActivityScoring implements org.matsim.core.scoring.Sum
 		return computation.computeZeroUtilityDuration_s(activityParams.getPriority(), typicalDuration_s) / 3600.0;
 	}
 
-	private void handleOvernightActivity(Activity lastActivity) {
+	private void handleOvernightActivity(Activity lastActivity, Activity lastActivitySource) {
 		assert firstActivity != null;
 		assert lastActivity != null;
 
@@ -304,7 +405,7 @@ public final class DresdenActivityScoring implements org.matsim.core.scoring.Sum
 			}
 
 			Score calcActScore = calcActScore(lastActivity.getStartTime().seconds(),
-					this.firstActivity.getEndTime().seconds() + 24 * 3600, lastActivity);
+					this.firstActivity.getEndTime().seconds() + 24 * 3600, lastActivitySource);
 			this.score.add(calcActScore); // SCENARIO_DURATION
 		} else {
 			// the first Act and the last Act have NOT the same type:
@@ -324,10 +425,10 @@ public final class DresdenActivityScoring implements org.matsim.core.scoring.Sum
 				}
 
 				// score first activity
-				this.score.add(calcActScore(0.0, this.firstActivity.getEndTime().seconds(), firstActivity));
+				this.score.add(calcActScore(0.0, this.firstActivity.getEndTime().seconds(), firstActivitySource));
 				// score last activity
 				this.score.add(calcActScore(lastActivity.getStartTime().seconds(),
-						this.params.simulationPeriodInDays * 24 * 3600, lastActivity));
+						this.params.simulationPeriodInDays * 24 * 3600, lastActivitySource));
 			}
 		}
 	}
@@ -335,23 +436,24 @@ public final class DresdenActivityScoring implements org.matsim.core.scoring.Sum
 	private void handleMorningActivity() {
 		assert firstActivity != null;
 		// score first activity
-		this.score.add(calcActScore(0.0, this.firstActivity.getEndTime().seconds(), firstActivity));
+		this.score.add(calcActScore(0.0, this.firstActivity.getEndTime().seconds(), firstActivitySource));
 	}
 
 	@Override
 	public void handleFirstActivity(Activity act) {
 		assert act != null;
 		this.firstActivity = act;
+		this.firstActivitySource = attributeSource(act);
 	}
 
 	@Override
 	public void handleActivity(Activity act) {
-		this.score.add(calcActScore(act.getStartTime().seconds(), act.getEndTime().seconds(), act));
+		this.score.add(calcActScore(act.getStartTime().seconds(), act.getEndTime().seconds(), attributeSource(act)));
 	}
 
 	@Override
 	public void handleLastActivity(Activity act) {
-		this.handleOvernightActivity(act);
+		this.handleOvernightActivity(act, attributeSource(act));
 		this.firstActivity = null;
 	}
 

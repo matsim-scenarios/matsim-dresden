@@ -11,6 +11,7 @@ import org.matsim.api.core.v01.Scenario;
 import org.matsim.api.core.v01.TransportMode;
 import org.matsim.api.core.v01.network.Link;
 import org.matsim.api.core.v01.population.Activity;
+import org.matsim.api.core.v01.population.Leg;
 import org.matsim.api.core.v01.population.Person;
 import org.matsim.api.core.v01.population.Plan;
 import org.matsim.application.MATSimApplication;
@@ -49,6 +50,8 @@ import org.matsim.core.replanning.annealing.ReplanningAnnealerConfigGroup.Anneal
 import org.matsim.core.scoring.functions.ScoringParametersForPerson;
 import org.matsim.dashboards.DresdenDashboardProvider;
 import org.matsim.prepare.*;
+import org.matsim.scoring.DresdenActivityScoring;
+import org.matsim.scoring.DresdenScoringConfigGroup;
 import org.matsim.scoring.DresdenScoringFunctionFactory;
 import org.matsim.simwrapper.DashboardProvider;
 import org.matsim.simwrapper.SimWrapperConfigGroup;
@@ -59,6 +62,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 import playground.vsp.scoring.IncomeDependentUtilityOfMoneyPersonScoringParameters;
+
+import java.util.List;
 
 import static java.lang.Double.*;
 import static org.matsim.run.scenarios.DresdenUtils.*;
@@ -120,6 +125,14 @@ public class DresdenModel extends MATSimApplication {
 			"strategy that re-plans the whole day at once by optimizing a linearized approximation of the activity " +
 			"scoring (see org.matsim.replanning.bestresponse). Default false.")
 	private boolean bestResponseScheduling = false;
+
+	@CommandLine.Option(names="--schedule-delay-scoring",
+		description = "Arm the schedule-delay corridor in the scoring: starting later than the stamped initial " +
+			"(surveyed) start time is penalized with the lateArrival rate, ending earlier than the stamped initial " +
+			"end time with the performing rate (via earlyDeparture). If false (default), the per-activity anchors " +
+			"are ignored by the scoring and only the (undefined) type-level trigger times apply, i.e. the terms are " +
+			"dead, as before. Default false.")
+	private boolean scheduleDelayScoring = false;
 
 	@CommandLine.Option(names="--best-response-sigma",
 		description = "Standard deviation (seconds) of the random perturbation added to the target end times in the " +
@@ -204,6 +217,18 @@ public class DresdenModel extends MATSimApplication {
 		scoringConfig.setWriteExperiencedPlans(true);
 		scoringConfig.setPathSizeLogitBeta(0.);
 
+//		Schedule-delay corridor (see --schedule-delay-scoring and DresdenActivityScoring): armed, the per-activity
+//		anchor times (initialStartTime/initialEndTime, stamped in prepareScenario) act as latestStartTime /
+//		earliestEndTime -- the late side keeps the configured lateArrival (-18/h), the early side gets the performing
+//		rate as its opportunity cost (ending earlier than the anchored schedule means waiting/untyped time instead of
+//		performing). The on/off gate lives inside DresdenActivityScoring (via DresdenScoringConfigGroup), NOT in the
+//		slopes: zeroing lateArrival would also soften the stuck-agent penalty (abortedPlanScore derives from it) and
+//		the best-response scheduler's slopes.
+		ConfigUtils.addOrGetModule(config, DresdenScoringConfigGroup.class).setScheduleDelayScoring(scheduleDelayScoring);
+		if (scheduleDelayScoring) {
+			scoringConfig.setEarlyDeparture_utils_hr(-scoringConfig.getPerforming_utils_hr());
+		}
+
 //		Move the else-branch overnight scoring clamp from 24:00 to 27:00. handleOvernightActivity
 //		scores the (non-wrap-around) last activity from its start to simulationPeriodInDays * 24h;
 //		1.125 * 24h = 27:00.
@@ -275,14 +300,16 @@ public class DresdenModel extends MATSimApplication {
 //		this happens in the makefile pipeline already, but we do it here anyways, in case somebody uses a preliminary network.
 		PrepareNetwork.prepareFreightNetwork(scenario.getNetwork());
 
-//		Stamp each activity's end time as its stable scheduling anchor (the attribute the initial-anchored time
-//		mutator and the best-response scheduling strategy read as the target end time). Without it, those strategies
-//		fall back to the activity's *current* end time, which makes the anchor self-referential: every replanning
-//		re-anchors to its own output, and with a stochastic best response (sigma > 0) end times random-walk instead
-//		of exploring around a fixed point. Stamping only where absent keeps the original anchors across restarts
-//		(output plans carry the attribute) and lets preprocessing override. Unconditional: an extra activity
-//		attribute changes nothing unless one of those strategies is active.
-		stampInitialEndTimes(scenario);
+//		Stamp each end-time-based activity's initial start and end time as its stable scheduling anchors. The end
+//		anchor is what the initial-anchored time mutator and the best-response scheduling strategy read as the target
+//		end time (without it they fall back to the *current* end time, which makes the anchor self-referential:
+//		every replanning re-anchors to its own output, and with a stochastic best response (sigma > 0) end times
+//		random-walk instead of exploring around a fixed point). Both anchors are what DresdenActivityScoring reads as
+//		the per-activity latestStartTime / earliestEndTime of the schedule-delay corridor (armed via
+//		--schedule-delay-scoring). Stamping only where absent keeps the original anchors across restarts (output
+//		plans carry the attributes) and lets preprocessing override. Unconditional: the extra activity attributes
+//		change nothing unless one of those consumers is active.
+		stampScheduleAnchors(scenario);
 
 //		Splitting the first and last act of the day into separate _morning and _evening act types (to switch off
 //		wrap-around scoring) is now done during population preparation, see the split-wrap-around-activities step.
@@ -311,18 +338,52 @@ public class DresdenModel extends MATSimApplication {
 		}
 	}
 
-	/** See the call site in {@link #prepareScenario(Scenario)}: every end-time-based activity gets its end time stamped
-	 * as the stable scheduling anchor, unless preprocessing or an earlier run already stamped one. Package-visible for testing. */
-	static void stampInitialEndTimes(Scenario scenario) {
+	/** See the call site in {@link #prepareScenario(Scenario)}: every end-time-based activity gets its end time (and,
+	 * except for the first activity, its start time -- recorded where present, otherwise reconstructed by walking the
+	 * chain) stamped as its stable scheduling anchors, unless preprocessing or an earlier run already stamped them.
+	 * Duration-based and open activities get no anchors; their position is implied by their anchored neighbours.
+	 * Package-visible for testing. */
+	static void stampScheduleAnchors(Scenario scenario) {
 		for (Person person : scenario.getPopulation().getPersons().values()) {
 			for (Plan plan : person.getPlans()) {
-				for (Activity act : TripStructureUtils.getActivities(plan, TripStructureUtils.StageActivityHandling.ExcludeStageActivities)) {
-					if (act.getEndTime().isDefined()
-						&& act.getAttributes().getAttribute(MutateActivityTimeAllocation.INITIAL_END_TIME_ATTRIBUTE) == null) {
-						act.getAttributes().putAttribute(MutateActivityTimeAllocation.INITIAL_END_TIME_ATTRIBUTE, act.getEndTime().seconds());
+				List<Activity> activities = TripStructureUtils.getActivities(plan, TripStructureUtils.StageActivityHandling.ExcludeStageActivities);
+				List<TripStructureUtils.Trip> trips = TripStructureUtils.getTrips(plan);
+				double clock = 0;
+				for (int i = 0; i < activities.size(); i++) {
+					Activity act = activities.get(i);
+					if (i > 0) {
+						double travel = 0;
+						if (i - 1 < trips.size()) {
+							for (Leg leg : trips.get(i - 1).getLegsOnly()) {
+								if (leg.getTravelTime().isDefined()) {
+									travel += leg.getTravelTime().seconds();
+								} else if (leg.getRoute() != null && leg.getRoute().getTravelTime().isDefined()) {
+									travel += leg.getRoute().getTravelTime().seconds();
+								}
+							}
+						}
+						clock += travel;
+					}
+					double start = act.getStartTime().orElse(clock);
+					if (act.getEndTime().isDefined()) {
+						stampIfAbsent(act, MutateActivityTimeAllocation.INITIAL_END_TIME_ATTRIBUTE, act.getEndTime().seconds());
+						if (i > 0) {
+							stampIfAbsent(act, DresdenActivityScoring.INITIAL_START_TIME_ATTRIBUTE, start);
+						}
+						clock = act.getEndTime().seconds();
+					} else if (act.getMaximumDuration().isDefined()) {
+						clock = start + act.getMaximumDuration().seconds();
+					} else {
+						clock = start;
 					}
 				}
 			}
+		}
+	}
+
+	private static void stampIfAbsent(Activity act, String attribute, double value) {
+		if (act.getAttributes().getAttribute(attribute) == null) {
+			act.getAttributes().putAttribute(attribute, value);
 		}
 	}
 

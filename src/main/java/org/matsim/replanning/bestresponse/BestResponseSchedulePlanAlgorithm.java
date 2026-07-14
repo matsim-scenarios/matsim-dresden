@@ -58,7 +58,12 @@ public final class BestResponseSchedulePlanAlgorithm implements PlanAlgorithm {
 		// penalty segment. Being above the late-arrival slope (3x performing in the Dresden setup), it makes squeezing
 		// an activity toward zero a last resort rather than a free tie-breaking vertex among equal-slope duration terms.
 		this.durVeryShortSlope = 4. * scoringConfigGroup.getPerforming_utils_hr() / 3600.;
-		this.endLateSlope = Math.abs( scoringConfigGroup.getLateArrival_utils_hr() ) / 3600.;
+		// The late side of the anchor comes from lateArrival where configured. Should a config leave it at 0, the LP
+		// still needs a late slope to act as a regularizer (with 0 the objective is flat in the late direction and
+		// end times drift to arbitrary vertices); fall back to 3x the performing rate, the classic Vickrey-style
+		// ratio the Dresden -18/6 embodies.
+		double lateArrival = Math.abs( scoringConfigGroup.getLateArrival_utils_hr() );
+		this.endLateSlope = ( lateArrival > 0 ? lateArrival : 3. * scoringConfigGroup.getPerforming_utils_hr() ) / 3600.;
 		// The early side of the anchor is floored at the performing rate: the configured earlyDeparture is typically 0,
 		// and a zero early slope would let the whole day drift arbitrarily early (Charypar-Nagel scoring without opening
 		// times really is indifferent to that shift, but holding the day in place is the anchor's entire purpose).

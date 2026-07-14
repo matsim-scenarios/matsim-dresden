@@ -384,6 +384,22 @@ run-1pct-notimes: input/prepare-config.xml | $(CLASSPATH)
 	 --with-opening-times=false\
 	 $(ARGS)
 
+# Like run-1pct-notimes, but with the schedule-delay corridor armed in the scoring: per-activity soft anchors at the
+# stamped initial (surveyed) start/end times (late start at the lateArrival rate, early end at the performing rate),
+# replacing made-up opening times as the positional anchor. Replanning is the plain random mutator, as in notimes.
+run-1pct-notimes-penalties: input/prepare-config.xml | $(CLASSPATH)
+	$(sc) run --config $<\
+	 --config:plans.inputPlansFile=before-calibration/output/$N-$V-1pct.plans-initial.xml.gz\
+	 --config:qsim.flowCapacityFactor=0.01\
+	 --config:qsim.storageCapacityFactor=0.01\
+	 --config:counts.countsScaleFactor=0.01\
+	 --config:simwrapper.sampleSize=0.01\
+	 --runId $N-$V-1pct-notimes-penalties\
+	 --output output/$N-$V-1pct-notimes-penalties\
+	 --with-opening-times=false\
+	 --schedule-delay-scoring\
+	 $(ARGS)
+
 run-1pct-bestresponse: input/prepare-config.xml | $(CLASSPATH)
 	$(sc) run --config $<\
 	 --config:plans.inputPlansFile=before-calibration/output/$N-$V-1pct.plans-initial.xml.gz\
