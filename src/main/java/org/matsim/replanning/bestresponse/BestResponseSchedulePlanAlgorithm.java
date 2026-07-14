@@ -83,14 +83,29 @@ public final class BestResponseSchedulePlanAlgorithm implements PlanAlgorithm {
 		writeBack( activities, travelBefore, durations, problem.dayStart );
 	}
 
-	/** Travel time (s) of the trip arriving at each activity; index 0 is the first activity and is always 0. */
+	/**
+	 * Travel time (s) of the trip arriving at each activity; index 0 is the first activity and is always 0.
+	 * <p>
+	 * The travel time of a leg lives on its {@link org.matsim.api.core.v01.population.Route}, not on the leg itself:
+	 * freshly routed legs carry an undefined leg-level travel time (only preprocessed initial plans still have one).
+	 * Treating undefined as 0 made the optimizer schedule whole days with zero travel -- every anchor trivially
+	 * satisfiable, and the written schedule infeasible by exactly the cumulated real travel times, realized as
+	 * zero-duration activities at the next anchor.
+	 */
 	static double[] travelTimesBeforeEachActivity( Plan plan, int nActivities ) {
 		double[] travelBefore = new double[nActivities];
 		List<TripStructureUtils.Trip> trips = TripStructureUtils.getTrips( plan );
 		for ( int j = 0; j < trips.size() && j + 1 < nActivities; j++ ) {
 			double t = 0.;
 			for ( Leg leg : trips.get( j ).getLegsOnly() ) {
-				t += leg.getTravelTime().orElse( 0. );
+				if ( leg.getTravelTime().isDefined() ) {
+					t += leg.getTravelTime().seconds();
+				} else if ( leg.getRoute() != null && leg.getRoute().getTravelTime().isDefined() ) {
+					t += leg.getRoute().getTravelTime().seconds();
+				} else {
+					log.warn( "Leg with neither leg nor route travel time (mode {}); treating as 0. Schedule may come out too tight.",
+						leg.getMode() );
+				}
 			}
 			travelBefore[j + 1] = t;
 		}

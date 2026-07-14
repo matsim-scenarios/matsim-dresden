@@ -2,6 +2,7 @@ package org.matsim.replanning.bestresponse;
 
 import org.junit.jupiter.api.Test;
 import org.matsim.api.core.v01.Coord;
+import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.TransportMode;
 import org.matsim.api.core.v01.population.Activity;
 import org.matsim.api.core.v01.population.Leg;
@@ -9,6 +10,7 @@ import org.matsim.api.core.v01.population.Plan;
 import org.matsim.core.config.groups.ScoringConfigGroup;
 import org.matsim.core.population.PopulationUtils;
 import org.matsim.core.population.algorithms.MutateActivityTimeAllocation;
+import org.matsim.core.population.routes.RouteUtils;
 import org.matsim.prepare.EncodeTypicalDuration;
 
 import java.util.Random;
@@ -72,6 +74,31 @@ class BestResponseSchedulePlanAlgorithmTest {
 		// the open last activity stays unscheduled.
 		assertFalse( home2.getEndTime().isDefined() );
 		assertFalse( home2.getMaximumDuration().isDefined() );
+	}
+
+	/**
+	 * Travel time lives on the route for freshly routed legs (leg-level travel time undefined); the extractor must
+	 * fall back to it instead of treating the leg as instantaneous. This bug made the optimizer schedule whole days
+	 * with zero travel during a run: every replanned leg lost its leg-level travel time, and each activity whose
+	 * anchor gap was smaller than the real cumulated travel realized as zero-duration.
+	 */
+	@Test
+	void travelTimesFallBackToRouteTravelTime() {
+		Plan plan = garbledWrapAroundPlan();
+		for ( var element : plan.getPlanElements() ) {
+			if ( element instanceof Leg leg ) {
+				double t = leg.getTravelTime().seconds();
+				leg.setTravelTimeUndefined();
+				leg.setRoute( RouteUtils.createGenericRouteImpl( Id.createLinkId( "a" ), Id.createLinkId( "b" ) ) );
+				leg.getRoute().setTravelTime( t );
+			}
+		}
+
+		double[] travel = BestResponseSchedulePlanAlgorithm.travelTimesBeforeEachActivity( plan, 3 );
+
+		assertEquals( 0., travel[0], 1e-9 );
+		assertEquals( 1800., travel[1], 1e-9 );
+		assertEquals( 1800., travel[2], 1e-9 );
 	}
 
 	@Test
