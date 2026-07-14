@@ -31,12 +31,15 @@ import java.util.List;
  *   {@code endEarlySlope*(e* - end_i)} if early, {@code endLateSlope*(end_i - e*)} if late. Because {@code end_i}
  *   couples to all upstream durations, this term is what makes the problem a genuine chain LP rather than n independent
  *   one-dimensional problems.</li>
- *   <li><b>Random error</b> {@link Act#randomError} (seconds): a per-activity, per-replanning perturbation of the
- *   preferred duration, equivalent to a random linear term in the objective; it is what makes the best response
- *   stochastic (Pougala's additive error), replacing the random mutation as the source of exploration.</li>
+ *   <li><b>Random error</b>: a per-activity, per-replanning perturbation added directly to the penalty <em>slopes</em>
+ *   (the utility coefficients), following Pougala's additive random utility on the parameters -- not to the durations
+ *   or times. It is what makes the best response stochastic, replacing the random mutation as the source of
+ *   exploration. Because it perturbs the coefficients, it only changes the solution once the coefficients actually bind,
+ *   i.e. in the coupled LP; the separable mockup ({@link SeparableDurationScheduleSolver}), which ignores the slopes,
+ *   is unaffected by it.</li>
  * </ul>
  * The penalty slopes are filled from the configured Charypar-Nagel parameters (see
- * {@link BestResponseSchedulePlanAlgorithm}); the units are utils per second.
+ * {@link BestResponseSchedulePlanAlgorithm}) plus the random perturbation; the units are utils per second.
  */
 public final class ScheduleProblem {
 
@@ -51,18 +54,17 @@ public final class ScheduleProblem {
 		public final double travelTimeBefore;
 		/** Preferred (typical) duration t*, seconds. */
 		public final double typicalDuration;
+		/** Penalty slopes (utils/s), each already including its per-activity random perturbation; see class javadoc. */
 		public final double durShortSlope;
 		public final double durLongSlope;
 		/** Desired end time e*, or undefined if this activity has no scheduling anchor. */
 		public final OptionalTime targetEndTime;
 		public final double endEarlySlope;
 		public final double endLateSlope;
-		/** Random error on the preferred duration (s), drawn per replanning; see class javadoc. */
-		public final double randomError;
 
 		public Act( String type, boolean endTimeBased, boolean lastActivity, double travelTimeBefore, double typicalDuration,
 					double durShortSlope, double durLongSlope, OptionalTime targetEndTime, double endEarlySlope,
-					double endLateSlope, double randomError ) {
+					double endLateSlope ) {
 			this.type = type;
 			this.endTimeBased = endTimeBased;
 			this.lastActivity = lastActivity;
@@ -73,7 +75,6 @@ public final class ScheduleProblem {
 			this.targetEndTime = targetEndTime;
 			this.endEarlySlope = endEarlySlope;
 			this.endLateSlope = endLateSlope;
-			this.randomError = randomError;
 		}
 	}
 

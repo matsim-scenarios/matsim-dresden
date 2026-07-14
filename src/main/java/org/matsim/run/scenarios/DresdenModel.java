@@ -117,9 +117,10 @@ public class DresdenModel extends MATSimApplication {
 	private boolean bestResponseScheduling = false;
 
 	@CommandLine.Option(names="--best-response-sigma",
-		description = "Standard deviation (seconds) of the per-activity random error in the best-response scheduling " +
-			"strategy; >0 makes the best response stochastic (Pougala-style). Only used with --best-response-scheduling.")
-	private double bestResponseSigma = 900.0;
+		description = "Standard deviation (utils/second) of the random perturbation added to the penalty slopes in the " +
+			"best-response scheduling strategy; >0 makes the best response stochastic (Pougala-style random utility on " +
+			"the coefficients). Default 0. Only used with --best-response-scheduling.")
+	private double bestResponseSigma = 0.0;
 
 //	TODO: remove before release
 //	@CommandLine.Option(names="--ride-alpha", description = "alpha value for ride. For calibration only! To be removed before release.")

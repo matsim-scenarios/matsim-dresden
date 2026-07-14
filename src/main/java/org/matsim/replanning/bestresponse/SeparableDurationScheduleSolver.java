@@ -3,14 +3,16 @@ package org.matsim.replanning.bestresponse;
 /**
  * MOCKUP solver. It optimizes only the separable <em>duration</em> term of the {@link ScheduleProblem} and ignores the
  * end-time scheduling penalties (which couple the activities through the chain and are what actually require a linear
- * program). With a symmetric duration penalty the separable optimum of each activity is simply its preferred duration,
- * so the best response reduces to the (randomly perturbed) typical duration clamped to be non-negative:
+ * program). The separable optimum of each activity's duration penalty is its preferred duration (the kink of the
+ * V-shaped penalty, independent of the slope magnitudes), so the best response reduces to the typical duration clamped
+ * to be non-negative:
  * <pre>
- *   d_i = max(0, typicalDuration_i + randomError_i)
+ *   d_i = max(0, typicalDuration_i)
  * </pre>
  * That already delivers the headline property we are after -- durations are non-negative and near typical, so no
  * activity is squeezed to zero -- while leaving the genuine optimization (the coupled end-time term) as the project
- * work.
+ * work. Note that because this solver never looks at the slopes, it is insensitive to the random-utility perturbation
+ * (which lives on the slopes); the randomization only takes effect once the coupled LP is in place.
  * <p>
  * TODO(project): replace with a real {@link ScheduleSolver} that minimizes the full objective, e.g. an LP over the
  * durations with the chain constraints {@code start_i = end_{i-1} + travelTimeBefore_i}, {@code end_i = start_i + d_i},
@@ -25,7 +27,7 @@ public final class SeparableDurationScheduleSolver implements ScheduleSolver {
 		double[] durations = new double[problem.activities.size()];
 		for ( int i = 0; i < durations.length; i++ ) {
 			ScheduleProblem.Act act = problem.activities.get( i );
-			durations[i] = Math.max( 0.0, act.typicalDuration + act.randomError );
+			durations[i] = Math.max( 0.0, act.typicalDuration );
 		}
 		return durations;
 	}

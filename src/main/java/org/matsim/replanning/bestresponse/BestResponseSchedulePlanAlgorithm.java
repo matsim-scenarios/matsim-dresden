@@ -92,13 +92,19 @@ public final class BestResponseSchedulePlanAlgorithm implements PlanAlgorithm {
 				( !activity.getMaximumDuration().isDefined() && !lastActivity );
 
 			double typicalDuration = typicalDuration( activity );
-			double randomError = lastActivity ? 0. : random.nextGaussian() * randomErrorSigma;
 
+			// Random utility (Pougala): the additive error goes on the penalty slopes (the utility coefficients), each
+			// perturbed by an independent draw ~ N(0, sigma) [utils/s], not on the durations or times.
 			acts.add( new ScheduleProblem.Act(
 				activity.getType(), endTimeBased, lastActivity, travelBefore[i], typicalDuration,
-				durSlope, durSlope, targetEndTime( activity ), endEarlySlope, endLateSlope, randomError ) );
+				perturb( durSlope ), perturb( durSlope ), targetEndTime( activity ), perturb( endEarlySlope ), perturb( endLateSlope ) ) );
 		}
 		return new ScheduleProblem( acts, 0. );
+	}
+
+	/** A penalty slope (utils/s) with its additive random-utility perturbation. */
+	private double perturb( double baseSlope ) {
+		return baseSlope + random.nextGaussian() * randomErrorSigma;
 	}
 
 	/** Preferred duration: the per-activity typical-duration attribute (see {@link EncodeTypicalDuration}), else the type's config value, else a fallback. */

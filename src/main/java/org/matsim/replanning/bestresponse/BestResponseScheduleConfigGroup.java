@@ -6,14 +6,14 @@ import org.matsim.core.config.ReflectiveConfigGroup;
  * Config for the {@link BestResponseScheduleStrategy}. Kept deliberately small for the mockup: the penalty slopes are
  * derived from the configured Charypar-Nagel scoring parameters at runtime (see
  * {@link BestResponseSchedulePlanAlgorithm}), so the only genuinely new parameter here is the scale of the random error
- * that turns the deterministic best response into a stochastic one (as in Pougala et al.).
+ * added to those slopes that turns the deterministic best response into a stochastic one (as in Pougala et al.).
  */
 public final class BestResponseScheduleConfigGroup extends ReflectiveConfigGroup {
 
 	public static final String GROUP_NAME = "bestResponseSchedule";
 
-	/** Standard deviation (seconds) of the per-activity random error added to each preferred duration. */
-	private double randomErrorSigma = 900.0;
+	/** Standard deviation (utils/second) of the random perturbation added to each penalty slope. Default 0 = deterministic. */
+	private double randomErrorSigma = 0.0;
 
 	public BestResponseScheduleConfigGroup() {
 		super( GROUP_NAME );

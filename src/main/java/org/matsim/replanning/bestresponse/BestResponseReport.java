@@ -42,8 +42,9 @@ public final class BestResponseReport implements MATSimAppCommand {
 	@CommandLine.Option(names = "--output", description = "Optional path to write the optimized population to.")
 	private Path output;
 
-	@CommandLine.Option(names = "--sigma", description = "Random-error standard deviation (seconds). Default 0 gives the " +
-		"deterministic best response (durations = typical), which is easiest to interpret.", defaultValue = "0")
+	@CommandLine.Option(names = "--sigma", description = "Standard deviation (utils/second) of the random perturbation " +
+		"added to the penalty slopes. Default 0 gives the deterministic best response (durations = typical), which is " +
+		"easiest to interpret; note the mockup solver ignores the slopes, so only 0 is meaningful until the LP lands.", defaultValue = "0")
 	private double sigma;
 
 	@CommandLine.Option(names = "--seed", description = "RNG seed (only matters when --sigma > 0).", defaultValue = "4711")
@@ -118,7 +119,7 @@ public final class BestResponseReport implements MATSimAppCommand {
 		sb.append( "=== Best-response optimizer report ===" ).append( System.lineSeparator() );
 		sb.append( "input:            " ).append( input ).append( System.lineSeparator() );
 		sb.append( String.format( "persons:          %d processed, %d skipped (stay-home / single activity)%n", processed, skipped ) );
-		sb.append( String.format( "sigma:            %.0f s   seed: %d   performing: %.1f u/h%n", sigma, seed, performing ) );
+		sb.append( String.format( "sigma:            %.4f u/s (slope perturbation)   seed: %d   performing: %.1f u/h%n", sigma, seed, performing ) );
 		sb.append( System.lineSeparator() );
 		sb.append( "Activity end-time movement (min):  " ).append( stats( endMoveMin ) ).append( System.lineSeparator() );
 		sb.append( "Activity duration change  (min):   " ).append( stats( durChangeMin ) ).append( System.lineSeparator() );
