@@ -22,6 +22,7 @@ import org.matsim.core.router.TripStructureUtils;
 import org.matsim.core.scenario.ScenarioUtils;
 import org.matsim.core.scoring.functions.ScoringParametersForPerson;
 import org.matsim.prepare.EncodeTypicalDuration;
+import org.matsim.replanning.bestresponse.BestResponseScheduleStrategy;
 import org.matsim.run.scenarios.DresdenModel;
 import org.matsim.utils.tablesaw.TablesawUtils;
 import picocli.CommandLine;
@@ -137,6 +138,7 @@ public class DresdenAddVttsEtcToActivities implements MATSimAppCommand {
 												  .addOverridingModule( new AbstractModule(){
 													  @Override public void install(){
 														  bind( ScoringParametersForPerson.class ).to( IncomeDependentUtilityOfMoneyPersonScoringParameters.class );
+														  addPlanStrategyBinding(BestResponseScheduleStrategy.STRATEGY_NAME).toProvider(BestResponseScheduleStrategy.class);
 													  }
 												  } )
 												  .build();
