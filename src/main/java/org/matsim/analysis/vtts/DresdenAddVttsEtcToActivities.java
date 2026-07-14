@@ -127,9 +127,12 @@ public class DresdenAddVttsEtcToActivities implements MATSimAppCommand {
 			populationFilename = globFile( path, runPrefix + "*output_" + Controler.DefaultFiles.experiencedPlans.getFilename() + "*" );
 		}
 
+		Population experiencedPlans = PopulationUtils.readPopulation( populationFilename.toString() );
+		retainAnalyzedSubpopulation( experiencedPlans );
+
 		Scenario scenario = new ScenarioUtils.ScenarioBuilder(config)
 //								.setNetwork(NetworkUtils.readNetwork(path.resolve(runPrefix + "output_" + Controler.DefaultFiles.network.getFilename() + ".gz").toString()))
-								.setPopulation(PopulationUtils.readPopulation( populationFilename.toString() ))
+								.setPopulation( experiencedPlans )
 								.build();
 
 //		new TransitScheduleReader(scenario).readFile(path.resolve(runPrefix + "output_" + Controler.DefaultFiles.transitSchedule.getFilename() + ".gz").toString());
@@ -242,7 +245,7 @@ public class DresdenAddVttsEtcToActivities implements MATSimAppCommand {
 			degenerateTrips.write().usingOptions( options.build() );
 		}
 
-		// all the following would need to be separated by subpopulation
+		// (the following does not need to be separated by subpopulation: only ANALYZED_SUBPOPULATION is in here)
 
 		// A handful of residual trips (short middle activities squeezed to near-zero effective duration) have finite
 		// but enormous VTTS -- up to ~7e5 Eu/h -- so they classify as "ok" rather than "degenerate" and are kept in
@@ -262,6 +265,16 @@ public class DresdenAddVttsEtcToActivities implements MATSimAppCommand {
 		TablesawUtils.writeFigureToHtmlFile( htmlPath.toString(), figure );
 
 		log.info( "print summary statistics:");
+
+		// Number of activities that are actually 0.0 long -- the phenomenon we are trying to fix, so report it as a
+		// headline number. Counted over all rows of the trips table, i.e. over the same set of activities as the rest
+		// of this analysis (each agent's first activity is not in the table, since an activity enters it via its
+		// incoming trip). Trips with a degenerate scoring input are included: whether an activity has zero duration is
+		// a property of the mobsim result, not of whether we managed to score it.
+		int zeroDurationActs = tripsTable.doubleColumn( HeadersKN.activityDuration ).isEqualTo( 0. ).size();
+		System.out.println( System.lineSeparator() + "activities with duration 0.0: " + zeroDurationActs + " of " + tripsTable.rowCount()
+									+ " (" + format1.format( 100. * zeroDurationActs / tripsTable.rowCount() ) + "%)" + System.lineSeparator() );
+
 		final Table muttsStats = okTrips.summarize( HeadersKN.muttsh, mean, quartile1, median, quartile3, percentile95 ).apply();
 		System.out.println( System.lineSeparator() + muttsStats + System.lineSeparator() );
 		final Table vttsStats = okTrips.summarize( HeadersKN.vttsh, mean, quartile1, median, quartile3, percentile95 ).apply();
@@ -278,6 +291,27 @@ public class DresdenAddVttsEtcToActivities implements MATSimAppCommand {
 		}
 
 		return 0;
+	}
+
+	/**
+	 * The only subpopulation this analysis looks at. The others (freight, commercial traffic) do not have the
+	 * person-like activity scoring this analysis is about.
+	 */
+	private static final String ANALYZED_SUBPOPULATION = "person";
+
+	/**
+	 * Drop everyone outside the analyzed subpopulation from the experienced plans. That is all it takes to keep them
+	 * out of the whole analysis: the {@link VTTSHandler} ignores every agent that is not in the population, so they
+	 * end up in neither the trips table nor the statistics, and they are not written to the vtts experienced plans.
+	 */
+	private static void retainAnalyzedSubpopulation( Population population ) {
+		List<Id<Person>> otherSubpopulations = population.getPersons().values().stream()
+									   .filter( person -> !ANALYZED_SUBPOPULATION.equals( PopulationUtils.getSubpopulation( person ) ) )
+									   .map( Person::getId )
+									   .toList();
+		otherSubpopulations.forEach( population::removePerson );
+		log.info( "analyzing subpopulation '{}': {} persons; ignoring {} agents of other subpopulations.",
+			ANALYZED_SUBPOPULATION, population.getPersons().size(), otherSubpopulations.size() );
 	}
 
 	/**

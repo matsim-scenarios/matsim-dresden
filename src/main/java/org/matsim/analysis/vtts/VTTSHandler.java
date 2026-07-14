@@ -78,7 +78,8 @@ public final class VTTSHandler implements ActivityStartEventHandler, ActivityEnd
 		public double mUTTSh;
 		public String actType;
 		public double actTypDur_h;
-		public double actDur_h;
+		/** NaN until the activity following this trip has been seen, so an unscored trip is not reported as a zero-duration activity. */
+		public double actDur_h = Double.NaN;
 		public double actScore;
 		/** True if the activity scoring got a degenerate input (see {@link MarginalSumScoringFunction.Scores}); the VTTS/mUTTS/mUSL values are then NaN and this trip is reported in a separate class. */
 		public boolean degenerateScoringInput;
@@ -232,6 +233,10 @@ public final class VTTSHandler implements ActivityStartEventHandler, ActivityEnd
 		if ( StageActivityTypeIdentifier.isStageActivity( event.getActType() ) || this.personIdsToBeIgnored.contains( personId )) {
 			return;
 		}
+
+		if( isToBeIgnored( personId ) ) return;
+		// (as in the other handlers: an agent that is not in the population is not analysed, and must not even get a
+		// SimData record here -- this is the first event we see for an agent.)
 
 		SimData simData = simDataMap.get( personId );
 		if ( simData==null ) {
