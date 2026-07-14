@@ -397,6 +397,26 @@ run-1pct-bestresponse: input/prepare-config.xml | $(CLASSPATH)
 	 --best-response-scheduling\
 	 $(ARGS)
 
+# Stochastic best response (random-utility sampling): like run-1pct-bestresponse, but each scheduling anchor
+# (typical duration and target end time) is perturbed per replanning with N(0, sigma). Sigma mimics the spread of
+# the classic TimeAllocationMutator this scenario configures: uniform on +-mutationRange (1800s) has standard
+# deviation 1800/sqrt(3) ~ 1040s. Exploration happens around the stable stamped initialEndTime anchors, so the
+# perturbation does not accumulate into a random walk across replannings.
+BR_SIGMA ?= 1040
+run-1pct-bestresponse-sigma: input/prepare-config.xml | $(CLASSPATH)
+	$(sc) run --config $<\
+	 --config:plans.inputPlansFile=before-calibration/output/$N-$V-1pct.plans-initial.xml.gz\
+	 --config:qsim.flowCapacityFactor=0.01\
+	 --config:qsim.storageCapacityFactor=0.01\
+	 --config:counts.countsScaleFactor=0.01\
+	 --config:simwrapper.sampleSize=0.01\
+	 --runId $N-$V-1pct-bestresponse-sigma\
+	 --output output/$N-$V-1pct-bestresponse-sigma\
+	 --with-opening-times=false\
+	 --best-response-scheduling\
+	 --best-response-sigma=$(BR_SIGMA)\
+	 $(ARGS)
+
 vtts: | $(CLASSPATH)
 	$(sc) analysis run-vtts-analysis --path output/dresden-v1.1-1pct --runId dresden-v1.1-1pct
 
