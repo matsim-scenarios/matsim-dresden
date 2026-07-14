@@ -360,26 +360,30 @@ run-1pct: input/prepare-config.xml | $(CLASSPATH)
 	 --output output/$N-$V-1pct\
 	 $(ARGS)
 
-# Run at 1pct sample: no opening times, time mutation anchored to the initial (feasible) end times so activities
-# cannot drift into and get stuck at zero-duration corners.
-run-1pct-notimes-anchored: input/prepare-config.xml | $(CLASSPATH)
+run-1pct-yestimes: input/prepare-config.xml | $(CLASSPATH)
 	$(sc) run --config $<\
 	 --config:plans.inputPlansFile=before-calibration/output/$N-$V-1pct.plans-initial.xml.gz\
 	 --config:qsim.flowCapacityFactor=0.01\
 	 --config:qsim.storageCapacityFactor=0.01\
 	 --config:counts.countsScaleFactor=0.01\
 	 --config:simwrapper.sampleSize=0.01\
-	 --runId $N-$V-1pct-notimes-anchored\
-	 --output output/$N-$V-1pct-notimes-anchored\
-	 --with-opening-times=false\
-	 --mutate-around-initial-end-time-only\
+	 --runId $N-$V-1pct-yestimes\
+	 --output output/$N-$V-1pct-yestimes\
+	 --with-opening-times=true\
 	 $(ARGS)
 
-# Smoke test: the best-response scheduling strategy replacing the TimeAllocationMutator, on the
-# no-opening-times setup. lastIteration=2 -- iteration 0 (initial plans), one live round of best-response replanning
-# in iteration 1, and iteration 2 with innovation already disabled (fractionOfIterationsToDisableInnovation 0.9 kills
-# innovation at ceil(0.9*lastIteration), so with lastIteration=1 the only replanning round would handle 0 plans).
-# The best response is a one-shot construction, so further live iterations add nothing. Exercises the wiring end to end.
+run-1pct-notimes: input/prepare-config.xml | $(CLASSPATH)
+	$(sc) run --config $<\
+	 --config:plans.inputPlansFile=before-calibration/output/$N-$V-1pct.plans-initial.xml.gz\
+	 --config:qsim.flowCapacityFactor=0.01\
+	 --config:qsim.storageCapacityFactor=0.01\
+	 --config:counts.countsScaleFactor=0.01\
+	 --config:simwrapper.sampleSize=0.01\
+	 --runId $N-$V-1pct-notimes\
+	 --output output/$N-$V-1pct-notimes\
+	 --with-opening-times=false\
+	 $(ARGS)
+
 run-1pct-bestresponse: input/prepare-config.xml | $(CLASSPATH)
 	$(sc) run --config $<\
 	 --config:plans.inputPlansFile=before-calibration/output/$N-$V-1pct.plans-initial.xml.gz\
