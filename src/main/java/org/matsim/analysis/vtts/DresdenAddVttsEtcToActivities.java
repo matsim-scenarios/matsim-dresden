@@ -289,14 +289,18 @@ public class DresdenAddVttsEtcToActivities implements MATSimAppCommand {
 
 		log.info( "print summary statistics:");
 
-		// Number of activities that are actually 0.0 long -- the phenomenon we are trying to fix, so report it as a
-		// headline number. Counted over all rows of the trips table, i.e. over the same set of activities as the rest
-		// of this analysis (each agent's first activity is not in the table, since an activity enters it via its
-		// incoming trip). Trips with a degenerate scoring input are included: whether an activity has zero duration is
-		// a property of the mobsim result, not of whether we managed to score it.
+		// Headline numbers, all counted over the full trips table (each agent's first activity is not in the table,
+		// since an activity enters it via its incoming trip). The zero-duration count includes every class: whether an
+		// activity has zero duration is a property of the mobsim result, not of whether we managed to score it.
+		int total = tripsTable.rowCount();
 		int zeroDurationActs = tripsTable.doubleColumn( HeadersKN.activityDuration ).isEqualTo( 0. ).size();
-		System.out.println( System.lineSeparator() + "activities with duration 0.0: " + zeroDurationActs + " of " + tripsTable.rowCount()
-									+ " (" + format1.format( 100. * zeroDurationActs / tripsTable.rowCount() ) + "%)" + System.lineSeparator() );
+		StringBuilder summary = new StringBuilder( System.lineSeparator() );
+		summary.append( countLine( "scoring ok (log branch; in the stats)", okTrips.rowCount(), total ) );
+		summary.append( countLine( "scoring extrapolated (below zero-utility duration; excluded from means)", extrapolatedTrips.rowCount(), total ) );
+		summary.append( countLine( "scoring degenerate (not computable; pipeline alarm, expected 0)", degenerateTrips.rowCount(), total ) );
+		summary.append( countLine( "last activity arriving at/after day end (indicator, not a class)", afterDayEndCount, total ) );
+		summary.append( countLine( "activities with duration 0.0", zeroDurationActs, total ) );
+		System.out.println( summary );
 
 		final Table muttsStats = okTrips.summarize( HeadersKN.muttsh, mean, quartile1, median, quartile3, percentile95 ).apply();
 		System.out.println( System.lineSeparator() + muttsStats + System.lineSeparator() );
@@ -365,6 +369,12 @@ public class DresdenAddVttsEtcToActivities implements MATSimAppCommand {
 
 	private static double asDouble( Object attribute ) {
 		return (attribute instanceof Number number) ? number.doubleValue() : Double.NaN;
+	}
+
+	private static String countLine( String label, int count, int total ) {
+		NumberFormat format = NumberFormat.getNumberInstance( Locale.GERMAN );
+		format.setMaximumFractionDigits( 1 );
+		return String.format( "%-75s %6d of %d (%s%%)%n", label + ":", count, total, format.format( 100. * count / total ) );
 	}
 
 	private static final String MUTTS_H = "mUTTS_h (incoming trip)";
