@@ -375,8 +375,9 @@ run-1pct-notimes-anchored: input/prepare-config.xml | $(CLASSPATH)
 	 --mutate-around-initial-end-time-only\
 	 $(ARGS)
 
-# Smoke test (2 iterations): the best-response scheduling strategy (mockup) replacing the TimeAllocationMutator, on the
-# no-opening-times setup. Just enough to exercise the wiring end to end; not a calibration run.
+# Smoke test: the best-response scheduling strategy (mockup) replacing the TimeAllocationMutator, on the
+# no-opening-times setup. lastIteration=1 -- iteration 0 (initial plans) plus one round of best-response replanning;
+# the best response is a one-shot construction, so further iterations add nothing. Exercises the wiring end to end.
 run-1pct-bestresponse-smoke: input/prepare-config.xml | $(CLASSPATH)
 	$(sc) run --config $<\
 	 --config:plans.inputPlansFile=before-calibration/output/$N-$V-1pct.plans-initial.xml.gz\
@@ -384,7 +385,7 @@ run-1pct-bestresponse-smoke: input/prepare-config.xml | $(CLASSPATH)
 	 --config:qsim.storageCapacityFactor=0.01\
 	 --config:counts.countsScaleFactor=0.01\
 	 --config:simwrapper.sampleSize=0.01\
-	 --config:controller.lastIteration=2\
+	 --config:controller.lastIteration=1\
 	 --runId $N-$V-1pct-bestresponse-smoke\
 	 --output output/$N-$V-1pct-bestresponse-smoke\
 	 --with-opening-times=false\
@@ -393,3 +394,7 @@ run-1pct-bestresponse-smoke: input/prepare-config.xml | $(CLASSPATH)
 
 vtts: | $(CLASSPATH)
 	$(sc) analysis run-vtts-analysis --path output/dresden-v1.1-1pct --runId dresden-v1.1-1pct
+
+# Run the best-response optimizer standalone over the initial 1pct plans and report what it changes.
+best-response-report: | $(CLASSPATH)
+	$(sc) analysis best-response-report input/before-calibration/output/$N-$V-1pct.plans-initial.xml.gz

@@ -30,6 +30,7 @@ import org.matsim.contrib.vsp.scenario.SnzActivities;
 import org.matsim.contrib.vsp.scoring.RideScoringParamsFromCarParams;
 import org.matsim.core.config.Config;
 import org.matsim.core.config.ConfigUtils;
+import org.matsim.replanning.bestresponse.BestResponseReport;
 import org.matsim.replanning.bestresponse.BestResponseScheduleConfigGroup;
 import org.matsim.replanning.bestresponse.BestResponseScheduleStrategy;
 import org.matsim.core.config.groups.RoutingConfigGroup.AccessEgressType;
@@ -68,7 +69,8 @@ import static org.matsim.run.scenarios.DresdenUtils.*;
 		CreateScenarioCutOut.class
 })
 @MATSimApplication.Analysis({
-		LinkStats.class, CheckPopulation.class, CheckAndSummarizeLongDistanceFreightPopulation.class, CheckStayHomeAgents.class, DresdenAddVttsEtcToActivities.class
+		LinkStats.class, CheckPopulation.class, CheckAndSummarizeLongDistanceFreightPopulation.class, CheckStayHomeAgents.class, DresdenAddVttsEtcToActivities.class,
+		BestResponseReport.class
 })
 public class DresdenModel extends MATSimApplication {
 

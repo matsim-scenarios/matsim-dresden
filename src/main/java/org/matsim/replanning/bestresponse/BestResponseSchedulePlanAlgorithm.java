@@ -70,7 +70,7 @@ public final class BestResponseSchedulePlanAlgorithm implements PlanAlgorithm {
 	}
 
 	/** Travel time (s) of the trip arriving at each activity; index 0 is the first activity and is always 0. */
-	private static double[] travelTimesBeforeEachActivity( Plan plan, int nActivities ) {
+	static double[] travelTimesBeforeEachActivity( Plan plan, int nActivities ) {
 		double[] travelBefore = new double[nActivities];
 		List<TripStructureUtils.Trip> trips = TripStructureUtils.getTrips( plan );
 		for ( int j = 0; j < trips.size() && j + 1 < nActivities; j++ ) {
