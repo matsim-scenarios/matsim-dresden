@@ -122,9 +122,9 @@ public class DresdenModel extends MATSimApplication {
 	private boolean bestResponseScheduling = false;
 
 	@CommandLine.Option(names="--best-response-sigma",
-		description = "Standard deviation (seconds) of the random perturbation added to the scheduling anchors " +
-			"(typical durations and target end times) in the best-response scheduling strategy; >0 makes the best " +
-			"response stochastic. Default 0. Only used with --best-response-scheduling.")
+		description = "Standard deviation (seconds) of the random perturbation added to the target end times in the " +
+			"best-response scheduling strategy; >0 makes the best response stochastic. Default 0. Only used with " +
+			"--best-response-scheduling.")
 	private double bestResponseSigma = 0.0;
 
 //	TODO: remove before release

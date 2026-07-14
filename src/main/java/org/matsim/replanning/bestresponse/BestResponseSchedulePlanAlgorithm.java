@@ -122,11 +122,14 @@ public final class BestResponseSchedulePlanAlgorithm implements PlanAlgorithm {
 			boolean endTimeBased = activity.getEndTime().isDefined() ||
 				( !activity.getMaximumDuration().isDefined() && !lastActivity );
 
-			// Random utility: the scheduling anchors (typical duration t*, target end time e*) are each perturbed by
-			// an independent draw ~ N(0, sigma) [seconds] -- the kink positions move, not the slopes. (An additive
-			// error *term* would be constant w.r.t. the timing and thus inert in this continuous problem; a slope
-			// perturbation would risk negative coefficients, which break the piecewise-linear split.)
-			double typicalDuration = Math.max( 0., perturb( typicalDuration( activity ) ) );
+			// Random utility: each target end time e* is perturbed by an independent draw ~ N(0, sigma) [seconds] --
+			// the kink positions move, not the slopes. (An additive error *term* would be constant w.r.t. the timing
+			// and thus inert in this continuous problem; a slope perturbation would risk negative coefficients, which
+			// break the piecewise-linear split.) The typical durations are NOT perturbed: an absolute sigma sized for
+			// end times (~17min) dwarfs short activities' typicals (5-30min) and would clamp them to zero; the classic
+			// TimeAllocationMutator likewise mutates only end times here (affectingDuration=false). Randomizing the
+			// duration taste would need a relative (e.g. lognormal) scale -- future work.
+			double typicalDuration = typicalDuration( activity );
 
 			OptionalTime targetEndTime = targetEndTime( activity );
 			if ( i == 0 && wrapAround && targetEndTime.isUndefined() && activity.getMaximumDuration().isDefined() ) {
@@ -146,7 +149,7 @@ public final class BestResponseSchedulePlanAlgorithm implements PlanAlgorithm {
 		return new ScheduleProblem( acts, 0., dayEnd, wrapAround );
 	}
 
-	/** A scheduling anchor (seconds) with its additive random-utility perturbation. */
+	/** A target end time (seconds) with its additive random-utility perturbation. */
 	private double perturb( double seconds ) {
 		return seconds + random.nextGaussian() * randomErrorSigma;
 	}

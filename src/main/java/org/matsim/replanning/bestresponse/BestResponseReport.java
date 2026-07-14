@@ -43,8 +43,8 @@ public final class BestResponseReport implements MATSimAppCommand {
 	private Path output;
 
 	@CommandLine.Option(names = "--sigma", description = "Standard deviation (seconds) of the random perturbation " +
-		"added to the scheduling anchors (typical durations and target end times). Default 0 gives the deterministic " +
-		"best response, which is easiest to interpret.", defaultValue = "0")
+		"added to the target end times. Default 0 gives the deterministic best response, which is easiest to " +
+		"interpret.", defaultValue = "0")
 	private double sigma;
 
 	@CommandLine.Option(names = "--simulation-period-in-days", description = "Effective end of day, as a multiple of " +

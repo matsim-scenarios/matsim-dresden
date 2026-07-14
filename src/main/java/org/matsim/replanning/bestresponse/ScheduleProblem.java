@@ -45,12 +45,13 @@ import java.util.List;
  *   {@code endLateSlope*(end_i - e*)} if late. Because {@code end_i} couples to all upstream durations, this term is
  *   what makes the problem a genuine chain LP rather than n independent one-dimensional problems.</li>
  *   <li><b>Random error</b>: a per-activity, per-replanning perturbation {@code N(0, sigma)} (sigma in seconds) added
- *   to the scheduling <em>anchors</em> -- the typical durations {@code t*} and target end times {@code e*} -- i.e. to
- *   the kink positions of the piecewise-linear penalties. It is what makes the best response stochastic, replacing the
- *   random mutation as the source of exploration. (A Pougala-style additive error <em>term</em> per penalty would be a
- *   constant w.r.t. the decision variables and thus inert here: it only matters across discrete alternatives such as
- *   participation or mode, which this problem does not have. Perturbing the slopes instead would risk negative
- *   coefficients, which break the piecewise-linear split.)</li>
+ *   to the <em>target end times</em> {@code e*}, i.e. to the kink positions of the anchor penalties. It is what makes
+ *   the best response stochastic, replacing the random mutation as the source of exploration. (A Pougala-style
+ *   additive error <em>term</em> per penalty would be a constant w.r.t. the decision variables and thus inert here:
+ *   it only matters across discrete alternatives such as participation or mode, which this problem does not have.
+ *   Perturbing the slopes instead would risk negative coefficients, which break the piecewise-linear split. The
+ *   typical durations are not perturbed: an absolute sigma sized for end times dwarfs short activities' typicals and
+ *   would clamp them to zero; a duration-taste randomization would need a relative scale.)</li>
  * </ul>
  * The penalty slopes are filled unperturbed from the configured Charypar-Nagel parameters (see
  * {@link BestResponseSchedulePlanAlgorithm}); the units are utils per second.
@@ -72,7 +73,7 @@ public final class ScheduleProblem {
 		public final boolean lastActivity;
 		/** Fixed travel time (s) of the trip arriving at this activity; 0 for the first activity. */
 		public final double travelTimeBefore;
-		/** Preferred (typical) duration t* including its random perturbation, seconds. For a wrap-around first activity this is the combined wrapped duration. */
+		/** Preferred (typical) duration t*, seconds. For a wrap-around first activity this is the combined wrapped duration. */
 		public final double typicalDuration;
 		/** Penalty slopes (utils/s), unperturbed; see class javadoc. */
 		public final double durShortSlope;
