@@ -10,6 +10,9 @@ import org.matsim.analysis.personMoney.PersonMoneyEventsAnalysisModule;
 import org.matsim.api.core.v01.Scenario;
 import org.matsim.api.core.v01.TransportMode;
 import org.matsim.api.core.v01.network.Link;
+import org.matsim.api.core.v01.population.Activity;
+import org.matsim.api.core.v01.population.Person;
+import org.matsim.api.core.v01.population.Plan;
 import org.matsim.application.MATSimApplication;
 import org.matsim.application.analysis.CheckPopulation;
 import org.matsim.analysis.vtts.DresdenAddVttsEtcToActivities;
@@ -39,6 +42,8 @@ import org.matsim.core.controler.AbstractModule;
 import org.matsim.core.controler.Controler;
 import org.matsim.core.network.NetworkUtils;
 import org.matsim.core.network.turnRestrictions.DisallowedNextLinks;
+import org.matsim.core.population.algorithms.MutateActivityTimeAllocation;
+import org.matsim.core.router.TripStructureUtils;
 import org.matsim.core.replanning.annealing.ReplanningAnnealerConfigGroup.AnnealOption;
 import org.matsim.core.replanning.annealing.ReplanningAnnealerConfigGroup.AnnealingVariable;
 import org.matsim.core.scoring.functions.ScoringParametersForPerson;
@@ -270,6 +275,15 @@ public class DresdenModel extends MATSimApplication {
 //		this happens in the makefile pipeline already, but we do it here anyways, in case somebody uses a preliminary network.
 		PrepareNetwork.prepareFreightNetwork(scenario.getNetwork());
 
+//		Stamp each activity's end time as its stable scheduling anchor (the attribute the initial-anchored time
+//		mutator and the best-response scheduling strategy read as the target end time). Without it, those strategies
+//		fall back to the activity's *current* end time, which makes the anchor self-referential: every replanning
+//		re-anchors to its own output, and with a stochastic best response (sigma > 0) end times random-walk instead
+//		of exploring around a fixed point. Stamping only where absent keeps the original anchors across restarts
+//		(output plans carry the attribute) and lets preprocessing override. Unconditional: an extra activity
+//		attribute changes nothing unless one of those strategies is active.
+		stampInitialEndTimes(scenario);
+
 //		Splitting the first and last act of the day into separate _morning and _evening act types (to switch off
 //		wrap-around scoring) is now done during population preparation, see the split-wrap-around-activities step.
 
@@ -294,6 +308,21 @@ public class DresdenModel extends MATSimApplication {
 			PrepareNetwork.prepareEmissionsAttributes(scenario.getNetwork());
 //			prepare vehicle types for emission analysis
 			prepareVehicleTypesForEmissionAnalysis(scenario);
+		}
+	}
+
+	/** See the call site in {@link #prepareScenario(Scenario)}: every end-time-based activity gets its end time stamped
+	 * as the stable scheduling anchor, unless preprocessing or an earlier run already stamped one. Package-visible for testing. */
+	static void stampInitialEndTimes(Scenario scenario) {
+		for (Person person : scenario.getPopulation().getPersons().values()) {
+			for (Plan plan : person.getPlans()) {
+				for (Activity act : TripStructureUtils.getActivities(plan, TripStructureUtils.StageActivityHandling.ExcludeStageActivities)) {
+					if (act.getEndTime().isDefined()
+						&& act.getAttributes().getAttribute(MutateActivityTimeAllocation.INITIAL_END_TIME_ATTRIBUTE) == null) {
+						act.getAttributes().putAttribute(MutateActivityTimeAllocation.INITIAL_END_TIME_ATTRIBUTE, act.getEndTime().seconds());
+					}
+				}
+			}
 		}
 	}
 
