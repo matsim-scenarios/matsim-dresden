@@ -85,7 +85,7 @@ public class EncodeTypicalDuration implements MATSimAppCommand {
 	 *   than to a fixed 24h as the old code assumed.</li>
 	 * </ul>
 	 */
-	private void encodeTypicalDuration(Person person) {
+	void encodeTypicalDuration(Person person) {
 		for (Plan plan : person.getPlans()) {
 
 			List<Activity> activities = TripStructureUtils.getActivities(plan, TripStructureUtils.StageActivityHandling.ExcludeStageActivities);
@@ -95,36 +95,71 @@ public class EncodeTypicalDuration implements MATSimAppCommand {
 				continue;
 			}
 
+			double[] starts = startTimes(plan, activities);
+
 			// Middle activities are fully observed: their typical duration is simply their own duration.
 			for (int i = 1; i < activities.size() - 1; i++) {
 				Activity act = activities.get(i);
-				prolongToMinimumDuration(act);
-				setTypicalDuration(act, ownDuration(act));
+				prolongToMinimumDuration(act, starts[i]);
+				setTypicalDuration(act, ownDuration(act, starts[i]));
 			}
 
 			Activity first = activities.get(0);
 			Activity last = activities.get(activities.size() - 1);
+			double lastStart = starts[activities.size() - 1];
 
 			if (first.getType().equals(last.getType())) {
 				// wrap-around: first and last are one activity wrapping around midnight.
-				double wrapped = ownDuration(first) + (SECONDS_PER_DAY - last.getStartTime().orElse(0));
+				double wrapped = ownDuration(first, 0) + (SECONDS_PER_DAY - lastStart);
 				setTypicalDuration(first, wrapped);
 				setTypicalDuration(last, wrapped);
 			} else {
 				// no wrap-around: the last activity runs from its start to the effective end of the simulation period.
-				setTypicalDuration(first, ownDuration(first));
-				setTypicalDuration(last, simulationPeriodInDays * SECONDS_PER_DAY - last.getStartTime().orElse(0));
+				setTypicalDuration(first, ownDuration(first, 0));
+				setTypicalDuration(last, simulationPeriodInDays * SECONDS_PER_DAY - lastStart);
 			}
 		}
+	}
+
+	/**
+	 * Start time of every activity: the recorded start time where present, otherwise reconstructed by walking the chain
+	 * (previous end plus leg travel times). Populations that never went through a simulation carry no start times at
+	 * all; assuming 0 for those (as {@code getStartTime().orElse(0)} used to) silently turned every typical duration
+	 * into the activity's end time.
+	 */
+	private static double[] startTimes(Plan plan, List<Activity> activities) {
+		double[] starts = new double[activities.size()];
+		List<TripStructureUtils.Trip> trips = TripStructureUtils.getTrips(plan);
+		double clock = 0;
+		for (int i = 0; i < activities.size(); i++) {
+			Activity act = activities.get(i);
+			if (i > 0) {
+				double travel = 0;
+				if (i - 1 < trips.size()) {
+					for (var leg : trips.get(i - 1).getLegsOnly()) {
+						travel += leg.getTravelTime().orElse(0);
+					}
+				}
+				clock += travel;
+			}
+			starts[i] = act.getStartTime().orElse(clock);
+			clock = starts[i];
+			if (act.getEndTime().isDefined()) {
+				clock = act.getEndTime().seconds();
+			} else if (act.getMaximumDuration().isDefined()) {
+				clock += act.getMaximumDuration().seconds();
+			}
+		}
+		return starts;
 	}
 
 	/**
 	 * Duration of an activity as observed in the plan: end time minus start time if the end time is defined,
 	 * otherwise the maximum duration.
 	 */
-	private static double ownDuration(Activity act) {
+	private static double ownDuration(Activity act, double start) {
 		if (act.getEndTime().isDefined()) {
-			return act.getEndTime().seconds() - act.getStartTime().orElse(0);
+			return act.getEndTime().seconds() - start;
 		} else {
 			return act.getMaximumDuration().seconds();
 		}
@@ -144,8 +179,8 @@ public class EncodeTypicalDuration implements MATSimAppCommand {
 	 * the TimeAllocationMutator does not mutate, so a short activity would otherwise stay short forever -- performed
 	 * far below its (clamped) typical duration, which is exactly the degenerate scoring input we want to avoid.
 	 */
-	private void prolongToMinimumDuration(Activity act) {
-		if (minTypicalDuration > 0 && ownDuration(act) < minTypicalDuration) {
+	private void prolongToMinimumDuration(Activity act, double start) {
+		if (minTypicalDuration > 0 && ownDuration(act, start) < minTypicalDuration) {
 			act.setEndTimeUndefined();
 			act.setMaximumDuration(minTypicalDuration);
 		}
