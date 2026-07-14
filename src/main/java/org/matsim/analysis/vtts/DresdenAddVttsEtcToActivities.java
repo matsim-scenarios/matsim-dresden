@@ -22,6 +22,7 @@ import org.matsim.core.router.TripStructureUtils;
 import org.matsim.core.scenario.ScenarioUtils;
 import org.matsim.core.scoring.functions.ScoringParametersForPerson;
 import org.matsim.prepare.EncodeTypicalDuration;
+import org.matsim.replanning.bestresponse.BestResponseScheduleConfigGroup;
 import org.matsim.replanning.bestresponse.BestResponseScheduleStrategy;
 import org.matsim.run.scenarios.DresdenModel;
 import org.matsim.utils.tablesaw.TablesawUtils;
@@ -133,6 +134,7 @@ public class DresdenAddVttsEtcToActivities implements MATSimAppCommand {
 
 //		new TransitScheduleReader(scenario).readFile(path.resolve(runPrefix + "output_" + Controler.DefaultFiles.transitSchedule.getFilename() + ".gz").toString());
 
+		ConfigUtils.addOrGetModule(config, BestResponseScheduleConfigGroup.class);
 		com.google.inject.Injector injector = new Injector.InjectorBuilder( scenario )
 												  .addStandardModules()
 												  .addOverridingModule( new AbstractModule(){
