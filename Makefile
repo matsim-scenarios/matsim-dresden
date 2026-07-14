@@ -433,8 +433,15 @@ run-1pct-bestresponse-sigma: input/prepare-config.xml | $(CLASSPATH)
 	 --best-response-sigma=$(BR_SIGMA)\
 	 $(ARGS)
 
+vtts-v1.1: | $(CLASSPATH)
+	$(sc) analysis run-vtts-analysis --path output/dresden-v1.1-1pct --runId dresden-v1.1-1pct --simulation-period-in-days 1.0
+
 vtts: | $(CLASSPATH)
-	$(sc) analysis run-vtts-analysis --path output/dresden-v1.1-1pct --runId dresden-v1.1-1pct
+	$(sc) analysis run-vtts-analysis --path output/dresden-v1.1-1pct-bestresponse-sigma --runId dresden-v1.1-1pct-bestresponse-sigma --simulation-period-in-days 1.25
+	$(sc) analysis run-vtts-analysis --path output/dresden-v1.1-1pct-bestresponse --runId dresden-v1.1-1pct-bestresponse --simulation-period-in-days 1.25
+	$(sc) analysis run-vtts-analysis --path output/dresden-v1.1-1pct-notimes --runId dresden-v1.1-1pct-notimes --simulation-period-in-days 1.25
+	$(sc) analysis run-vtts-analysis --path output/dresden-v1.1-1pct-yestimes --runId dresden-v1.1-1pct-yestimes --simulation-period-in-days 1.25
+	$(sc) analysis run-vtts-analysis --path output/dresden-v1.1-1pct-notimes-penalties --runId dresden-v1.1-1pct-notimes-penalties --simulation-period-in-days 1.25
 
 # Run the best-response optimizer standalone over the initial 1pct plans and report what it changes.
 best-response-report: | $(CLASSPATH)
