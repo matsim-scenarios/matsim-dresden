@@ -11,21 +11,39 @@ stages:
       - input/before-calibration/output/dresden-v1.1-network-with-pt.xml.gz
       - input/before-calibration/output/dresden-v1.1-transitSchedule.xml.gz
       - input/before-calibration/output/dresden-v1.1-transitVehicles.xml.gz
+  # The plans chain up to short-trips does not depend on any experiment parameter, but it is what the persons
+  # stage feeds on. Tracking its result means a machine that has only pulled the data (the cluster) can obtain
+  # it instead of re-deriving it -- and therefore the network -- from OSM. Same reasoning for commercial_traffic
+  # below, whose make rule also reads the (untracked) network. See .SECONDARY in the Makefile.
+  short_trips:
+    cmd: make input/before-calibration/output/prepare-100pct-short-trips.plans.xml.gz
+    deps:
+      - Makefile
+      - input/20250123_Teilmodell_Hoyerswerda
+      - input/20250130_Teilmodell_Hoyerswerda
+      - input/sumo
+      - input/osm
+      - input/landuse
+      - input/shp
+    outs:
+      - input/before-calibration/output/prepare-100pct-short-trips.plans.xml.gz
+  commercial_traffic:
+    cmd: make input/before-calibration/output/dresden-small-scale-commercialTraffic-v1.1-100pct.xml.gz
+    deps:
+      - Makefile
+      - input/smallScaleCommercialTraffic
+      - input/sumo
+      - input/osm
+      - input/shp
+    outs:
+      - input/before-calibration/output/dresden-small-scale-commercialTraffic-v1.1-100pct.xml.gz
   persons:
     cmd: make input/before-calibration/output/prepare-100pct-persons.xml.gz SIM_PERIOD_DAYS=${sim_period_days}
     params:
       - sim_period_days
     deps:
       - Makefile
-      - input/20250123_Teilmodell_Hoyerswerda
-      - input/sumo
-      - input/osm
-      - input/landuse
-      - input/20250130_Teilmodell_Hoyerswerda
-      - input/shp
-      - input/gtfs
-      - input/germanWideFreight
-      - input/before-calibration/output/dresden-v1.1-network-with-pt.xml.gz
+      - input/before-calibration/output/prepare-100pct-short-trips.plans.xml.gz
     outs:
       - input/before-calibration/output/prepare-100pct-persons.xml.gz
   population:
@@ -46,6 +64,7 @@ stages:
       - input/germanWideFreight
       - input/before-calibration/output/dresden-v1.1-network-with-pt.xml.gz
       - input/before-calibration/output/prepare-100pct-persons.xml.gz
+      - input/before-calibration/output/dresden-small-scale-commercialTraffic-v1.1-100pct.xml.gz
     outs:
       - input/before-calibration/output/dresden-v1.1-100pct.plans-initial.xml.gz
       - input/before-calibration/output/dresden-v1.1-10pct.plans-initial.xml.gz

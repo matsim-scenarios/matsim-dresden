@@ -36,6 +36,21 @@ SIM_PERIOD_DAYS ?= 1.125
 
 .PHONY: prepare run run-1pct run-0pct
 
+# DVC owns cross-stage invalidation (see dvc.yaml); make only has to build what is genuinely absent.
+# None of the files below are DVC outputs, so a machine that only pulled the pipeline data (the cluster)
+# does not have them, and make would re-derive the entire network from OSM just because they are missing.
+# Marking them .SECONDARY makes make tolerate their absence: a missing secondary file does not force a
+# rebuild of a target that is otherwise up to date. It does NOT stop make from building one that is
+# actually needed as input to a step it has to run anyway.
+.SECONDARY: input/before-calibration/output/network-detailed-regional.osm.pbf \
+	input/before-calibration/output/network-coarse-germany.osm.pbf \
+	input/before-calibration/output/network.osm \
+	input/before-calibration/output/sumo.net.xml \
+	input/before-calibration/output/$N-$V-network.xml.gz \
+	input/before-calibration/output/prepare-100pct.plans.xml.gz \
+	input/before-calibration/output/prepare-cutout-100pct.plans.xml.gz \
+	input/before-calibration/output/prepare-cutout-fixed-subtours-100pct.plans.xml.gz
+
 # Compile sources incrementally and write the runtime classpath as a Java @argfile.
 # Fast after the first build: mvnw only recompiles changed sources.
 $(CLASSPATH): pom.xml $(shell find src/main/java -type f -name '*.java')
