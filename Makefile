@@ -28,6 +28,12 @@ sc := java -Xms$(MEMORY) -Xmx$(MEMORY) @$(CLASSPATH) org.matsim.run.DresdenModel
 # Last iteration for the run-* targets. Override on the command line, e.g. `make run-1pct LAST_IT=1`.
 LAST_IT ?= 500
 
+# Length of the simulation period, as a multiple of 24h: the effective end of day for the non-wrap-around
+# last-activity scoring. 1.125 = 27:00. The preprocessing steps, the runs and the post-hoc analyses must all
+# agree on it -- it is not persisted to the output config -- so it is passed explicitly from here everywhere.
+# Changing it invalidates the prepared plans: re-run the prepare pipeline.
+SIM_PERIOD_DAYS ?= 1.125
+
 .PHONY: prepare run run-1pct run-0pct
 
 # Compile sources incrementally and write the runtime classpath as a Java @argfile.
@@ -278,15 +284,14 @@ input/before-calibration/output/prepare-100pct-short-trips.plans.xml.gz: input/b
 
 # final steps of the person population, before freight traffic is merged in.
 input/before-calibration/output/prepare-100pct-persons.xml.gz: input/before-calibration/output/prepare-100pct-short-trips.plans.xml.gz | $(CLASSPATH)
-# clean redundant max-duration attributes and reschedule plans whose activities run past the simulation day (27:00),
-# order-preserving, so the last activity keeps a positive window. --simulation-period-in-days must match DresdenModel (1.125).
-	$(sc) prepare reschedule-late-plans $< --output $@ --simulation-period-in-days 1.125
+# clean redundant max-duration attributes and reschedule plans whose activities run past the simulation day,
+# order-preserving, so the last activity keeps a positive window.
+	$(sc) prepare reschedule-late-plans $< --output $@ --simulation-period-in-days $(SIM_PERIOD_DAYS)
 # switch off wrap-around scoring: split first and last act of the day into separate _morning and _evening act types.
 	$(sc) prepare split-wrap-around-activities $@ --output $@
 # encode each activity's typical duration as a "typicalDuration" attribute on the activity. Must run after the
 # wrap-around split, so the (now differing) morning/evening types take the non-wrap-around branch.
-# --simulation-period-in-days must match config.scenario().getSimulationPeriodInDays() set in DresdenModel (1.125).
-	$(sc) prepare encode-typical-duration $@ --output $@ --simulation-period-in-days 1.125 --min-typical-duration 300
+	$(sc) prepare encode-typical-duration $@ --output $@ --simulation-period-in-days $(SIM_PERIOD_DAYS) --min-typical-duration 300
 # for short activities, remove the end time and encode the span as a maximum duration instead.
 	$(sc) prepare end-time-to-duration $@ --output $@ --end-time-to-duration 1800
 
@@ -334,6 +339,7 @@ sc: | $(CLASSPATH)
 # Pass extra args to the run command verbatim via ARGS, e.g. `make run ARGS='--with-opening-times=false'`.
 run: input/prepare-config.xml | $(CLASSPATH)
 	$(sc) run --config $<\
+	 --simulation-period-in-days=$(SIM_PERIOD_DAYS)\
 	 $(ARGS)
 
 # Run at 10pct sample.
@@ -346,6 +352,7 @@ run-10pct: input/prepare-config.xml | $(CLASSPATH)
 	 --config:simwrapper.sampleSize=0.1\
 	 --runId $N-$V-10pct\
 	 --output output/$N-$V-10pct\
+	 --simulation-period-in-days=$(SIM_PERIOD_DAYS)\
 	 $(ARGS)
 
 # Run at 1pct sample.
@@ -358,6 +365,7 @@ run-1pct: input/prepare-config.xml | $(CLASSPATH)
 	 --config:simwrapper.sampleSize=0.01\
 	 --runId $N-$V-1pct\
 	 --output output/$N-$V-1pct\
+	 --simulation-period-in-days=$(SIM_PERIOD_DAYS)\
 	 $(ARGS)
 
 run-1pct-yestimes: input/prepare-config.xml | $(CLASSPATH)
@@ -370,6 +378,7 @@ run-1pct-yestimes: input/prepare-config.xml | $(CLASSPATH)
 	 --runId $N-$V-1pct-yestimes\
 	 --output output/$N-$V-1pct-yestimes\
 	 --with-opening-times=true\
+	 --simulation-period-in-days=$(SIM_PERIOD_DAYS)\
 	 $(ARGS)
 
 run-1pct-notimes: input/prepare-config.xml | $(CLASSPATH)
@@ -382,6 +391,7 @@ run-1pct-notimes: input/prepare-config.xml | $(CLASSPATH)
 	 --runId $N-$V-1pct-notimes\
 	 --output output/$N-$V-1pct-notimes\
 	 --with-opening-times=false\
+	 --simulation-period-in-days=$(SIM_PERIOD_DAYS)\
 	 $(ARGS)
 
 # Like run-1pct-notimes, but with the schedule-delay corridor armed in the scoring: per-activity soft anchors at the
@@ -398,6 +408,7 @@ run-1pct-notimes-penalties: input/prepare-config.xml | $(CLASSPATH)
 	 --output output/$N-$V-1pct-notimes-penalties\
 	 --with-opening-times=false\
 	 --schedule-delay-scoring\
+	 --simulation-period-in-days=$(SIM_PERIOD_DAYS)\
 	 $(ARGS)
 
 run-1pct-bestresponse: input/prepare-config.xml | $(CLASSPATH)
@@ -411,6 +422,7 @@ run-1pct-bestresponse: input/prepare-config.xml | $(CLASSPATH)
 	 --output output/$N-$V-1pct-bestresponse\
 	 --with-opening-times=false\
 	 --best-response-scheduling\
+	 --simulation-period-in-days=$(SIM_PERIOD_DAYS)\
 	 $(ARGS)
 
 # Stochastic best response (random-utility sampling): like run-1pct-bestresponse, but each target end time is
@@ -431,18 +443,21 @@ run-1pct-bestresponse-sigma: input/prepare-config.xml | $(CLASSPATH)
 	 --with-opening-times=false\
 	 --best-response-scheduling\
 	 --best-response-sigma=$(BR_SIGMA)\
+	 --simulation-period-in-days=$(SIM_PERIOD_DAYS)\
 	 $(ARGS)
 
+# The old dresden-v1.1-1pct run predates SIM_PERIOD_DAYS and was simulated with the 24:00 default, so it keeps
+# its own literal 1.0 rather than following the constant.
 vtts-v1.1: | $(CLASSPATH)
 	$(sc) analysis run-vtts-analysis --path output/dresden-v1.1-1pct --runId dresden-v1.1-1pct --simulation-period-in-days 1.0
 
 vtts: | $(CLASSPATH)
-	$(sc) analysis run-vtts-analysis --path output/dresden-v1.1-1pct-bestresponse-sigma --runId dresden-v1.1-1pct-bestresponse-sigma --simulation-period-in-days 1.125
-	$(sc) analysis run-vtts-analysis --path output/dresden-v1.1-1pct-bestresponse --runId dresden-v1.1-1pct-bestresponse --simulation-period-in-days 1.125
-	$(sc) analysis run-vtts-analysis --path output/dresden-v1.1-1pct-notimes --runId dresden-v1.1-1pct-notimes --simulation-period-in-days 1.125
-	$(sc) analysis run-vtts-analysis --path output/dresden-v1.1-1pct-yestimes --runId dresden-v1.1-1pct-yestimes --simulation-period-in-days 1.125
-	$(sc) analysis run-vtts-analysis --path output/dresden-v1.1-1pct-notimes-penalties --runId dresden-v1.1-1pct-notimes-penalties --simulation-period-in-days 1.125
+	$(sc) analysis run-vtts-analysis --path output/dresden-v1.1-1pct-bestresponse-sigma --runId dresden-v1.1-1pct-bestresponse-sigma --simulation-period-in-days $(SIM_PERIOD_DAYS)
+	$(sc) analysis run-vtts-analysis --path output/dresden-v1.1-1pct-bestresponse --runId dresden-v1.1-1pct-bestresponse --simulation-period-in-days $(SIM_PERIOD_DAYS)
+	$(sc) analysis run-vtts-analysis --path output/dresden-v1.1-1pct-notimes --runId dresden-v1.1-1pct-notimes --simulation-period-in-days $(SIM_PERIOD_DAYS)
+	$(sc) analysis run-vtts-analysis --path output/dresden-v1.1-1pct-yestimes --runId dresden-v1.1-1pct-yestimes --simulation-period-in-days $(SIM_PERIOD_DAYS)
+	$(sc) analysis run-vtts-analysis --path output/dresden-v1.1-1pct-notimes-penalties --runId dresden-v1.1-1pct-notimes-penalties --simulation-period-in-days $(SIM_PERIOD_DAYS)
 
 # Run the best-response optimizer standalone over the initial 1pct plans and report what it changes.
 best-response-report: | $(CLASSPATH)
-	$(sc) analysis best-response-report input/before-calibration/output/$N-$V-1pct.plans-initial.xml.gz
+	$(sc) analysis best-response-report input/before-calibration/output/$N-$V-1pct.plans-initial.xml.gz --simulation-period-in-days $(SIM_PERIOD_DAYS)

@@ -84,7 +84,7 @@ public class DresdenAddVttsEtcToActivities implements MATSimAppCommand {
 	@CommandLine.Option(names = "--simulation-period-in-days", description = "Effective end of day for the non-wrap-" +
 		"around last-activity scoring, as a multiple of 24h. NOT persisted to the output config, so it must be " +
 		"supplied to match the analyzed run: current runs use 1.125 (27:00, the default here); v1.1 used 1.0 (24:00).")
-	private double simulationPeriodInDays = DresdenModel.SIMULATION_PERIOD_IN_DAYS;
+	private double simulationPeriodInDays = DresdenModel.DEFAULT_SIMULATION_PERIOD_IN_DAYS;
 
 	public static void main(String[] args) {
 		new DresdenAddVttsEtcToActivities().execute(args );

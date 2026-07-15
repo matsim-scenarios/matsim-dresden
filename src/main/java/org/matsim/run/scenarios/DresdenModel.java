@@ -87,13 +87,13 @@ public class DresdenModel extends MATSimApplication {
 	public static final String VERSION = "v1.1";
 
 	/**
-	 * Length of the simulation period, as a multiple of 24h. Set to 1.125 (= 27:00) so that the non-wrap-around
-	 * overnight scoring clamps the last activity at 27:00 instead of 24:00 (see the setter call and
-	 * {@link org.matsim.scoring.DresdenActivityScoring} / {@link org.matsim.prepare.EncodeTypicalDuration}).
-	 * Exposed so post-hoc analyses (e.g. the VTTS analysis) can reproduce the run's scoring; the value is not
-	 * persisted to the output config (the scenario module is not written there), so it must come from here.
+	 * Default length of the simulation period, as a multiple of 24h; overridable with --simulation-period-in-days.
+	 * 1.125 (= 27:00) makes the non-wrap-around overnight scoring clamp the last activity at 27:00 instead of 24:00
+	 * (see {@link org.matsim.scoring.DresdenActivityScoring} / {@link org.matsim.prepare.EncodeTypicalDuration}).
+	 * Exposed so post-hoc analyses (e.g. the VTTS analysis) can reproduce a run's scoring; the value is not
+	 * persisted to the output config (the scenario module is not written there), so it must be supplied there.
 	 */
-	public static final double SIMULATION_PERIOD_IN_DAYS = 1.125;
+	public static final double DEFAULT_SIMULATION_PERIOD_IN_DAYS = 1.125;
 
 	/**
 	 * Fallback typical duration (seconds) for the untagged person activity types. Normally overridden per
@@ -112,6 +112,13 @@ public class DresdenModel extends MATSimApplication {
 
 	@CommandLine.Option(names="--with-opening-times")
 	private boolean withOpeningTimes = true;
+
+	@CommandLine.Option(names="--simulation-period-in-days",
+		description = "Length of the simulation period, as a multiple of 24h. Moves the else-branch overnight " +
+			"scoring clamp: handleOvernightActivity scores the (non-wrap-around) last activity from its start to " +
+			"simulationPeriodInDays * 24h. Preprocessing (reschedule-late-plans, encode-typical-duration) and " +
+			"post-hoc analyses must use the same value.")
+	private double simulationPeriodInDays = DEFAULT_SIMULATION_PERIOD_IN_DAYS;
 
 	@CommandLine.Option(names="--mutate-around-initial-end-time-only",
 		description = "If set, the TimeAllocationMutator mutates each activity's end time only around its initial " +
@@ -229,10 +236,10 @@ public class DresdenModel extends MATSimApplication {
 			scoringConfig.setEarlyDeparture_utils_hr(-scoringConfig.getPerforming_utils_hr());
 		}
 
-//		Move the else-branch overnight scoring clamp from 24:00 to 27:00. handleOvernightActivity
+//		Move the else-branch overnight scoring clamp away from 24:00. handleOvernightActivity
 //		scores the (non-wrap-around) last activity from its start to simulationPeriodInDays * 24h;
-//		1.125 * 24h = 27:00.
-		config.scenario().setSimulationPeriodInDays( SIMULATION_PERIOD_IN_DAYS );
+//		the default 1.125 * 24h = 27:00. See --simulation-period-in-days.
+		config.scenario().setSimulationPeriodInDays( simulationPeriodInDays );
 
 		prepareCommercialTrafficConfig(config);
 
