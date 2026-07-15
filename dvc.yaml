@@ -12,7 +12,9 @@ stages:
       - input/before-calibration/output/dresden-v1.1-transitSchedule.xml.gz
       - input/before-calibration/output/dresden-v1.1-transitVehicles.xml.gz
   persons:
-    cmd: make input/before-calibration/output/prepare-100pct-persons.xml.gz
+    cmd: make input/before-calibration/output/prepare-100pct-persons.xml.gz SIM_PERIOD_DAYS=${sim_period_days}
+    params:
+      - sim_period_days
     deps:
       - Makefile
       - input/20250123_Teilmodell_Hoyerswerda
@@ -27,7 +29,11 @@ stages:
     outs:
       - input/before-calibration/output/prepare-100pct-persons.xml.gz
   population:
-    cmd: make prepare
+    # Passes SIM_PERIOD_DAYS on even though no step of this stage consumes it directly: `make prepare` reaches
+    # through to the persons rule, and if make decides to rebuild it, it must use the experiment's value.
+    cmd: make prepare SIM_PERIOD_DAYS=${sim_period_days}
+    params:
+      - sim_period_days
     deps:
       - Makefile
       - input/20250123_Teilmodell_Hoyerswerda
@@ -46,4 +52,20 @@ stages:
       - input/before-calibration/output/dresden-v1.1-1pct.plans-initial.xml.gz
       - input/before-calibration/output/dresden-v1.1-activity-facilities.xml.gz
   run:
-    cmd: make run-1pct
+    # run-1pct-notimes (no made-up opening times) is the structural candidate we vary parameters on.
+    cmd: make run-1pct-notimes SIM_PERIOD_DAYS=${sim_period_days} LAST_IT=${last_iteration}
+    params:
+      - sim_period_days
+      - last_iteration
+    deps:
+      - Makefile
+      - pom.xml
+      - src/main/java
+      - input/prepare-config.xml
+      - input/before-calibration/output/dresden-v1.1-1pct.plans-initial.xml.gz
+      - input/before-calibration/output/dresden-v1.1-activity-facilities.xml.gz
+      - input/before-calibration/output/dresden-v1.1-network-with-pt.xml.gz
+      - input/before-calibration/output/dresden-v1.1-transitSchedule.xml.gz
+      - input/before-calibration/output/dresden-v1.1-transitVehicles.xml.gz
+    outs:
+      - output/dresden-v1.1-1pct-notimes

@@ -339,6 +339,7 @@ sc: | $(CLASSPATH)
 # Pass extra args to the run command verbatim via ARGS, e.g. `make run ARGS='--with-opening-times=false'`.
 run: input/prepare-config.xml | $(CLASSPATH)
 	$(sc) run --config $<\
+	 --config:controller.lastIteration=$(LAST_IT)\
 	 --simulation-period-in-days=$(SIM_PERIOD_DAYS)\
 	 $(ARGS)
 
@@ -352,6 +353,7 @@ run-10pct: input/prepare-config.xml | $(CLASSPATH)
 	 --config:simwrapper.sampleSize=0.1\
 	 --runId $N-$V-10pct\
 	 --output output/$N-$V-10pct\
+	 --config:controller.lastIteration=$(LAST_IT)\
 	 --simulation-period-in-days=$(SIM_PERIOD_DAYS)\
 	 $(ARGS)
 
@@ -365,6 +367,7 @@ run-1pct: input/prepare-config.xml | $(CLASSPATH)
 	 --config:simwrapper.sampleSize=0.01\
 	 --runId $N-$V-1pct\
 	 --output output/$N-$V-1pct\
+	 --config:controller.lastIteration=$(LAST_IT)\
 	 --simulation-period-in-days=$(SIM_PERIOD_DAYS)\
 	 $(ARGS)
 
@@ -378,6 +381,7 @@ run-1pct-yestimes: input/prepare-config.xml | $(CLASSPATH)
 	 --runId $N-$V-1pct-yestimes\
 	 --output output/$N-$V-1pct-yestimes\
 	 --with-opening-times=true\
+	 --config:controller.lastIteration=$(LAST_IT)\
 	 --simulation-period-in-days=$(SIM_PERIOD_DAYS)\
 	 $(ARGS)
 
@@ -391,6 +395,7 @@ run-1pct-notimes: input/prepare-config.xml | $(CLASSPATH)
 	 --runId $N-$V-1pct-notimes\
 	 --output output/$N-$V-1pct-notimes\
 	 --with-opening-times=false\
+	 --config:controller.lastIteration=$(LAST_IT)\
 	 --simulation-period-in-days=$(SIM_PERIOD_DAYS)\
 	 $(ARGS)
 
@@ -408,6 +413,7 @@ run-1pct-notimes-penalties: input/prepare-config.xml | $(CLASSPATH)
 	 --output output/$N-$V-1pct-notimes-penalties\
 	 --with-opening-times=false\
 	 --schedule-delay-scoring\
+	 --config:controller.lastIteration=$(LAST_IT)\
 	 --simulation-period-in-days=$(SIM_PERIOD_DAYS)\
 	 $(ARGS)
 
@@ -422,6 +428,7 @@ run-1pct-bestresponse: input/prepare-config.xml | $(CLASSPATH)
 	 --output output/$N-$V-1pct-bestresponse\
 	 --with-opening-times=false\
 	 --best-response-scheduling\
+	 --config:controller.lastIteration=$(LAST_IT)\
 	 --simulation-period-in-days=$(SIM_PERIOD_DAYS)\
 	 $(ARGS)
 
@@ -443,6 +450,7 @@ run-1pct-bestresponse-sigma: input/prepare-config.xml | $(CLASSPATH)
 	 --with-opening-times=false\
 	 --best-response-scheduling\
 	 --best-response-sigma=$(BR_SIGMA)\
+	 --config:controller.lastIteration=$(LAST_IT)\
 	 --simulation-period-in-days=$(SIM_PERIOD_DAYS)\
 	 $(ARGS)
 

@@ -1,0 +1,11 @@
+# Experiment parameters, interpolated into the stage commands in dvc.yaml and passed on to the
+# Makefile. Override per experiment instead of editing here, e.g.
+#   dvc exp run --set-param sim_period_days=1.5
+#
+# sim_period_days: length of the simulation period, as a multiple of 24h (1.125 = 27:00). Consumed by
+#   the prepare steps (reschedule-late-plans, encode-typical-duration) as well as the run, so changing
+#   it invalidates the plans and re-runs the whole pipeline, not just the simulation.
+# last_iteration: last iteration of the run. Lower it for smoke runs, e.g.
+#   dvc exp run --set-param last_iteration=1
+sim_period_days: 1.125
+last_iteration: 500
