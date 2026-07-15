@@ -50,7 +50,8 @@ stages:
       size: 5393314559
       nfiles: 28
   network:
-    cmd: make input/before-calibration/output/dresden-v1.1-network-with-pt.xml.gz
+    cmd: make 
+      input/before-calibration/output/dresden-v1.1-network-with-pt.xml.gz
     deps:
     - path: Makefile
       hash: md5
@@ -90,12 +91,12 @@ stages:
       md5: 36e549d221040a3091720b702cfea8a9
       size: 229677
   population:
-    cmd: make prepare
+    cmd: make prepare SIM_PERIOD_DAYS=1.125
     deps:
     - path: Makefile
       hash: md5
-      md5: 06de91b4dbb9b9a32d50764733dc8cde
-      size: 23470
+      md5: b30c3957263f3e7a727465d3193cee84
+      size: 28253
     - path: input/20250123_Teilmodell_Hoyerswerda
       hash: md5
       md5: 3272a2301c12051831ba875bcb5641e3.dir
@@ -106,6 +107,11 @@ stages:
       md5: 0e110ab27f923e8fefb85d5f73cf9975.dir
       size: 10041161
       nfiles: 2
+    - path: 
+        input/before-calibration/output/dresden-small-scale-commercialTraffic-v1.1-100pct.xml.gz
+      hash: md5
+      md5: b4142fff33990baa56b469105fad71e2
+      size: 9728867
     - path: input/before-calibration/output/dresden-v1.1-network-with-pt.xml.gz
       hash: md5
       md5: 4c840afa6e0f02c07abb68e823e071f0
@@ -144,74 +150,46 @@ stages:
       md5: 73902fdec1ead0ad2e40b5d6ff5d0c1a.dir
       size: 8124
       nfiles: 2
+    params:
+      params.yaml:
+        sim_period_days: 1.125
     outs:
-    - path: input/before-calibration/output/dresden-v1.1-100pct.plans-initial.xml.gz
+    - path: 
+        input/before-calibration/output/dresden-v1.1-100pct.plans-initial.xml.gz
       hash: md5
-      md5: a57cb4c2effa4d270d47ae9d1e498e01
-      size: 126730062
-    - path: input/before-calibration/output/dresden-v1.1-10pct.plans-initial.xml.gz
+      md5: 5b0d5d6cd566c1efa7794afe765caba9
+      size: 126729858
+    - path: 
+        input/before-calibration/output/dresden-v1.1-10pct.plans-initial.xml.gz
       hash: md5
-      md5: 7657e3d509865f4974246a8ace5944d5
-      size: 13168442
-    - path: input/before-calibration/output/dresden-v1.1-1pct.plans-initial.xml.gz
+      md5: 6e56c54a357f7f592f561aca6b9f671c
+      size: 13168449
+    - path: 
+        input/before-calibration/output/dresden-v1.1-1pct.plans-initial.xml.gz
       hash: md5
-      md5: 0ffa069891a876fb9182699ac9a0715a
-      size: 1359692
-    - path: input/before-calibration/output/dresden-v1.1-activity-facilities.xml.gz
+      md5: 9ae31b2b0d6eadb208779e47b7f9a939
+      size: 1359703
+    - path: 
+        input/before-calibration/output/dresden-v1.1-activity-facilities.xml.gz
       hash: md5
       md5: 42700ca40a7f121b38eb3296c3f7d502
       size: 41884973
   persons:
-    cmd: make input/before-calibration/output/prepare-100pct-persons.xml.gz
+    cmd: make input/before-calibration/output/prepare-100pct-persons.xml.gz 
+      SIM_PERIOD_DAYS=1.125
     deps:
     - path: Makefile
       hash: md5
-      md5: 06de91b4dbb9b9a32d50764733dc8cde
-      size: 23470
-    - path: input/20250123_Teilmodell_Hoyerswerda
+      md5: b30c3957263f3e7a727465d3193cee84
+      size: 28253
+    - path: 
+        input/before-calibration/output/prepare-100pct-short-trips.plans.xml.gz
       hash: md5
-      md5: 3272a2301c12051831ba875bcb5641e3.dir
-      size: 71389250
-      nfiles: 1
-    - path: input/20250130_Teilmodell_Hoyerswerda
-      hash: md5
-      md5: 0e110ab27f923e8fefb85d5f73cf9975.dir
-      size: 10041161
-      nfiles: 2
-    - path: input/before-calibration/output/dresden-v1.1-network-with-pt.xml.gz
-      hash: md5
-      md5: 4c840afa6e0f02c07abb68e823e071f0
-      size: 42866902
-    - path: input/germanWideFreight
-      hash: md5
-      md5: b0322affd41aef6276d7debc61667a99.dir
-      size: 106527099
-      nfiles: 2
-    - path: input/gtfs
-      hash: md5
-      md5: 31f000198d1738d565b89e73733bd9ed.dir
-      size: 197883446
-      nfiles: 3
-    - path: input/landuse
-      hash: md5
-      md5: 4c7811bc5f592b64d44881db1d14b27d.dir
-      size: 1178952097
-      nfiles: 5
-    - path: input/osm
-      hash: md5
-      md5: a9feb92fc645e4a87ddaa273e13e6425.dir
-      size: 4242318247
-      nfiles: 1
-    - path: input/shp
-      hash: md5
-      md5: 580148b3d708f187a6a6b556500b1d3a.dir
-      size: 354474
-      nfiles: 16
-    - path: input/sumo
-      hash: md5
-      md5: 73902fdec1ead0ad2e40b5d6ff5d0c1a.dir
-      size: 8124
-      nfiles: 2
+      md5: 153fd388f346ac4cc658485b98455a82
+      size: 91330113
+    params:
+      params.yaml:
+        sim_period_days: 1.125
     outs:
     - path: input/before-calibration/output/prepare-100pct-persons.xml.gz
       hash: md5
@@ -220,7 +198,8 @@ stages:
   run:
     cmd: make run-1pct
   short_trips:
-    cmd: make input/before-calibration/output/prepare-100pct-short-trips.plans.xml.gz
+    cmd: make 
+      input/before-calibration/output/prepare-100pct-short-trips.plans.xml.gz
     deps:
     - path: Makefile
       hash: md5
@@ -257,7 +236,8 @@ stages:
       size: 8124
       nfiles: 2
     outs:
-    - path: input/before-calibration/output/prepare-100pct-short-trips.plans.xml.gz
+    - path: 
+        input/before-calibration/output/prepare-100pct-short-trips.plans.xml.gz
       hash: md5
       md5: 153fd388f346ac4cc658485b98455a82
       size: 91330113
