@@ -23,8 +23,7 @@ package org.matsim.scoring;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.matsim.api.core.v01.population.Activity;
-import org.matsim.api.core.v01.population.Plan;
-import org.matsim.api.core.v01.population.PlanElement;
+import org.matsim.api.core.v01.population.Person;
 import org.matsim.core.config.groups.ScoringConfigGroup;
 import org.matsim.core.scoring.ScoringFunction;
 import org.matsim.core.scoring.functions.ActivityTypeOpeningIntervalCalculator;
@@ -32,10 +31,11 @@ import org.matsim.core.scoring.functions.ActivityUtilityParameters;
 import org.matsim.core.scoring.functions.OpeningIntervalCalculator;
 import org.matsim.core.population.algorithms.MutateActivityTimeAllocation;
 import org.matsim.core.scoring.functions.ScoringParameters;
+import org.matsim.core.router.StageActivityTypeIdentifier;
+import org.matsim.core.router.TripStructureUtils;
 import org.matsim.core.utils.misc.OptionalTime;
 import org.matsim.prepare.EncodeTypicalDuration;
 
-import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -60,13 +60,17 @@ import java.util.List;
  * At runtime, scoring is event-driven: {@code EventsToActivities} rebuilds each activity from events
  * ({@code PopulationUtils.createActivityFromLinkId}) and those reconstructions carry <em>no attributes</em> -- reading
  * attributes off the handed activity silently falls back to the config values for every activity (which is exactly
- * what happened until this was discovered: every run scored against the uniform config typical durations). The
- * selected plan's activity sequence is, however, a 1:1 template for the realized sequence (the realized one is a
- * prefix of it, including stage activities), so when constructed with the person's selected {@link Plan} this class
- * walks a cursor over the plan's activities and reads the attributes from the aligned <em>plan</em> activity, while
- * all times still come from the realized one. Activity types are compared as a safety net; on a mismatch the cursor
- * is abandoned and scoring falls back to the handed activity (i.e. to config values). Offline consumers (the VTTS
- * analysis) construct this class without a plan and hand in plan activities that carry their attributes directly.
+ * what happened until this was discovered: every run scored against the uniform config typical durations). So when
+ * constructed with the {@link Person}, this class walks a cursor over the selected plan's <em>main</em> activities
+ * and reads the attributes from the aligned plan activity, while all times still come from the realized one. Stage
+ * ("interaction") activities bypass the cursor on both sides: they are never really scored and their count is not
+ * invariant, whereas the main-activity sequence is identical across all of a person's plans (participation and order
+ * are fixed). The plan is resolved lazily at the first scoring callback, i.e. after replanning -- scoring functions
+ * are created at iteration start, <em>before</em> replanning, so capturing the selected plan at construction time
+ * would walk the previous iteration's plan (whose trip structure can differ after mode choice or rerouting).
+ * Activity types are compared as a safety net; on a mismatch the cursor is abandoned and scoring falls back to the
+ * handed activity (i.e. to config values). Offline consumers (the VTTS analysis) construct this class without a
+ * person and hand in plan activities that carry their attributes directly.
  *
  * <h3>Schedule-delay corridor</h3>
  * When armed ({@code scheduleDelayScoring}), the per-activity anchor attributes {@code initialStartTime} /
@@ -101,12 +105,19 @@ public final class DresdenActivityScoring implements org.matsim.core.scoring.Sum
 	private final OpeningIntervalCalculator openingIntervalCalculator;
 	/** Whether the schedule-delay corridor (per-activity anchor attributes) is armed; see class javadoc. */
 	private final boolean scheduleDelayScoring;
+	/** Fail hard when a scored activity carries no positive typicalDuration attribute. The experiment's premise is
+	 * that every (person-subpopulation) activity is scored against its survey-derived typical duration; a silent
+	 * config-typical fallback would corrupt exactly the quantity under study. Off for subpopulations that score by
+	 * config typicals by design (freight/commercial) and for legacy type-encoded populations. */
+	private final boolean requireTypicalDurationAttribute;
 
-	/** The selected plan's activities in order (incl. stage activities), the attribute source for the realized
-	 * activities handed in by the events machinery; null => read attributes off the handed activities themselves. */
-	private final List<Activity> planActivities;
+	/** Owner of the plan the cursor aligns against; null => read attributes off the handed activities themselves. */
+	private final Person person;
+	/** The executed plan's main activities in order, resolved lazily at the first scoring callback (i.e. after
+	 * replanning; see class javadoc); the attribute source for the realized activities handed in by the events
+	 * machinery. */
+	private List<Activity> planActivities;
 	private int planActivityIndex = 0;
-	private boolean cursorAbandoned = false;
 
 	private Activity firstActivity;
 	/** Attribute source aligned with {@link #firstActivity}; the first activity is only scored at {@link #finish()}. */
@@ -116,54 +127,60 @@ public final class DresdenActivityScoring implements org.matsim.core.scoring.Sum
 
 	/** Attribute-carrying activities are handed in directly (offline use, e.g. the VTTS analysis); no plan cursor. */
 	public DresdenActivityScoring(final ScoringParameters params, final ScoringConfigGroup.ScoringParameterSet scoringParameterSet) {
-		this(params, scoringParameterSet, null, false, new ActivityTypeOpeningIntervalCalculator(params));
+		this(params, scoringParameterSet, null, false, false, new ActivityTypeOpeningIntervalCalculator(params));
 	}
 
 	public DresdenActivityScoring(final ScoringParameters params, final ScoringConfigGroup.ScoringParameterSet scoringParameterSet,
-								  final Plan selectedPlan, final boolean scheduleDelayScoring) {
-		this(params, scoringParameterSet, selectedPlan, scheduleDelayScoring, new ActivityTypeOpeningIntervalCalculator(params));
+								  final Person person, final boolean scheduleDelayScoring) {
+		this(params, scoringParameterSet, person, scheduleDelayScoring, false, new ActivityTypeOpeningIntervalCalculator(params));
 	}
 
 	public DresdenActivityScoring(final ScoringParameters params, final ScoringConfigGroup.ScoringParameterSet scoringParameterSet,
-								  final Plan selectedPlan, final boolean scheduleDelayScoring,
+								  final Person person, final boolean scheduleDelayScoring,
+								  final boolean requireTypicalDurationAttribute) {
+		this(params, scoringParameterSet, person, scheduleDelayScoring, requireTypicalDurationAttribute, new ActivityTypeOpeningIntervalCalculator(params));
+	}
+
+	public DresdenActivityScoring(final ScoringParameters params, final ScoringConfigGroup.ScoringParameterSet scoringParameterSet,
+								  final Person person, final boolean scheduleDelayScoring,
+								  final boolean requireTypicalDurationAttribute,
 								  final OpeningIntervalCalculator openingIntervalCalculator) {
 		this.params = params;
 		this.scoringParameterSet = scoringParameterSet;
 		this.openingIntervalCalculator = openingIntervalCalculator;
 		this.scheduleDelayScoring = scheduleDelayScoring;
-		if (selectedPlan == null) {
-			this.planActivities = null;
-		} else {
-			this.planActivities = new ArrayList<>();
-			for (PlanElement element : selectedPlan.getPlanElements()) {
-				if (element instanceof Activity activity) {
-					this.planActivities.add(activity);
-				}
-			}
-		}
+		this.requireTypicalDurationAttribute = requireTypicalDurationAttribute;
+		this.person = person;
 	}
 
 	/**
-	 * The attribute source for a realized activity: the aligned plan activity when a plan was given (advancing the
-	 * cursor), otherwise the realized activity itself. A type mismatch abandons the cursor for the rest of the day --
-	 * scoring then falls back to config values, which is the pre-cursor behavior.
+	 * The attribute source for a realized activity: the aligned main activity of the executed plan (advancing the
+	 * cursor), otherwise the realized activity itself. Stage activities bypass the cursor on both sides -- their count
+	 * varies with routing, they are not really scored, and they carry no scheduling attributes. A main-activity type
+	 * mismatch is a broken model invariant (the main sequence is identical across all of a person's plans, and the
+	 * plan is resolved after replanning), so it aborts the run rather than silently degrading the scoring input.
 	 */
 	private Activity attributeSource(Activity realized) {
-		if (planActivities == null || cursorAbandoned) {
+		if (person == null || StageActivityTypeIdentifier.isStageActivity(realized.getType())) {
 			return realized;
 		}
-		if (planActivityIndex < planActivities.size()) {
-			Activity planned = planActivities.get(planActivityIndex++);
-			if (planned.getType().equals(realized.getType())) {
-				return planned;
-			}
-			log.warn("Realized activity sequence diverged from the selected plan (plan: {}, realized: {}); " +
-				"falling back to config values for the rest of this person's day.", planned.getType(), realized.getType());
-		} else {
-			log.warn("More realized activities than the selected plan contains; falling back to config values.");
+		if (planActivities == null) {
+			// lazily: at the first callback we are past replanning, so this is the executed plan
+			planActivities = TripStructureUtils.getActivities(person.getSelectedPlan(), TripStructureUtils.StageActivityHandling.ExcludeStageActivities);
 		}
-		cursorAbandoned = true;
-		return realized;
+		if (planActivityIndex >= planActivities.size()) {
+			throw new RuntimeException("Person " + person.getId() + " realized more main activities than the selected plan contains "
+				+ "(realized " + realized.getType() + " after " + planActivities.size() + " plan activities). "
+				+ "The realized sequence must be a prefix of the executed plan; this run's scoring input is corrupt.");
+		}
+		Activity planned = planActivities.get(planActivityIndex++);
+		if (!planned.getType().equals(realized.getType())) {
+			throw new RuntimeException("Realized activity sequence of person " + person.getId() + " diverged from the selected plan "
+				+ "(plan: " + planned.getType() + ", realized: " + realized.getType() + " at main-activity index " + (planActivityIndex - 1) + "). "
+				+ "The main-activity sequence is invariant across a person's plans, so this indicates a broken model invariant; "
+				+ "aborting instead of scoring against corrupt input.");
+		}
+		return planned;
 	}
 
 	@Override
@@ -282,6 +299,12 @@ public final class DresdenActivityScoring implements org.matsim.core.scoring.Sum
 			if (typicalDurationAttribute != null && ((Number) typicalDurationAttribute).doubleValue() > 0) {
 				typicalDuration = ((Number) typicalDurationAttribute).doubleValue();
 				zeroUtilityDuration_h = recomputeZeroUtilityDuration_h(act.getType(), typicalDuration);
+			} else if (requireTypicalDurationAttribute) {
+				throw new RuntimeException("Activity of type " + act.getType() + (person != null ? " of person " + person.getId() : "")
+					+ " carries no positive typicalDuration attribute (" + typicalDurationAttribute + "), but this run requires "
+					+ "every scored activity to use its survey-derived typical duration. Either the population was not "
+					+ "preprocessed (EncodeTypicalDuration) or the attribute was lost; for legacy type-encoded populations "
+					+ "pass --allow-config-typical-durations.");
 			} else {
 				typicalDuration = actParams.getTypicalDuration();
 				zeroUtilityDuration_h = actParams.getZeroUtilityDuration_h();

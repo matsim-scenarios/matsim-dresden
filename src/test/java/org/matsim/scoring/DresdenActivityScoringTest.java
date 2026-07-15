@@ -2,7 +2,9 @@ package org.matsim.scoring;
 
 import org.junit.jupiter.api.Test;
 import org.matsim.api.core.v01.Coord;
+import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.population.Activity;
+import org.matsim.api.core.v01.population.Person;
 import org.matsim.api.core.v01.population.Plan;
 import org.matsim.core.config.Config;
 import org.matsim.core.config.ConfigUtils;
@@ -13,6 +15,8 @@ import org.matsim.core.scoring.functions.ScoringParameters;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * The runtime scoring is handed attribute-less activity reconstructions (see {@link DresdenActivityScoring}'s class
@@ -29,7 +33,17 @@ class DresdenActivityScoringTest {
 		for (String type : new String[]{"home", "work", "home_evening"}) {
 			scoring.addActivityParams(new ScoringConfigGroup.ActivityParams(type).setTypicalDuration(2. * 3600.));
 		}
+		ScoringConfigGroup.ActivityParams interaction = new ScoringConfigGroup.ActivityParams("pt interaction");
+		interaction.setScoringThisActivityAtAll(false);
+		scoring.addActivityParams(interaction);
 		return config;
+	}
+
+	private static Person person(Plan plan) {
+		Person person = PopulationUtils.getFactory().createPerson(Id.createPersonId("p"));
+		person.addPlan(plan);
+		person.setSelectedPlan(plan);
+		return person;
 	}
 
 	private static ScoringParameters params(Config config) {
@@ -76,7 +90,7 @@ class DresdenActivityScoringTest {
 		ScoringConfigGroup.ScoringParameterSet set = config.scoring().getScoringParameters(null);
 		// with the plan cursor, work is scored against its 8h attribute typical; without a plan, the bare activities
 		// fall back to the 2h config typical -- the scores must differ (they were identical before the fix).
-		DresdenActivityScoring withPlan = new DresdenActivityScoring(params(config), set, plan(), false);
+		DresdenActivityScoring withPlan = new DresdenActivityScoring(params(config), set, person(plan()), false);
 		DresdenActivityScoring withoutPlan = new DresdenActivityScoring(params(config), set, null, false);
 		double scoreWithPlan = score(withPlan, 30600., 59400.);
 		double scoreWithoutPlan = score(withoutPlan, 30600., 59400.);
@@ -103,26 +117,94 @@ class DresdenActivityScoringTest {
 		ScoringConfigGroup.ScoringParameterSet set = config.scoring().getScoringParameters(null);
 		// work starts 30min late (31200 vs anchor 30600) and ends 30min early (57600 vs anchor 59400 -> 1800s early):
 		// armed = disarmed - 18*0.5 - 6*0.5 = disarmed - 12.
-		double disarmed = score(new DresdenActivityScoring(params(config), set, plan(), false), 32400., 57600.);
-		double armed = score(new DresdenActivityScoring(params(config), set, plan(), true), 32400., 57600.);
+		double disarmed = score(new DresdenActivityScoring(params(config), set, person(plan()), false), 32400., 57600.);
+		double armed = score(new DresdenActivityScoring(params(config), set, person(plan()), true), 32400., 57600.);
 		assertEquals(disarmed - 18. * 0.5 - 6. * 0.5, armed, 1e-9);
 	}
 
+	/**
+	 * Stage activities must not consume the cursor: the realized stream contains "pt interaction" activities whose
+	 * count varies with routing (and, before this fix, with the replanning-vs-scoring-function-creation race), while
+	 * the plan cursor aligns main activities only. Scores must equal the interaction-free day exactly (interactions
+	 * have scoringThisActivityAtAll=false).
+	 */
 	@Test
-	void cursorMismatchFallsBackToConfigValues() {
+	void stageActivitiesBypassTheCursor() {
+		Config config = config();
+		ScoringConfigGroup.ScoringParameterSet set = config.scoring().getScoringParameters(null);
+		DresdenActivityScoring withStages = new DresdenActivityScoring(params(config), set, person(plan()), true);
+		withStages.handleFirstActivity(bare("home", null, 28800.));
+		withStages.handleActivity(bare("pt interaction", 29000., 29000.));
+		withStages.handleActivity(bare("pt interaction", 29800., 29800.));
+		withStages.handleActivity(bare("work", 30600., 59400.));
+		withStages.handleActivity(bare("pt interaction", 60000., 60000.));
+		withStages.handleLastActivity(bare("home_evening", 61200., null));
+		withStages.finish();
+
+		double plain = score(new DresdenActivityScoring(params(config), set, person(plan()), true), 30600., 59400.);
+		assertEquals(plain, withStages.getScore(), 1e-9);
+	}
+
+	/**
+	 * Scoring functions are created at iteration start, BEFORE replanning: the plan selected at construction time is
+	 * not necessarily the executed one. The cursor must resolve the plan lazily -- here the person's selected plan is
+	 * replaced after construction (with different attributes standing in for a structurally different plan), and the
+	 * scoring must use the replacement.
+	 */
+	@Test
+	void planIsResolvedAfterConstructionNotAt() {
+		Config config = config();
+		ScoringConfigGroup.ScoringParameterSet set = config.scoring().getScoringParameters(null);
+		Person person = person(plan());
+		DresdenActivityScoring scoring = new DresdenActivityScoring(params(config), set, person, false);
+
+		// "replanning": a new selected plan with a different work typical duration (4h instead of 8h)
+		person.addPlan(planWithWorkTypical(14400.));
+		person.setSelectedPlan(person.getPlans().get(1));
+
+		double lazily = score(scoring, 30600., 59400.);
+		double onReplanned = score(new DresdenActivityScoring(params(config), set, person(planWithWorkTypical(14400.)), false), 30600., 59400.);
+		double onStale = score(new DresdenActivityScoring(params(config), set, person(plan()), false), 30600., 59400.);
+		assertEquals(onReplanned, lazily, 1e-9);
+		assertNotEquals(onStale, lazily, 1.);
+	}
+
+	private static Plan planWithWorkTypical(double typicalDuration) {
+		Plan plan = plan();
+		((Activity) plan.getPlanElements().get(2)).getAttributes().putAttribute("typicalDuration", typicalDuration);
+		return plan;
+	}
+
+	/** A main-activity divergence between plan and realization is a broken model invariant: fail hard, never degrade. */
+	@Test
+	void cursorMismatchAbortsTheRun() {
 		Config config = config();
 		config.scoring().addActivityParams(new ScoringConfigGroup.ActivityParams("unexpected").setTypicalDuration(2. * 3600.));
 		ScoringConfigGroup.ScoringParameterSet set = config.scoring().getScoringParameters(null);
-		// realized day diverges from the plan right away ("unexpected" vs the plan's "home"): the cursor is abandoned,
-		// nothing blows up, and the whole day scores exactly like the no-plan (config-values) scoring.
-		DresdenActivityScoring scoring = new DresdenActivityScoring(params(config), set, plan(), true);
-		DresdenActivityScoring noPlan = new DresdenActivityScoring(params(config), set, null, true);
-		for (DresdenActivityScoring s : new DresdenActivityScoring[]{scoring, noPlan}) {
-			s.handleFirstActivity(bare("unexpected", null, 28800.));
-			s.handleActivity(bare("work", 30600., 59400.));
-			s.handleLastActivity(bare("home_evening", 61200., null));
-			s.finish();
-		}
-		assertEquals(noPlan.getScore(), scoring.getScore(), 1e-9);
+		DresdenActivityScoring scoring = new DresdenActivityScoring(params(config), set, person(plan()), true);
+		RuntimeException e = assertThrows(RuntimeException.class,
+			() -> scoring.handleFirstActivity(bare("unexpected", null, 28800.)));
+		assertTrue(e.getMessage().contains("diverged"), e.getMessage());
+	}
+
+	/** With the attribute requirement armed, a scored activity without a typicalDuration attribute aborts the run. */
+	@Test
+	void missingTypicalDurationAbortsWhenRequired() {
+		Config config = config();
+		ScoringConfigGroup.ScoringParameterSet set = config.scoring().getScoringParameters(null);
+		Plan stripped = plan();
+		((Activity) stripped.getPlanElements().get(2)).getAttributes().removeAttribute("typicalDuration");
+
+		DresdenActivityScoring strict = new DresdenActivityScoring(params(config), set, person(stripped), false, true);
+		strict.handleFirstActivity(bare("home", null, 28800.));
+		RuntimeException e = assertThrows(RuntimeException.class,
+			() -> strict.handleActivity(bare("work", 30600., 59400.)));
+		assertTrue(e.getMessage().contains("typicalDuration"), e.getMessage());
+
+		// lenient (legacy type-encoded populations): same day scores against the config typical without complaint
+		Plan stripped2 = plan();
+		((Activity) stripped2.getPlanElements().get(2)).getAttributes().removeAttribute("typicalDuration");
+		DresdenActivityScoring lenient = new DresdenActivityScoring(params(config), set, person(stripped2), false, false);
+		score(lenient, 30600., 59400.); // must not throw
 	}
 }

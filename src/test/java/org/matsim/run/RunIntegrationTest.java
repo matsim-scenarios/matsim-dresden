@@ -65,6 +65,7 @@ class RunIntegrationTest {
 //			"--config:controller.overwriteFiles=deleteDirectoryIfExists",
 			"--config:global.numberOfThreads", "2",
 			"--config:qsim.numberOfThreads", "2",
+			"--allow-config-typical-durations", // legacy v1.0 fixture: typicals are type-encoded, not attributes
 			"--emissions", DresdenUtils.EmissionsAnalysisHandling.NO_EMISSIONS_ANALYSIS.name() );
 		Assertions.assertEquals(0, code, "Must return non error code");
 

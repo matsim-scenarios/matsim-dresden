@@ -141,6 +141,13 @@ public class DresdenModel extends MATSimApplication {
 			"dead, as before. Default false.")
 	private boolean scheduleDelayScoring = false;
 
+	@CommandLine.Option(names="--allow-config-typical-durations",
+		description = "Allow person-subpopulation activities without a typicalDuration attribute to score against the " +
+			"config typical duration. By default such an activity ABORTS the run: the experiment requires every person " +
+			"activity to be scored against its survey-derived typical duration. Pass this only for legacy type-encoded " +
+			"populations (v1.1 and earlier), whose typicals live in the activity type names. Default false.")
+	private boolean allowConfigTypicalDurations = false;
+
 	@CommandLine.Option(names="--best-response-sigma",
 		description = "Standard deviation (seconds) of the random perturbation added to the target end times in the " +
 			"best-response scheduling strategy; >0 makes the best response stochastic. Default 0. Only used with " +
@@ -231,7 +238,9 @@ public class DresdenModel extends MATSimApplication {
 //		performing). The on/off gate lives inside DresdenActivityScoring (via DresdenScoringConfigGroup), NOT in the
 //		slopes: zeroing lateArrival would also soften the stuck-agent penalty (abortedPlanScore derives from it) and
 //		the best-response scheduler's slopes.
-		ConfigUtils.addOrGetModule(config, DresdenScoringConfigGroup.class).setScheduleDelayScoring(scheduleDelayScoring);
+		DresdenScoringConfigGroup dresdenScoring = ConfigUtils.addOrGetModule(config, DresdenScoringConfigGroup.class);
+		dresdenScoring.setScheduleDelayScoring(scheduleDelayScoring);
+		dresdenScoring.setAllowConfigTypicalDurations(allowConfigTypicalDurations);
 		if (scheduleDelayScoring) {
 			scoringConfig.setEarlyDeparture_utils_hr(-scoringConfig.getPerforming_utils_hr());
 		}

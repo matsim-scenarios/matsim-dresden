@@ -54,12 +54,18 @@ public final class DresdenScoringFunctionFactory implements ScoringFunctionFacto
 		final ScoringParameters parameters = params.getScoringParameters(person);
 
 		SumScoringFunction sumScoringFunction = new SumScoringFunction();
-		// The selected plan is the attribute source: the activities the events machinery hands to the scoring carry
-		// no attributes (see DresdenActivityScoring's class javadoc).
+		// The person's executed plan is the attribute source: the activities the events machinery hands to the scoring
+		// carry no attributes. The person (not the plan) is passed because scoring functions are created BEFORE
+		// replanning; DresdenActivityScoring resolves the selected plan lazily at the first scoring callback.
+		// Person-subpopulation activities MUST carry survey-derived typical durations (the experiment's premise);
+		// freight/commercial score by config typicals by design.
+		DresdenScoringConfigGroup dresdenScoring = ConfigUtils.addOrGetModule(config, DresdenScoringConfigGroup.class);
+		String subpopulation = PopulationUtils.getSubpopulation(person);
 		sumScoringFunction.addScoringFunction(new DresdenActivityScoring(parameters,
-			config.scoring().getScoringParameters(PopulationUtils.getSubpopulation(person)),
-			person.getSelectedPlan(),
-			ConfigUtils.addOrGetModule(config, DresdenScoringConfigGroup.class).isScheduleDelayScoring()));
+			config.scoring().getScoringParameters(subpopulation),
+			person,
+			dresdenScoring.isScheduleDelayScoring(),
+			"person".equals(subpopulation) && !dresdenScoring.isAllowConfigTypicalDurations()));
 		sumScoringFunction.addScoringFunction(new CharyparNagelLegScoring(parameters, config.transit().getTransitModes()));
 		sumScoringFunction.addScoringFunction(new CharyparNagelMoneyScoring(parameters));
 		sumScoringFunction.addScoringFunction(new CharyparNagelAgentStuckScoring(parameters));
