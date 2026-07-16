@@ -7,5 +7,5 @@
 #   it invalidates the plans and re-runs the whole pipeline, not just the simulation.
 # last_iteration: last iteration of the run. Lower it for smoke runs, e.g.
 #   dvc exp run --set-param last_iteration=1
-sim_period_days: 1.125
+sim_period_days: 1.5
 last_iteration: 500
