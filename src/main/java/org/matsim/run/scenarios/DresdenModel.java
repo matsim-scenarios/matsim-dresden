@@ -14,6 +14,7 @@ import org.matsim.api.core.v01.population.Activity;
 import org.matsim.api.core.v01.population.Leg;
 import org.matsim.api.core.v01.population.Person;
 import org.matsim.api.core.v01.population.Plan;
+import org.matsim.application.MATSimAppCommand;
 import org.matsim.application.MATSimApplication;
 import org.matsim.application.analysis.CheckPopulation;
 import org.matsim.analysis.vtts.DresdenAddVttsEtcToActivities;
@@ -63,6 +64,7 @@ import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 import playground.vsp.scoring.IncomeDependentUtilityOfMoneyPersonScoringParameters;
 
+import java.nio.file.Path;
 import java.util.List;
 
 import static java.lang.Double.*;
@@ -432,6 +434,17 @@ public class DresdenModel extends MATSimApplication {
 				Multibinder.newSetBinder( binder(), DashboardProvider.class ).addBinding().toInstance( dashboardProvider );
 			}
 		});
+	}
+
+	/**
+	 * Run the VTTS analysis as a post-processing step of every run, so its outputs -- including the metrics.json that
+	 * tracks the zero-duration-activity count as a DVC metric -- land directly in the run output folder (owned by the
+	 * "run" DVC stage). No separate make/DVC stage. simulationPeriodInDays is threaded in because it is not persisted to
+	 * the output config the analysis reloads. The vtts-v1.1 make target stays as a standalone backport for old runs.
+	 */
+	@Override
+	protected List<MATSimAppCommand> preparePostProcessing(Path outputFolder, String runId) {
+		return List.of(new DresdenAddVttsEtcToActivities(outputFolder, runId, simulationPeriodInDays));
 	}
 
 }

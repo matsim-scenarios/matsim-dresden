@@ -2,6 +2,7 @@ package org.matsim.analysis.vtts;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.Scenario;
 import org.matsim.api.core.v01.population.Activity;
@@ -85,6 +86,20 @@ public class DresdenAddVttsEtcToActivities implements MATSimAppCommand {
 		"around last-activity scoring, as a multiple of 24h. NOT persisted to the output config, so it must be " +
 		"supplied to match the analyzed run: current runs use 1.125 (27:00, the default here); v1.1 used 1.0 (24:00).")
 	private double simulationPeriodInDays = DresdenModel.DEFAULT_SIMULATION_PERIOD_IN_DAYS;
+
+	public DresdenAddVttsEtcToActivities() {}
+
+	/**
+	 * Programmatic constructor for running this analysis as a post-processing step of a DresdenModel run (see
+	 * {@link DresdenModel#preparePostProcessing}), rather than as a standalone CLI command. The {@code path} is the run
+	 * output folder, {@code runId} its run id, and {@code simulationPeriodInDays} the value the run scored with -- it is
+	 * not persisted to the output config, so it must be threaded in from the model (see the option's description).
+	 */
+	public DresdenAddVttsEtcToActivities( Path path, String runId, double simulationPeriodInDays ) {
+		this.path = path;
+		this.runId = runId;
+		this.simulationPeriodInDays = simulationPeriodInDays;
+	}
 
 	public static void main(String[] args) {
 		new DresdenAddVttsEtcToActivities().execute(args );
@@ -301,6 +316,14 @@ public class DresdenAddVttsEtcToActivities implements MATSimAppCommand {
 		summary.append( countLine( "last activity arriving at/after day end (indicator, not a class)", afterDayEndCount, total ) );
 		summary.append( countLine( "activities with duration 0.0", zeroDurationActs, total ) );
 		System.out.println( summary );
+
+		// Track the zero-duration count as a DVC metric. metrics.json lives at the top of the run output folder (which
+		// the "run" DVC stage owns), so it is produced by the run itself now that the analysis runs as a post-processing
+		// step of DresdenModel -- no separate stage. The key matches the metric declared in dvc.yaml.
+		Path metricsPath = outputDir.resolve( "metrics.json" );
+		log.info( "Writing DVC metrics to file: {}", metricsPath );
+		new ObjectMapper().writerWithDefaultPrettyPrinter()
+			.writeValue( metricsPath.toFile(), Map.of( "zero_duration_activity_count", zeroDurationActs ) );
 
 		final Table muttsStats = okTrips.summarize( HeadersKN.muttsh, mean, quartile1, median, quartile3, percentile95 ).apply();
 		System.out.println( System.lineSeparator() + muttsStats + System.lineSeparator() );

@@ -1,3 +1,5 @@
+metrics:
+  - output/dresden-v1.1-1pct-notimes/metrics.json
 stages:
   network:
     cmd: make input/before-calibration/output/dresden-v1.1-network-with-pt.xml.gz
