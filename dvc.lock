@@ -196,7 +196,57 @@ stages:
       md5: 500641ad08e915b0658e69143fdc0912
       size: 103601959
   run:
-    cmd: make run-1pct
+    cmd: make run-1pct-notimes SIM_PERIOD_DAYS=1.125 LAST_IT=500
+    deps:
+    - path: Makefile
+      hash: md5
+      md5: b30c3957263f3e7a727465d3193cee84
+      size: 28253
+    - path: 
+        input/before-calibration/output/dresden-v1.1-1pct.plans-initial.xml.gz
+      hash: md5
+      md5: 9ae31b2b0d6eadb208779e47b7f9a939
+      size: 1359703
+    - path: 
+        input/before-calibration/output/dresden-v1.1-activity-facilities.xml.gz
+      hash: md5
+      md5: 42700ca40a7f121b38eb3296c3f7d502
+      size: 41884973
+    - path: input/before-calibration/output/dresden-v1.1-network-with-pt.xml.gz
+      hash: md5
+      md5: 4c840afa6e0f02c07abb68e823e071f0
+      size: 42866902
+    - path: input/before-calibration/output/dresden-v1.1-transitSchedule.xml.gz
+      hash: md5
+      md5: 8b55bd61a55c21b626d815df4ea248cf
+      size: 5311460
+    - path: input/before-calibration/output/dresden-v1.1-transitVehicles.xml.gz
+      hash: md5
+      md5: 36e549d221040a3091720b702cfea8a9
+      size: 229677
+    - path: input/prepare-config.xml
+      hash: md5
+      md5: 04fa53cdec2e200ed69917f4c3ea33b5
+      size: 11125
+    - path: pom.xml
+      hash: md5
+      md5: 490dad1a33ef5dc48c389f9f15c73850
+      size: 9331
+    - path: src/main/java
+      hash: md5
+      md5: d111f1a329adbc1ebd580c61fc4c08e3.dir
+      size: 252571
+      nfiles: 35
+    params:
+      params.yaml:
+        last_iteration: 500
+        sim_period_days: 1.125
+    outs:
+    - path: output/dresden-v1.1-1pct-notimes
+      hash: md5
+      md5: cba00475bedaed03d07942924bfc36e1.dir
+      size: 1941450891
+      nfiles: 6234
   short_trips:
     cmd: make 
       input/before-calibration/output/prepare-100pct-short-trips.plans.xml.gz
