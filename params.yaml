@@ -8,4 +8,4 @@
 # last_iteration: last iteration of the run. Lower it for smoke runs, e.g.
 #   dvc exp run --set-param last_iteration=1
 sim_period_days: 1.125
-last_iteration: 500
+last_iteration: 2000
