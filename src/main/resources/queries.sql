@@ -13,6 +13,13 @@ CREATE OR REPLACE VIEW output_plans AS
     SELECT * FROM read_parquet('*output_plans.parquet');
 -- (future files: just add another CREATE VIEW ... here)
 
+-- The "person table" the plan-grain schema doesn't have: one row per person with the
+-- generic person attributes (subpopulation, carAvail, income, SNZ_*, ...). Person attributes
+-- are rolled out onto every plan row, so this just dedups them back to one row per person.
+CREATE OR REPLACE VIEW persons AS
+    SELECT personId, any_value(personAttributes) AS attributes
+    FROM experienced_plans GROUP BY personId;
+
 -- ---- derived view: experienced plans decomposed into trips -----------------
 -- One row per trip per person. A "trip" is the stage chain (access/egress walk +
 -- interaction activities + main leg) between two "real" (non-interaction) activities,
@@ -53,10 +60,12 @@ CREATE OR REPLACE VIEW experienced_trips AS
     SELECT a.personId, a.r AS trip,
            a.actType AS from_act, a.t_end AS depart,
            tl.main_mode, b.actType AS to_act, b.t_start AS arrive,
-           tl.trav_s, tl.dist_m, tl.main_dist_m, tl.stages
+           tl.trav_s, tl.dist_m, tl.main_dist_m, tl.stages,
+           pp.attributes AS personAttributes   -- filter inline, e.g. personAttributes['subpopulation']
     FROM real_acts a
     JOIN real_acts b ON b.personId = a.personId AND b.r = a.r + 1
     LEFT JOIN trip_legs tl ON tl.personId = a.personId AND tl.trip_id = a.r
+    LEFT JOIN persons pp ON pp.personId = a.personId
     ORDER BY a.personId, a.r;   -- naturally sorted, like the plans (personId, then trip)
 
 -- ---- derived view: experienced activities with a defined effective duration ---------------
@@ -74,7 +83,8 @@ CREATE OR REPLACE VIEW experienced_activities AS
                a.startTime, a.endTime, a.maxDuration,
                CASE WHEN a.startTime IS NOT NULL AND a.endTime IS NOT NULL
                     THEN a.endTime - a.startTime
-                    ELSE a.maxDuration END AS eff_duration
+                    ELSE a.maxDuration END AS eff_duration,
+               personAttributes   -- filter inline, e.g. personAttributes['subpopulation']
         FROM experienced_plans, UNNEST(activities) AS t(a)
         WHERE a.actType NOT LIKE '%interaction%'
     ) WHERE eff_duration IS NOT NULL
