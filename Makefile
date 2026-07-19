@@ -447,6 +447,21 @@ run-1pct-bestresponse: input/prepare-config.xml | $(CLASSPATH)
 	 --simulation-period-in-days=$(SIM_PERIOD_DAYS)\
 	 $(ARGS)
 
+ run-continue: input/prepare-config.xml | $(CLASSPATH)
+	$(sc) run --config $<\
+	 --config:plans.inputPlansFile=../output/dresden-v1.1-1pct-notimes/$N-$V-1pct-notimes.output_plans.xml.zst\
+	 --config:qsim.flowCapacityFactor=0.01\
+	 --config:qsim.storageCapacityFactor=0.01\
+	 --config:counts.countsScaleFactor=0.01\
+	 --config:simwrapper.sampleSize=0.01\
+	 --runId $N-$V-1pct-continued\
+	 --output output/$N-$V-1pct-continued\
+	 --with-opening-times=false\
+	 --config:controller.lastIteration=0\
+	 --simulation-period-in-days=$(SIM_PERIOD_DAYS)\
+	 $(ARGS)
+
+
 # Stochastic best response (random-utility sampling): like run-1pct-bestresponse, but each target end time is
 # perturbed per replanning with N(0, sigma). Sigma mimics the spread of the classic TimeAllocationMutator this
 # scenario configures: uniform on +-mutationRange (1800s) has standard deviation 1800/sqrt(3) ~ 1040s. Exploration
