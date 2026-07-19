@@ -58,6 +58,20 @@ CREATE OR REPLACE VIEW experienced_trips AS
     JOIN real_acts b ON b.personId = a.personId AND b.r = a.r + 1
     LEFT JOIN trip_legs tl ON tl.personId = a.personId AND tl.trip_id = a.r;
 
+-- ---- derived view: experienced real activities (stage/interaction activities dropped) -------
+-- One row per non-interaction activity per person, carrying the three nullable source time fields
+-- (startTime, endTime, maxDuration -- raw seconds) for reference, plus an effective duration:
+-- endTime - startTime when both are set, else maxDuration (else null -- e.g. the day's first/last
+-- activity, which lacks a start or an end respectively). Format times/durations with hms().
+CREATE OR REPLACE VIEW experienced_activities AS
+    SELECT personId, a.sequence AS seq, a.actType, a.link,
+           a.startTime, a.endTime, a.maxDuration,
+           CASE WHEN a.startTime IS NOT NULL AND a.endTime IS NOT NULL
+                THEN a.endTime - a.startTime
+                ELSE a.maxDuration END AS eff_duration
+    FROM experienced_plans, UNNEST(activities) AS t(a)
+    WHERE a.actType NOT LIKE '%interaction%';
+
 -- ---- helpers ---------------------------------------------------------------
 
 -- Seconds -> a native INTERVAL that prints as HH:MM:SS. There is no >24h TIME type in DuckDB
@@ -90,6 +104,13 @@ CREATE OR REPLACE MACRO trip_chain(pid) AS TABLE
            to_act, hms(arrive) AS arrive,
            round(trav_s) AS trav_s, round(dist_m) AS dist_m, stages
     FROM experienced_trips WHERE personId = pid ORDER BY trip;
+
+-- One person's experienced (non-interaction) activities with formatted times/durations.
+CREATE OR REPLACE MACRO activity_chain(pid) AS TABLE
+    SELECT seq, actType, link,
+           hms(startTime) AS start, hms(endTime) AS "end",
+           hms(maxDuration) AS maxDur, hms(eff_duration) AS eff_dur
+    FROM experienced_activities WHERE personId = pid ORDER BY seq;
 
 -- Realized main-mode share of TRIPS (not legs): each experienced trip counts once, by its main mode.
 CREATE OR REPLACE MACRO experienced_mode_share() AS TABLE
