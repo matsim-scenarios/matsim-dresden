@@ -144,3 +144,10 @@ CREATE OR REPLACE MACRO freight_zero_distance() AS TABLE
            round(100.0 * count(*) FILTER (WHERE coalesce(main_dist_m, 0) = 0) / count(*), 1) AS pct_zero
     FROM experienced_trips WHERE main_mode LIKE 'truck%'
     GROUP BY main_mode ORDER BY main_mode;
+
+-- Zero-duration activities (start == end, a genuine 0-second stay -- not undefined) by type,
+-- with the number of distinct persons affected. A recurring data-quality check.
+CREATE OR REPLACE MACRO zero_duration_activities() AS TABLE
+    SELECT actType, count(*) AS zero_dur_acts, count(DISTINCT personId) AS persons
+    FROM experienced_activities WHERE eff_duration = 0
+    GROUP BY actType ORDER BY zero_dur_acts DESC;
