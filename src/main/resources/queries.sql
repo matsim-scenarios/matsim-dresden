@@ -68,26 +68,22 @@ CREATE OR REPLACE VIEW experienced_trips AS
     LEFT JOIN persons pp ON pp.personId = a.personId
     ORDER BY a.personId, a.r;   -- naturally sorted, like the plans (personId, then trip)
 
--- ---- derived view: experienced activities with a defined effective duration ---------------
--- One row per non-interaction activity per person WHERE the effective duration is defined:
---   eff_duration = endTime - startTime if both are set, else maxDuration.
--- Rows without a defined duration are dropped. In practice that leaves the "middle" activities:
--- the day's first/last activity lack a start/end and (in experienced plans) carry no maxDuration,
--- so they fall out. No wrap-around and no start/end interpolation is modelled here -- activities
--- stay exactly as the experienced plan has them. The three source time fields (startTime, endTime,
--- maxDuration -- raw seconds) are kept for reference. eff_duration = 0 here is a GENUINE
--- zero-duration activity (start == end), not "undefined". Format times/durations with hms().
+-- ---- derived view: experienced real activities (stage/interaction activities dropped) -------
+-- One row per non-interaction activity per person. These are EXPERIENCED activities, so there is
+-- no maxDuration column (that is an intended-plan field, kept in the parquet for plans that could
+-- be either). eff_duration = endTime - startTime, which is NULL exactly when a start or an end is
+-- missing -- i.e. the day's first (no start) and last (no end) activity. That NULL is distinct from
+-- a genuine 0.0 (start == end): filter eff_duration = 0.0 for real zero-duration stays, and
+-- eff_duration IS NULL for the morning/evening ends of the day. No wrap-around / interpolation is
+-- modelled -- activities stay exactly as the experienced plan has them. Times/durations are raw
+-- seconds (format with hms()); personAttributes lets you filter by e.g. subpopulation without a join.
 CREATE OR REPLACE VIEW experienced_activities AS
-    SELECT * FROM (
-        SELECT personId, a.sequence AS seq, a.actType, a.link,
-               a.startTime, a.endTime, a.maxDuration,
-               CASE WHEN a.startTime IS NOT NULL AND a.endTime IS NOT NULL
-                    THEN a.endTime - a.startTime
-                    ELSE a.maxDuration END AS eff_duration,
-               personAttributes   -- filter inline, e.g. personAttributes['subpopulation']
-        FROM experienced_plans, UNNEST(activities) AS t(a)
-        WHERE a.actType NOT LIKE '%interaction%'
-    ) WHERE eff_duration IS NOT NULL
+    SELECT personId, a.sequence AS seq, a.actType, a.link,
+           a.startTime, a.endTime,
+           a.endTime - a.startTime AS eff_duration,   -- NULL iff start or end missing (day's first/last)
+           personAttributes
+    FROM experienced_plans, UNNEST(activities) AS t(a)
+    WHERE a.actType NOT LIKE '%interaction%'
     ORDER BY personId, seq;   -- naturally sorted, like the plans (personId, then sequence)
 
 -- ---- helpers ---------------------------------------------------------------
@@ -124,10 +120,10 @@ CREATE OR REPLACE MACRO trip_chain(pid) AS TABLE
     FROM experienced_trips WHERE personId = pid::VARCHAR ORDER BY trip;
 
 -- One person's experienced (non-interaction) activities with formatted times/durations.
+-- The day's first/last activity have a NULL eff_dur (no start / no end).
 CREATE OR REPLACE MACRO activity_chain(pid) AS TABLE
     SELECT seq, actType, link,
-           hms(startTime) AS start, hms(endTime) AS "end",
-           hms(maxDuration) AS maxDur, hms(eff_duration) AS eff_dur
+           hms(startTime) AS start, hms(endTime) AS "end", hms(eff_duration) AS eff_dur
     FROM experienced_activities WHERE personId = pid::VARCHAR ORDER BY seq;
 
 -- Realized main-mode share of TRIPS (not legs): each experienced trip counts once, by its main mode.
@@ -156,10 +152,3 @@ CREATE OR REPLACE MACRO freight_zero_distance() AS TABLE
            round(100.0 * count(*) FILTER (WHERE coalesce(main_dist_m, 0) = 0) / count(*), 1) AS pct_zero
     FROM experienced_trips WHERE main_mode LIKE 'truck%'
     GROUP BY main_mode ORDER BY main_mode;
-
--- Zero-duration activities (start == end, a genuine 0-second stay -- not undefined) by type,
--- with the number of distinct persons affected. A recurring data-quality check.
-CREATE OR REPLACE MACRO zero_duration_activities() AS TABLE
-    SELECT actType, count(*) AS zero_dur_acts, count(DISTINCT personId) AS persons
-    FROM experienced_activities WHERE eff_duration = 0
-    GROUP BY actType ORDER BY zero_dur_acts DESC;
