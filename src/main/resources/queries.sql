@@ -90,7 +90,7 @@ CREATE OR REPLACE MACRO hms(t) AS to_seconds(t::BIGINT);
 
 -- Full experienced day of one person: activities and legs interleaved by sequence.
 CREATE OR REPLACE MACRO plan_chain(pid) AS TABLE
-    WITH p AS (SELECT * FROM experienced_plans WHERE personId = pid)
+    WITH p AS (SELECT * FROM experienced_plans WHERE personId = pid::VARCHAR)
     SELECT seq, kind, detail, link, hms(t_start) AS start, hms(t_end) AS "end",
            round(travTime) AS trav_s, round(distance) AS dist_m
     FROM (
@@ -109,14 +109,14 @@ CREATE OR REPLACE MACRO trip_chain(pid) AS TABLE
     SELECT trip, from_act, hms(depart) AS depart, main_mode,
            to_act, hms(arrive) AS arrive,
            round(trav_s) AS trav_s, round(dist_m) AS dist_m, stages
-    FROM experienced_trips WHERE personId = pid ORDER BY trip;
+    FROM experienced_trips WHERE personId = pid::VARCHAR ORDER BY trip;
 
 -- One person's experienced (non-interaction) activities with formatted times/durations.
 CREATE OR REPLACE MACRO activity_chain(pid) AS TABLE
     SELECT seq, actType, link,
            hms(startTime) AS start, hms(endTime) AS "end",
            hms(maxDuration) AS maxDur, hms(eff_duration) AS eff_dur
-    FROM experienced_activities WHERE personId = pid ORDER BY seq;
+    FROM experienced_activities WHERE personId = pid::VARCHAR ORDER BY seq;
 
 -- Realized main-mode share of TRIPS (not legs): each experienced trip counts once, by its main mode.
 CREATE OR REPLACE MACRO experienced_mode_share() AS TABLE
