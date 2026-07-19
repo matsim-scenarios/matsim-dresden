@@ -45,13 +45,15 @@ CREATE OR REPLACE VIEW experienced_trips AS
         SELECT personId, real_rank AS trip_id,
                coalesce(max(routing_mode), arg_max(name, coalesce(distance, 0))) AS main_mode,
                sum(travTime) AS trav_s, sum(distance) AS dist_m,
+               -- distance of the main-mode leg(s) only (name = routingMode), i.e. excluding access/egress walk
+               sum(distance) FILTER (WHERE name = routing_mode) AS main_dist_m,
                list(name ORDER BY seq) AS stages
         FROM ranked WHERE NOT is_act GROUP BY personId, real_rank
     )
     SELECT a.personId, a.r AS trip,
            a.actType AS from_act, a.t_end AS depart,
            tl.main_mode, b.actType AS to_act, b.t_start AS arrive,
-           tl.trav_s, tl.dist_m, tl.stages
+           tl.trav_s, tl.dist_m, tl.main_dist_m, tl.stages
     FROM real_acts a
     JOIN real_acts b ON b.personId = a.personId AND b.r = a.r + 1
     LEFT JOIN trip_legs tl ON tl.personId = a.personId AND tl.trip_id = a.r;
@@ -104,3 +106,14 @@ CREATE OR REPLACE MACRO best_response_gap() AS TABLE
     SELECT count(*) FILTER (WHERE sel >= best - 1e-6) AS selected_is_best,
            count(*) AS persons, round(avg(best - sel), 3) AS avg_gap
     FROM g;
+
+-- Freight sanity: share of truck trips whose MAIN (truck) leg is 0 m -- same-link goods movements
+-- the small-scale commercial traffic generation produces (truck leg 0 m, start = end link). routingMode
+-- still classifies them as truck (the distance heuristic mislabels them walk), but they pull freight VKT
+-- down. main_dist_m is the truck leg alone, excluding any access/egress walk.
+CREATE OR REPLACE MACRO freight_zero_distance() AS TABLE
+    SELECT main_mode, count(*) AS trips,
+           count(*) FILTER (WHERE coalesce(main_dist_m, 0) = 0) AS zero_main_leg,
+           round(100.0 * count(*) FILTER (WHERE coalesce(main_dist_m, 0) = 0) / count(*), 1) AS pct_zero
+    FROM experienced_trips WHERE main_mode LIKE 'truck%'
+    GROUP BY main_mode ORDER BY main_mode;
