@@ -6,6 +6,7 @@ import com.google.inject.multibindings.Multibinder;
 import jakarta.annotation.Nullable;
 import org.matsim.analysis.CheckAndSummarizeLongDistanceFreightPopulation;
 import org.matsim.analysis.CheckStayHomeAgents;
+import org.matsim.analysis.PlansToParquet;
 import org.matsim.analysis.personMoney.PersonMoneyEventsAnalysisModule;
 import org.matsim.api.core.v01.Scenario;
 import org.matsim.api.core.v01.TransportMode;
@@ -59,6 +60,7 @@ import org.matsim.simwrapper.SimWrapperConfigGroup;
 import org.matsim.simwrapper.SimWrapperModule;
 import org.matsim.smallScaleCommercialTrafficGeneration.GenerateSmallScaleCommercialTrafficDemand;
 import org.matsim.smallScaleCommercialTrafficGeneration.prepare.CreateDataDistributionOfStructureData;
+import org.matsim.store.PlanSnapshotWriterDuckDB;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
@@ -82,7 +84,7 @@ import static org.matsim.run.scenarios.DresdenUtils.*;
 })
 @MATSimApplication.Analysis({
 		LinkStats.class, CheckPopulation.class, CheckAndSummarizeLongDistanceFreightPopulation.class, CheckStayHomeAgents.class, DresdenAddVttsEtcToActivities.class,
-		BestResponseReport.class
+		BestResponseReport.class, PlansToParquet.class
 })
 public class DresdenModel extends MATSimApplication {
 
@@ -280,7 +282,7 @@ public class DresdenModel extends MATSimApplication {
 		vvo10.setTransactionPartner( "VVO Tarifzone 10 Dresden" );
 		vvo10.setDescription( "VVO Tarifzone 10 Dresden" );
 		vvo10.setOrder( 1 );
-		vvo10.setFareZoneShp( "https://svn.vsp.tu-berlin.de/repos/public-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/shp/v1.1_vvo_tarifzone_10_dresden_utm32n.shp" );
+		vvo10.setFareZoneShp( "shp/v1.1_vvo_tarifzone_10_dresden_utm32n.shp" ); // DVC-tracked local copy (input/shp.dvc), resolved relative to the config context
 		ptFareConfigGroup.addParameterSet( vvo10 );
 
 		DistanceBasedPtFareParams germany = DistanceBasedPtFareParams.GERMAN_WIDE_FARE_2024;
@@ -434,6 +436,7 @@ public class DresdenModel extends MATSimApplication {
 				Multibinder.newSetBinder( binder(), DashboardProvider.class ).addBinding().toInstance( dashboardProvider );
 			}
 		});
+		controler.addControllerListener(new PlanSnapshotWriterDuckDB());
 	}
 
 	/**
@@ -444,7 +447,11 @@ public class DresdenModel extends MATSimApplication {
 	 */
 	@Override
 	protected List<MATSimAppCommand> preparePostProcessing(Path outputFolder, String runId) {
-		return List.of(new DresdenAddVttsEtcToActivities(outputFolder, runId, simulationPeriodInDays));
+		return List.of(
+			new DresdenAddVttsEtcToActivities(outputFolder, runId, simulationPeriodInDays),
+			new PlansToParquet(outputFolder, runId, Controler.DefaultFiles.population.getFilename()),
+			new PlansToParquet(outputFolder, runId, Controler.DefaultFiles.experiencedPlans.getFilename())
+		);
 	}
 
 }

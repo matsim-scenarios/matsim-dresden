@@ -1,0 +1,61 @@
+{
+  "namespace": "org.matsim.application.avro",
+  "type": "record",
+  "name": "PlanRecord",
+  "doc": "One plan from one person's plan memory. Grain is one row per plan; a person's full choice set is the group of rows sharing personId. There is no intrinsic iteration field: when the ControlerListener writes a snapshot the iteration lives in the ITERS/it.NNN/ path (recover it in analytics from read_parquet(..., filename := true)); a standalone-converted plans file has no iteration at all.",
+  "fields": [
+    { "name": "personId", "type": "string" },
+    { "name": "planIdx", "type": "int", "doc": "position of this plan in the person's plan memory (0-based)" },
+    { "name": "selected", "type": "boolean" },
+    { "name": "score", "type": ["null", "double"], "default": null, "doc": "null pre-scoring" },
+    {
+      "name": "activities",
+      "type": {
+        "type": "array",
+        "items": {
+          "type": "record",
+          "name": "ActivityRecord",
+          "fields": [
+            { "name": "sequence", "type": "int", "doc": "position in the original plan-element list; even for activities" },
+            { "name": "actType", "type": "string" },
+            { "name": "link", "type": ["null", "string"], "default": null, "doc": "LinkId; null if unknown" },
+            { "name": "startTime", "type": ["null", "double"], "default": null, "doc": "Activity.getStartTime() (OptionalTime); usually null in plan memory, set in experienced plans" },
+            { "name": "endTime", "type": ["null", "double"], "default": null, "doc": "Activity.getEndTime() (OptionalTime)" },
+            { "name": "maxDuration", "type": ["null", "double"], "default": null, "doc": "Activity.getMaximumDuration() (OptionalTime)" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "legs",
+      "type": {
+        "type": "array",
+        "items": {
+          "type": "record",
+          "name": "LegRecord",
+          "fields": [
+            { "name": "sequence", "type": "int", "doc": "position in the original plan-element list; odd for legs" },
+            { "name": "mode", "type": "string" },
+            { "name": "travTime", "type": ["null", "double"], "default": null, "doc": "leg-level travel time (Leg.getTravelTime)" },
+            {
+              "name": "route",
+              "doc": "present for every leg, teleported or network. `links` is populated only for NetworkRoute; teleported legs still carry distance/travTime/type/endpoints.",
+              "type": {
+                "type": "record",
+                "name": "RouteRecord",
+                "fields": [
+                  { "name": "routeType", "type": ["null", "string"], "default": null, "doc": "Route.getRouteType(), e.g. 'links', 'generic'; discriminates teleported vs network" },
+                  { "name": "distance", "type": ["null", "double"], "default": null, "doc": "Route.getDistance(); null when NaN/undefined" },
+                  { "name": "travTime", "type": ["null", "double"], "default": null, "doc": "Route.getTravelTime() (OptionalTime)" },
+                  { "name": "startLink", "type": ["null", "string"], "default": null, "doc": "LinkId; null if none" },
+                  { "name": "endLink", "type": ["null", "string"], "default": null, "doc": "LinkId; null if none" },
+                  { "name": "links", "type": { "type": "array", "items": "string" }, "doc": "ordered LinkId strings; empty for teleported legs" }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}
