@@ -56,7 +56,8 @@ CREATE OR REPLACE VIEW experienced_trips AS
            tl.trav_s, tl.dist_m, tl.main_dist_m, tl.stages
     FROM real_acts a
     JOIN real_acts b ON b.personId = a.personId AND b.r = a.r + 1
-    LEFT JOIN trip_legs tl ON tl.personId = a.personId AND tl.trip_id = a.r;
+    LEFT JOIN trip_legs tl ON tl.personId = a.personId AND tl.trip_id = a.r
+    ORDER BY a.personId, a.r;   -- naturally sorted, like the plans (personId, then trip)
 
 -- ---- derived view: experienced activities with a defined effective duration ---------------
 -- One row per non-interaction activity per person WHERE the effective duration is defined:
@@ -76,7 +77,8 @@ CREATE OR REPLACE VIEW experienced_activities AS
                     ELSE a.maxDuration END AS eff_duration
         FROM experienced_plans, UNNEST(activities) AS t(a)
         WHERE a.actType NOT LIKE '%interaction%'
-    ) WHERE eff_duration IS NOT NULL;
+    ) WHERE eff_duration IS NOT NULL
+    ORDER BY personId, seq;   -- naturally sorted, like the plans (personId, then sequence)
 
 -- ---- helpers ---------------------------------------------------------------
 
