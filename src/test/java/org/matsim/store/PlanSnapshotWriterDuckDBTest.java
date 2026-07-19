@@ -34,6 +34,7 @@ class PlanSnapshotWriterDuckDBTest {
 		PopulationFactory pf = pop.getFactory();
 
 		Person person = pf.createPerson(Id.createPersonId("A"));
+		person.getAttributes().putAttribute("subpopulation", "person"); // generic person attribute -> personAttributes map
 
 		// Plan 0 (selected): score left null (pre-scoring), first activity has NO end time,
 		// and a teleported leg whose generic route has NaN distance + undefined travel time.
@@ -41,6 +42,7 @@ class PlanSnapshotWriterDuckDBTest {
 		Activity home = pf.createActivityFromLinkId("home", Id.createLinkId("1"));
 		// deliberately no start/end time on `home`, but a maximum duration -> exercises both null and non-null time fields
 		home.setMaximumDuration(3600.);
+		home.getAttributes().putAttribute("typicalDuration", 3600.0); // generic activity attribute -> activities[].attributes map
 		p0.addActivity(home);
 		Leg teleported = pf.createLeg("pt");
 		teleported.setRoute(RouteUtils.createGenericRouteImpl(Id.createLinkId("1"), Id.createLinkId("2")));
@@ -65,6 +67,8 @@ class PlanSnapshotWriterDuckDBTest {
 		nr.setTravelTime(600.);
 		carLeg.setRoute(nr);
 		carLeg.setTravelTime(600.);
+		carLeg.setRoutingMode("car"); // dedicated field -> routingMode column (NOT a generic attribute)
+		carLeg.getAttributes().putAttribute("totalRouteCost", 12.5); // generic leg attribute -> legs[].attributes map
 		p1.addLeg(carLeg);
 		Activity w2 = pf.createActivityFromLinkId("work", Id.createLinkId("4"));
 		p1.addActivity(w2);
@@ -92,12 +96,14 @@ class PlanSnapshotWriterDuckDBTest {
 			}
 
 			// planIdx 0 = selected pre-scoring plan: score NULL, first activity has NULL start/end time
-			// but a defined maxDuration, teleported leg -> travTime / route.distance / route.travTime all NULL.
+			// but a defined maxDuration; teleported leg -> travTime / route.distance / route.travTime all NULL;
+			// generic attributes surface as maps (person-level repeated onto the plan row, activity-level nested).
 			try (ResultSet rs = st.executeQuery(
 					"SELECT score, selected, activities[1].startTime, activities[1].endTime, " +
 					"       activities[1].maxDuration, activities[1].link, " +
 					"       legs[1].travTime, legs[1].route.distance, legs[1].route.travTime, " +
-					"       legs[1].route.links " +
+					"       legs[1].route.links, " +
+					"       personAttributes['subpopulation'], activities[1].attributes['typicalDuration'] " +
 					"FROM " + pq + " WHERE personId = 'A' AND planIdx = 0")) {
 				assertTrue(rs.next());
 				rs.getObject(1); assertTrue(rs.wasNull(), "pre-scoring score should be SQL NULL");
@@ -110,13 +116,17 @@ class PlanSnapshotWriterDuckDBTest {
 				rs.getObject(8); assertTrue(rs.wasNull(), "NaN route distance should be SQL NULL");
 				rs.getObject(9); assertTrue(rs.wasNull(), "undefined route travel time should be SQL NULL");
 				assertEquals("[]", rs.getString(10), "teleported leg should have no route links");
+				assertEquals("person", rs.getString(11), "person attribute should surface in personAttributes map");
+				assertEquals("3600.0", rs.getString(12), "activity attribute should surface in activities[].attributes map");
 			}
 
-			// planIdx 1 = fully populated network-routed plan: non-null side + inlined link sequence.
+			// planIdx 1 = fully populated network-routed plan: non-null side + inlined link sequence,
+			// plus routingMode (dedicated field) and a generic leg attribute (map).
 			try (ResultSet rs = st.executeQuery(
 					"SELECT score, selected, legs[1].route.distance, legs[1].route.travTime, " +
 					"       legs[1].route.startLink, legs[1].route.endLink, " +
-					"       array_to_string(legs[1].route.links, ',') " +
+					"       array_to_string(legs[1].route.links, ','), " +
+					"       legs[1].routingMode, legs[1].attributes['totalRouteCost'] " +
 					"FROM " + pq + " WHERE personId = 'A' AND planIdx = 1")) {
 				assertTrue(rs.next());
 				assertEquals(-3.5, rs.getDouble(1), 1e-9);
@@ -126,6 +136,8 @@ class PlanSnapshotWriterDuckDBTest {
 				assertEquals("2", rs.getString(5), "start link id");
 				assertEquals("4", rs.getString(6), "end link id");
 				assertEquals("2,3,4", rs.getString(7), "route link sequence: start, hops, end");
+				assertEquals("car", rs.getString(8), "routingMode should round-trip from the dedicated field");
+				assertEquals("12.5", rs.getString(9), "leg attribute should surface in legs[].attributes map");
 			}
 		} finally {
 			Files.deleteIfExists(out);

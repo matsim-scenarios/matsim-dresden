@@ -16,19 +16,19 @@ CREATE OR REPLACE VIEW output_plans AS
 -- ---- derived view: experienced plans decomposed into trips -----------------
 -- One row per trip per person. A "trip" is the stage chain (access/egress walk +
 -- interaction activities + main leg) between two "real" (non-interaction) activities,
--- collapsed to one row. main_mode = mode of the longest-distance stage leg (walk
--- access/egress is short, so this is the car/pt/bike/ride the trip is really made of);
--- trav_s / dist_m accumulate over ALL stage legs. Times are raw seconds -- wrap with
--- hms() for HH:MM:SS display (see trip_chain).
+-- collapsed to one row. main_mode = the leg routingMode (MATSim's authoritative trip main
+-- mode, identical across a trip's stage legs), falling back to the longest-distance stage's
+-- mode if routingMode is absent. trav_s / dist_m accumulate over ALL stage legs. Times are
+-- raw seconds -- wrap with hms() for HH:MM:SS display (see trip_chain).
 CREATE OR REPLACE VIEW experienced_trips AS
     WITH elements AS (
-        SELECT personId, a.sequence AS seq, TRUE AS is_act, a.actType AS name,
+        SELECT personId, a.sequence AS seq, TRUE AS is_act, a.actType AS name, NULL::VARCHAR AS routing_mode,
                a.startTime AS t_start, a.endTime AS t_end,
                NULL::DOUBLE AS travTime, NULL::DOUBLE AS distance,
                (a.actType NOT LIKE '%interaction%') AS is_real
         FROM experienced_plans, UNNEST(activities) AS t(a)
         UNION ALL
-        SELECT personId, l.sequence, FALSE, l.mode,
+        SELECT personId, l.sequence, FALSE, l.mode, l.routingMode,
                NULL::DOUBLE, NULL::DOUBLE, l.travTime, l.route.distance, FALSE
         FROM experienced_plans, UNNEST(legs) AS t(l)
     ),
@@ -43,7 +43,7 @@ CREATE OR REPLACE VIEW experienced_trips AS
     ),
     trip_legs AS (   -- stage legs grouped into their trip (a leg's real_rank = its trip id)
         SELECT personId, real_rank AS trip_id,
-               arg_max(name, coalesce(distance, 0)) AS main_mode,
+               coalesce(max(routing_mode), arg_max(name, coalesce(distance, 0))) AS main_mode,
                sum(travTime) AS trav_s, sum(distance) AS dist_m,
                list(name ORDER BY seq) AS stages
         FROM ranked WHERE NOT is_act GROUP BY personId, real_rank

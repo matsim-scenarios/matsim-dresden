@@ -8,6 +8,8 @@
     { "name": "planIdx", "type": "int", "doc": "position of this plan in the person's plan memory (0-based)" },
     { "name": "selected", "type": "boolean" },
     { "name": "score", "type": ["null", "double"], "default": null, "doc": "null pre-scoring" },
+    { "name": "personAttributes", "type": ["null", { "type": "map", "values": "string" }], "default": null, "doc": "Person.getAttributes() as name->string (e.g. subpopulation, carAvail, income, SNZ_*); repeated across a person's plans; null if none" },
+    { "name": "planAttributes", "type": ["null", { "type": "map", "values": "string" }], "default": null, "doc": "Plan.getAttributes() as name->string; null if none" },
     {
       "name": "activities",
       "type": {
@@ -21,7 +23,8 @@
             { "name": "link", "type": ["null", "string"], "default": null, "doc": "LinkId; null if unknown" },
             { "name": "startTime", "type": ["null", "double"], "default": null, "doc": "Activity.getStartTime() (OptionalTime); usually null in plan memory, set in experienced plans" },
             { "name": "endTime", "type": ["null", "double"], "default": null, "doc": "Activity.getEndTime() (OptionalTime)" },
-            { "name": "maxDuration", "type": ["null", "double"], "default": null, "doc": "Activity.getMaximumDuration() (OptionalTime)" }
+            { "name": "maxDuration", "type": ["null", "double"], "default": null, "doc": "Activity.getMaximumDuration() (OptionalTime)" },
+            { "name": "attributes", "type": ["null", { "type": "map", "values": "string" }], "default": null, "doc": "Activity.getAttributes() as name->string (e.g. typicalDuration, initialEndTime, initialStartTime); null if none" }
           ]
         }
       }
@@ -36,6 +39,7 @@
           "fields": [
             { "name": "sequence", "type": "int", "doc": "position in the original plan-element list; odd for legs" },
             { "name": "mode", "type": "string" },
+            { "name": "routingMode", "type": ["null", "string"], "default": null, "doc": "Leg.getRoutingMode() -- the trip's main mode; a dedicated field, NOT part of getAttributes(); null if unset" },
             { "name": "travTime", "type": ["null", "double"], "default": null, "doc": "leg-level travel time (Leg.getTravelTime)" },
             {
               "name": "route",
@@ -52,7 +56,8 @@
                   { "name": "links", "type": { "type": "array", "items": "string" }, "doc": "ordered LinkId strings; empty for teleported legs" }
                 ]
               }
-            }
+            },
+            { "name": "attributes", "type": ["null", { "type": "map", "values": "string" }], "default": null, "doc": "Leg.getAttributes() as name->string (e.g. totalRouteCost); note routingMode is NOT here (see the routingMode field); null if none" }
           ]
         }
       }

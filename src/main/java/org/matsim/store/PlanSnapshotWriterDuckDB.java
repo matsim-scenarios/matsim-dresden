@@ -10,10 +10,12 @@ import org.matsim.core.controler.events.BeforeMobsimEvent;
 import org.matsim.core.controler.listener.BeforeMobsimListener;
 import org.matsim.core.population.routes.NetworkRoute;
 import org.matsim.core.utils.misc.OptionalTime;
+import org.matsim.utils.objectattributes.attributable.Attributable;
 
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Map;
 
 /**
  * Plan-memory snapshot writer using ONLY the DuckDB JDBC driver (single fat jar,
@@ -91,9 +93,14 @@ public final class PlanSnapshotWriterDuckDB implements BeforeMobsimListener {
 			st.execute("CREATE TABLE stg_plan     (plan_id BIGINT, person_id VARCHAR, plan_idx INT, score DOUBLE, selected BOOLEAN)");
 			st.execute("CREATE TABLE stg_act      (plan_id BIGINT, sequence INT, act_type VARCHAR, link VARCHAR, " +
 				"start_time DOUBLE, end_time DOUBLE, max_dur DOUBLE)");
-			st.execute("CREATE TABLE stg_leg      (plan_id BIGINT, leg_id BIGINT, sequence INT, mode VARCHAR, trav_time DOUBLE, " +
+			st.execute("CREATE TABLE stg_leg      (plan_id BIGINT, leg_id BIGINT, sequence INT, mode VARCHAR, routing_mode VARCHAR, trav_time DOUBLE, " +
 				"route_type VARCHAR, distance DOUBLE, route_trav_time DOUBLE, start_link VARCHAR, end_link VARCHAR)");
 			st.execute("CREATE TABLE stg_routelink(leg_id BIGINT, ord INT, link VARCHAR)");
+			// generic MATSim entity attributes (getAttributes()) captured as name->string, one row per attribute
+			st.execute("CREATE TABLE stg_person_attr(person_id VARCHAR, attr_key VARCHAR, attr_value VARCHAR)");
+			st.execute("CREATE TABLE stg_plan_attr  (plan_id BIGINT, attr_key VARCHAR, attr_value VARCHAR)");
+			st.execute("CREATE TABLE stg_act_attr   (plan_id BIGINT, sequence INT, attr_key VARCHAR, attr_value VARCHAR)");
+			st.execute("CREATE TABLE stg_leg_attr   (leg_id BIGINT, attr_key VARCHAR, attr_value VARCHAR)");
 		}
 	}
 
@@ -104,11 +111,17 @@ public final class PlanSnapshotWriterDuckDB implements BeforeMobsimListener {
 		try (DuckDBAppender plan = conn.createAppender(DuckDBConnection.DEFAULT_SCHEMA, "stg_plan");
 			 DuckDBAppender act = conn.createAppender(DuckDBConnection.DEFAULT_SCHEMA, "stg_act");
 			 DuckDBAppender leg = conn.createAppender(DuckDBConnection.DEFAULT_SCHEMA, "stg_leg");
-			 DuckDBAppender routelink = conn.createAppender(DuckDBConnection.DEFAULT_SCHEMA, "stg_routelink")) {
+			 DuckDBAppender routelink = conn.createAppender(DuckDBConnection.DEFAULT_SCHEMA, "stg_routelink");
+			 DuckDBAppender personAttr = conn.createAppender(DuckDBConnection.DEFAULT_SCHEMA, "stg_person_attr");
+			 DuckDBAppender planAttr = conn.createAppender(DuckDBConnection.DEFAULT_SCHEMA, "stg_plan_attr");
+			 DuckDBAppender actAttr = conn.createAppender(DuckDBConnection.DEFAULT_SCHEMA, "stg_act_attr");
+			 DuckDBAppender legAttr = conn.createAppender(DuckDBConnection.DEFAULT_SCHEMA, "stg_leg_attr")) {
 
 			for (Person p : population.getPersons().values()) {
 				String personId = p.getId().toString();
 				Plan selected = p.getSelectedPlan();
+
+				stageAttrs(p, (k, v) -> { personAttr.beginRow(); personAttr.append(personId); personAttr.append(k); personAttr.append(v); personAttr.endRow(); });
 
 				int planIdx = 0;
 				for (Plan pl : p.getPlans()) {
@@ -121,8 +134,11 @@ public final class PlanSnapshotWriterDuckDB implements BeforeMobsimListener {
 					plan.append(pl == selected);
 					plan.endRow();
 
+					stageAttrs(pl, (k, v) -> { planAttr.beginRow(); planAttr.append(thisPlan); planAttr.append(k); planAttr.append(v); planAttr.endRow(); });
+
 					int seq = 0;
 					for (PlanElement pe : pl.getPlanElements()) {
+						int thisSeq = seq;
 						if (pe instanceof Activity a) {
 							act.beginRow();
 							act.append(thisPlan);
@@ -133,6 +149,7 @@ public final class PlanSnapshotWriterDuckDB implements BeforeMobsimListener {
 							appendOptionalTime(act, a.getEndTime());
 							appendOptionalTime(act, a.getMaximumDuration());
 							act.endRow();
+							stageAttrs(a, (k, v) -> { actAttr.beginRow(); actAttr.append(thisPlan); actAttr.append(thisSeq); actAttr.append(k); actAttr.append(v); actAttr.endRow(); });
 						} else if (pe instanceof Leg lg) {
 							long thisLeg = legId++;
 							Route r = lg.getRoute();
@@ -141,6 +158,7 @@ public final class PlanSnapshotWriterDuckDB implements BeforeMobsimListener {
 							leg.append(thisLeg);
 							leg.append(seq);
 							leg.append(lg.getMode());
+							leg.append(lg.getRoutingMode()); // dedicated field, NOT in getAttributes(); null if unset
 							appendOptionalTime(leg, lg.getTravelTime());
 							// route attributes for ALL legs, teleported or network
 							leg.append(r != null ? r.getRouteType() : null);
@@ -149,6 +167,7 @@ public final class PlanSnapshotWriterDuckDB implements BeforeMobsimListener {
 							appendLink(leg, r != null ? r.getStartLinkId() : null);
 							appendLink(leg, r != null ? r.getEndLinkId() : null);
 							leg.endRow();
+							stageAttrs(lg, (k, v) -> { legAttr.beginRow(); legAttr.append(thisLeg); legAttr.append(k); legAttr.append(v); legAttr.endRow(); });
 
 							// route link sequence: only for NetworkRoute; teleported -> none
 							if (r instanceof NetworkRoute nr) {
@@ -167,6 +186,17 @@ public final class PlanSnapshotWriterDuckDB implements BeforeMobsimListener {
 		}
 	}
 
+	/** Functional sink for one (key, value) attribute row; lets the walk keep the per-table id columns local. */
+	@FunctionalInterface
+	private interface AttrSink { void put(String key, String value) throws SQLException; }
+
+	/** Stream an entity's generic MATSim attributes (name -> String.valueOf(value)) into {@code sink}. */
+	private static void stageAttrs(Attributable entity, AttrSink sink) throws SQLException {
+		for (Map.Entry<String, Object> e : entity.getAttributes().getAsMap().entrySet()) {
+			sink.put(e.getKey(), String.valueOf(e.getValue()));
+		}
+	}
+
 	/** SQL that folds flat staging into the plan-grain nested schema and COPYs to parquet. */
 	private void assembleAndCopy(DuckDBConnection conn, String outPath) throws SQLException {
 		String assembly = """
@@ -174,35 +204,61 @@ public final class PlanSnapshotWriterDuckDB implements BeforeMobsimListener {
 			    SELECT leg_id, list(link ORDER BY ord) AS links
 			    FROM stg_routelink GROUP BY leg_id
 			),
+			person_attrs AS (
+			    SELECT person_id, map_from_entries(list(struct_pack(k := attr_key, v := attr_value))) AS attributes
+			    FROM stg_person_attr GROUP BY person_id
+			),
+			plan_attrs AS (
+			    SELECT plan_id, map_from_entries(list(struct_pack(k := attr_key, v := attr_value))) AS attributes
+			    FROM stg_plan_attr GROUP BY plan_id
+			),
+			act_attrs AS (
+			    SELECT plan_id, sequence, map_from_entries(list(struct_pack(k := attr_key, v := attr_value))) AS attributes
+			    FROM stg_act_attr GROUP BY plan_id, sequence
+			),
+			leg_attrs AS (
+			    SELECT leg_id, map_from_entries(list(struct_pack(k := attr_key, v := attr_value))) AS attributes
+			    FROM stg_leg_attr GROUP BY leg_id
+			),
 			legs AS (
 			    SELECT l.plan_id,
 			           list(struct_pack(
-			               sequence := l.sequence, mode := l.mode, travTime := l.trav_time,
+			               sequence := l.sequence, mode := l.mode, routingMode := l.routing_mode, travTime := l.trav_time,
 			               route := struct_pack(
 			                   routeType := l.route_type, distance := l.distance,
 			                   travTime := l.route_trav_time,
 			                   startLink := l.start_link, endLink := l.end_link,
 			                   links := COALESCE(r.links, [])
-			               )
+			               ),
+			               attributes := la.attributes
 			           ) ORDER BY l.sequence) AS legs
-			    FROM stg_leg l LEFT JOIN leg_routes r USING (leg_id)
+			    FROM stg_leg l
+			    LEFT JOIN leg_routes r USING (leg_id)
+			    LEFT JOIN leg_attrs la USING (leg_id)
 			    GROUP BY l.plan_id
 			),
 			acts AS (
-			    SELECT plan_id,
+			    SELECT a.plan_id,
 			           list(struct_pack(
-			               sequence := sequence, actType := act_type, link := link,
-			               startTime := start_time, endTime := end_time, maxDuration := max_dur
-			           ) ORDER BY sequence) AS activities
-			    FROM stg_act GROUP BY plan_id
+			               sequence := a.sequence, actType := a.act_type, link := a.link,
+			               startTime := a.start_time, endTime := a.end_time, maxDuration := a.max_dur,
+			               attributes := aa.attributes
+			           ) ORDER BY a.sequence) AS activities
+			    FROM stg_act a
+			    LEFT JOIN act_attrs aa USING (plan_id, sequence)
+			    GROUP BY a.plan_id
 			)
 			SELECT p.person_id AS personId, p.plan_idx AS planIdx,
 			       p.selected, p.score,
+			       pa.attributes  AS personAttributes,
+			       pla.attributes AS planAttributes,
 			       COALESCE(a.activities, []) AS activities,
 			       COALESCE(g.legs, []) AS legs
 			FROM stg_plan p
 			LEFT JOIN acts a USING (plan_id)
 			LEFT JOIN legs g USING (plan_id)
+			LEFT JOIN plan_attrs pla USING (plan_id)
+			LEFT JOIN person_attrs pa ON pa.person_id = p.person_id
 			ORDER BY p.person_id, p.plan_idx
 			""";
 
