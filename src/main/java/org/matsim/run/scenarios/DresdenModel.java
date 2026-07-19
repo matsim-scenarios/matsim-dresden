@@ -7,6 +7,7 @@ import jakarta.annotation.Nullable;
 import org.matsim.analysis.CheckAndSummarizeLongDistanceFreightPopulation;
 import org.matsim.analysis.CheckStayHomeAgents;
 import org.matsim.analysis.PlansToParquet;
+import org.matsim.analysis.WriteDuckDbQueries;
 import org.matsim.analysis.personMoney.PersonMoneyEventsAnalysisModule;
 import org.matsim.api.core.v01.Scenario;
 import org.matsim.api.core.v01.TransportMode;
@@ -450,7 +451,8 @@ public class DresdenModel extends MATSimApplication {
 		return List.of(
 			new DresdenAddVttsEtcToActivities(outputFolder, runId, simulationPeriodInDays),
 			new PlansToParquet(outputFolder, runId, Controler.DefaultFiles.population.getFilename()),
-			new PlansToParquet(outputFolder, runId, Controler.DefaultFiles.experiencedPlans.getFilename())
+			new PlansToParquet(outputFolder, runId, Controler.DefaultFiles.experiencedPlans.getFilename()),
+			new WriteDuckDbQueries(outputFolder)
 		);
 	}
 
