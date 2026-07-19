@@ -58,19 +58,25 @@ CREATE OR REPLACE VIEW experienced_trips AS
     JOIN real_acts b ON b.personId = a.personId AND b.r = a.r + 1
     LEFT JOIN trip_legs tl ON tl.personId = a.personId AND tl.trip_id = a.r;
 
--- ---- derived view: experienced real activities (stage/interaction activities dropped) -------
--- One row per non-interaction activity per person, carrying the three nullable source time fields
--- (startTime, endTime, maxDuration -- raw seconds) for reference, plus an effective duration:
--- endTime - startTime when both are set, else maxDuration (else null -- e.g. the day's first/last
--- activity, which lacks a start or an end respectively). Format times/durations with hms().
+-- ---- derived view: experienced activities with a defined effective duration ---------------
+-- One row per non-interaction activity per person WHERE the effective duration is defined:
+--   eff_duration = endTime - startTime if both are set, else maxDuration.
+-- Rows without a defined duration are dropped. In practice that leaves the "middle" activities:
+-- the day's first/last activity lack a start/end and (in experienced plans) carry no maxDuration,
+-- so they fall out. No wrap-around and no start/end interpolation is modelled here -- activities
+-- stay exactly as the experienced plan has them. The three source time fields (startTime, endTime,
+-- maxDuration -- raw seconds) are kept for reference. eff_duration = 0 here is a GENUINE
+-- zero-duration activity (start == end), not "undefined". Format times/durations with hms().
 CREATE OR REPLACE VIEW experienced_activities AS
-    SELECT personId, a.sequence AS seq, a.actType, a.link,
-           a.startTime, a.endTime, a.maxDuration,
-           CASE WHEN a.startTime IS NOT NULL AND a.endTime IS NOT NULL
-                THEN a.endTime - a.startTime
-                ELSE a.maxDuration END AS eff_duration
-    FROM experienced_plans, UNNEST(activities) AS t(a)
-    WHERE a.actType NOT LIKE '%interaction%';
+    SELECT * FROM (
+        SELECT personId, a.sequence AS seq, a.actType, a.link,
+               a.startTime, a.endTime, a.maxDuration,
+               CASE WHEN a.startTime IS NOT NULL AND a.endTime IS NOT NULL
+                    THEN a.endTime - a.startTime
+                    ELSE a.maxDuration END AS eff_duration
+        FROM experienced_plans, UNNEST(activities) AS t(a)
+        WHERE a.actType NOT LIKE '%interaction%'
+    ) WHERE eff_duration IS NOT NULL;
 
 -- ---- helpers ---------------------------------------------------------------
 
