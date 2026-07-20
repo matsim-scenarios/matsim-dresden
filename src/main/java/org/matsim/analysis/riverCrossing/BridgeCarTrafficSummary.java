@@ -2,18 +2,21 @@ package org.matsim.analysis.riverCrossing;
 
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
+import org.apache.commons.lang.mutable.MutableInt;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.geotools.api.feature.simple.SimpleFeature;
+import org.locationtech.jts.geom.Geometry;
 import org.matsim.analysis.VolumesAnalyzer;
+import org.matsim.api.core.v01.Coord;
 import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.TransportMode;
-import org.matsim.api.core.v01.events.LinkEnterEvent;
-import org.matsim.api.core.v01.events.handler.LinkEnterEventHandler;
 import org.matsim.api.core.v01.network.Link;
 import org.matsim.api.core.v01.network.Network;
 import org.matsim.api.core.v01.population.Leg;
 import org.matsim.api.core.v01.population.Person;
 import org.matsim.api.core.v01.population.Population;
+import org.matsim.application.options.ShpOptions;
 import org.matsim.core.api.experimental.events.EventsManager;
 import org.matsim.core.events.EventsUtils;
 import org.matsim.core.network.NetworkUtils;
@@ -22,7 +25,7 @@ import org.matsim.core.population.routes.NetworkRoute;
 import org.matsim.core.router.DefaultAnalysisMainModeIdentifier;
 import org.matsim.core.router.MainModeIdentifier;
 import org.matsim.core.router.TripStructureUtils;
-import org.matsim.vehicles.Vehicle;
+import org.matsim.core.utils.geometry.geotools.MGC;
 
 import java.io.FileWriter;
 import java.io.IOException;
@@ -30,6 +33,7 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static org.matsim.analysis.riverCrossing.BridgeCrossingAnalysisUtils.*;
 import static org.matsim.contrib.drt.analysis.afterSimAnalysis.DrtVehicleStoppingTaskWriter.glob;
 
 public class BridgeCarTrafficSummary {
@@ -61,30 +65,38 @@ public class BridgeCarTrafficSummary {
 	static final Id<Link> linkIdNiederwarthaerBridgeSouthToNorth = Id.createLinkId("419106272");
 	static final Id<Link> linkIdNiederwarthaerBridgeNorthToSouth = Id.createLinkId("22112767");
 
+	static final String UNKNOWN = "unknown";
+
 	private static final Logger log = LogManager.getLogger(BridgeCarTrafficSummary.class);
 
 	public static void main(String[] args) throws IOException {
 		String outputFolderBefore = args.length >= 2 ? args[0] : "/Users/luchengqi/Documents/MATSimScenarios/Dresden/dresden-scenario/v1.1/output/10pct/before";
 		String outputFolderAfter = args.length >= 2 ? args[1] : "/Users/luchengqi/Documents/MATSimScenarios/Dresden/dresden-scenario/v1.1/output/10pct/after";
-		double sampleSize = args.length == 3 ? Double.parseDouble(args[2]) : 0.1;
+		String shpFile = args.length >= 3 ? args[2] : "/Users/luchengqi/Documents/MATSimScenarios/Dresden/dresden-scenario/shp/ortsteile-dresden-only.shp";
+		double sampleSize = args.length == 4 ? Double.parseDouble(args[3]) : 0.1;
 
 		Network network = NetworkUtils.readNetwork(glob(Path.of(outputFolderBefore), "*output_network.xml.*").orElseThrow().toString());
+		ShpOptions shp = new ShpOptions(Path.of(shpFile), "EPSG:25832", null);
 
 		// analyze traffic volume on the bridges
 		analyzeTrafficVolume(outputFolderBefore, network, sampleSize, "before");
 		analyzeTrafficVolume(outputFolderAfter, network, sampleSize, "after");
 
 		// analyze the behavior change due to the bridge collapse
-		analyzeBehaviorChange(outputFolderBefore, outputFolderAfter);
+		analyzeBehaviorChange(outputFolderBefore, outputFolderAfter, shp, sampleSize);
 	}
 
-	private static void analyzeBehaviorChange(String outputFolderBefore, String outputFolderAfter) throws IOException {
+	private static void analyzeBehaviorChange(String outputFolderBefore, String outputFolderAfter, ShpOptions shp, double sampleSize) throws IOException {
 		Population experiencedPlansBefore = PopulationUtils.readPopulation(glob(Path.of(outputFolderBefore), "*output_experienced_plans.xml.*").orElseThrow().toString());
 		Population experiencedPlansAfter = PopulationUtils.readPopulation(glob(Path.of(outputFolderAfter), "*output_experienced_plans.xml.*").orElseThrow().toString());
+		List<SimpleFeature> features = shp.readFeatures();
+
+		Map<String, MutableInt> departuresPerRegion = new HashMap<>();
+		Map<String, MutableInt> arrivalsPerRegion = new HashMap<>();
 
 		String behaviorChangeAnalysisOutput = outputFolderAfter + "/behavior-change-analysis.csv";
 		CSVPrinter behaviorAnalysisPrinter = new CSVPrinter(new FileWriter(behaviorChangeAnalysisOutput), CSVFormat.DEFAULT);
-		behaviorAnalysisPrinter.printRecord("person", "trip_id", "main_mode_before", "main_mode_after", "alternative_bridge_used_when_no_mode_change");
+		behaviorAnalysisPrinter.printRecord("person", "trip_id", "main_mode_before", "main_mode_after", "bridge_used_before", "alternative_bridge_used_when_no_mode_change", "from_region_id", "to_region_id");
 
 		MainModeIdentifier mainModeIdentifier = new DefaultAnalysisMainModeIdentifier();
 		for (Person person : experiencedPlansBefore.getPersons().values()) {
@@ -100,10 +112,20 @@ public class BridgeCarTrafficSummary {
 							// to be consistent with the volumes analysis: start link in the route is not counted
 							linksInTheRoute.add(routeBefore.getEndLinkId());
 
-							if (linksInTheRoute.contains(linkIdCarolaBridgeSouthToNorth) || linksInTheRoute.contains(linkIdCarolaBridgeNorthToSouth)) {
-								// the original trip uses the Carola bridge.
+							String bridgeUsedBefore = identifyBridge(linksInTheRoute);
+							if (!bridgeUsedBefore.equals(UNKNOWN)) {
+								// the original trip uses one of the bridges in and around Dresden.
 								int tripIdx = i + 1;
 								String tripId = person.getId().toString() + "_" + tripIdx;
+
+								// get od relation of the trip
+								Coord fromCoord = trip.getOriginActivity().getCoord();
+								String fromRegionId = getRegionId(features, fromCoord);
+								departuresPerRegion.computeIfAbsent(fromRegionId, k -> new MutableInt(0)).increment();
+
+								Coord toCoord = trip.getDestinationActivity().getCoord();
+								String toRegionId = getRegionId(features, toCoord);
+								arrivalsPerRegion.computeIfAbsent(toRegionId, k -> new MutableInt(0)).increment();
 
 								Person personAfterChange = experiencedPlansAfter.getPersons().get(person.getId());
 								List<TripStructureUtils.Trip> tripsAfter = TripStructureUtils.getTrips(personAfterChange.getSelectedPlan());
@@ -126,7 +148,7 @@ public class BridgeCarTrafficSummary {
 										}
 									}
 								}
-								behaviorAnalysisPrinter.printRecord(person.getId().toString(), tripId, mainModeBefore, mainModeAfter, alternativeBridgeUsed);
+								behaviorAnalysisPrinter.printRecord(person.getId().toString(), tripId, mainModeBefore, mainModeAfter, bridgeUsedBefore, alternativeBridgeUsed, fromRegionId, toRegionId);
 							}
 						}
 					}
@@ -134,6 +156,18 @@ public class BridgeCarTrafficSummary {
 			}
 		}
 		behaviorAnalysisPrinter.close();
+
+		// print out od relations
+		String odRelationsOutput = outputFolderAfter + "/carola-bridge-trips-od-relations.csv";
+		CSVPrinter odRelationsPrinter = new CSVPrinter(new FileWriter(odRelationsOutput), CSVFormat.DEFAULT);
+		odRelationsPrinter.printRecord("OBJECTID", "departures", "arrivals");
+		for (SimpleFeature feature : features) {
+			String regionId = feature.getAttribute("OBJECTID").toString();
+			double departures = departuresPerRegion.getOrDefault(regionId, new MutableInt(0)).intValue() / sampleSize;
+			double arrivals = arrivalsPerRegion.getOrDefault(regionId, new MutableInt(0)).intValue() / sampleSize;
+			odRelationsPrinter.printRecord(regionId, departures, arrivals);
+		}
+		odRelationsPrinter.close();
 	}
 
 	private static void analyzeTrafficVolume(String outputFolder, Network network, double sampleSize, String caseName) throws IOException {
@@ -239,84 +273,60 @@ public class BridgeCarTrafficSummary {
 	}
 
 	private static String identifyAlternativeBridgeUsed(Set<Id<Link>> linksInTheRouteAfter) {
+		String identifiedBridge = identifyBridge(linksInTheRouteAfter);
+		if (identifiedBridge.equals(CAROLA_BRIDGE)) {
+			throw new RuntimeException("Carola bridge is used in the route after the Carola bridge collapsed. This should not happen.");
+		}
+		return identifiedBridge;
+	}
+
+	private static String identifyBridge(Set<Id<Link>> linksInTheRouteAfter) {
 		if (linksInTheRouteAfter.contains(linkIdCarolaBridgeSouthToNorth) || linksInTheRouteAfter.contains(linkIdCarolaBridgeNorthToSouth)) {
-			throw new RuntimeException("The trip still uses the Carola bridge. This should not happen.");
+			return CAROLA_BRIDGE;
 		}
 
 		if (linksInTheRouteAfter.contains(motorwayA4SouthToNorth) || linksInTheRouteAfter.contains(motorwayA4NorthToSouth)) {
-			return "Motorway A4";
+			return ELBE_BRIDGE_A4;
 		}
 
 		if (linksInTheRouteAfter.contains(linkIdFluegelwegBridgeSouthToNorth) || linksInTheRouteAfter.contains(linkIdFluegelwegBridgeNorthToSouth)) {
-			return "Flügelwegbrücke";
+			return FLUEGELWEG_BRIDGE;
 		}
 
 		if (linksInTheRouteAfter.contains(linkIdMarienBridgeSouthToNorth) || linksInTheRouteAfter.contains(linkIdMarienBridgeNorthToSouth)) {
-			return "Marienbrücke";
+			return MARIEN_BRIDGE;
 		}
 
 		if (linksInTheRouteAfter.contains(linkIdAugustusBridgeSouthToNorth) || linksInTheRouteAfter.contains(linkIdAugustusBridgeNorthToSouth)) {
-			return "Augustusbrücke";
+			return AUGUSTUS_BRIDGE;
 		}
 
 		if (linksInTheRouteAfter.contains(linkIdAlbertBridgeSouthToNorth) || linksInTheRouteAfter.contains(linkIdAlbertBridgeNorthToSouth)) {
-			return "Albertbrücke";
+			return ALBERT_BRIDGE;
 		}
 
 		if (linksInTheRouteAfter.contains(linkIdWsbBridgeSouthToNorth) || linksInTheRouteAfter.contains(linkIdWsbBridgeNorthToSouth)) {
-			return "Waldschlösschenbrücke";
+			return WSB;
 		}
 
 		if (linksInTheRouteAfter.contains(linkIdLoschwitzerBridgeSouthToNorth) || linksInTheRouteAfter.contains(linkIdLoschwitzerBridgeNorthToSouth)) {
-			return "Loschwitzer Brücke";
+			return BLAUES_WUNDER_BRIDGE;
 		}
 
 		if (linksInTheRouteAfter.contains(linkIdNiederwarthaerBridgeSouthToNorth) || linksInTheRouteAfter.contains(linkIdNiederwarthaerBridgeNorthToSouth)) {
 			return "Niederwarthaer Brücke";
 		}
 
-		return null;
+		return UNKNOWN;
 	}
 
-	static class BridgeCountAnalysis implements LinkEnterEventHandler {
-		private final Map<Id<Link>, List<String>> bridgeCounts = initializeMap();
-		Set<Id<Person>> idsOfCarolaBridgeUsers = new HashSet<>();
-
-		private Map<Id<Link>, List<String>> initializeMap() {
-			Map<Id<Link>, List<String>> bridgeCounts = new HashMap<>();
-			bridgeCounts.put(linkIdCarolaBridgeSouthToNorth, new ArrayList<>());
-			bridgeCounts.put(linkIdCarolaBridgeNorthToSouth, new ArrayList<>());
-			return bridgeCounts;
-		}
-
-		@Override
-		public void handleEvent(LinkEnterEvent event) {
-			if (bridgeCounts.containsKey(event.getLinkId())) {
-				String vehicleType = getVehicleTypeFromVehicleId(event.getVehicleId());
-				bridgeCounts.get(event.getLinkId()).add(vehicleType);
-
-				// users of the Carola bridge
-				if (event.getLinkId().toString().equals(linkIdCarolaBridgeSouthToNorth.toString()) ||
-					event.getLinkId().toString().equals(linkIdCarolaBridgeNorthToSouth.toString())) {
-					idsOfCarolaBridgeUsers.add(getPersonIdFromVehicleId(event.getVehicleId()));
-				}
+	private static String getRegionId(List<SimpleFeature> features, Coord coord) {
+		for (SimpleFeature feature : features) {
+			Geometry geometry = (Geometry) feature.getDefaultGeometry();
+			if (MGC.coord2Point(coord).within(geometry)) {
+				return feature.getAttribute("OBJECTID").toString();
 			}
-
-
 		}
-
-		private static Id<Person> getPersonIdFromVehicleId(Id<Vehicle> vehicleId) {
-			String s = vehicleId.toString();
-			int pos = s.lastIndexOf('_');
-			return pos >= 0 ? Id.createPersonId(s.substring(0, pos)) : Id.createPersonId(s);
-		}
-
-		private static String getVehicleTypeFromVehicleId(Id<Vehicle> vehicleId) {
-			String s = vehicleId.toString();
-			int pos = s.lastIndexOf('_');
-			return pos >= 0 && pos < s.length() - 1 ? s.substring(pos + 1) : "unknown";
-		}
+		return UNKNOWN;
 	}
-
-
 }

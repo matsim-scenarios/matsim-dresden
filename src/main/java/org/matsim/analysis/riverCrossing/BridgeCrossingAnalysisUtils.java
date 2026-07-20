@@ -13,7 +13,7 @@ public class BridgeCrossingAnalysisUtils {
 	static final String WSB = "Waldschlößchenbrücke";
 	static final String BLAUES_WUNDER_BRIDGE = "Loschwitzer Brücke";
 
-	static final String ELBE_BRIDGE_A4 = "Elbebrücke";
+	static final String ELBE_BRIDGE_A4 = "Elbebrücke Dresden (A4)";
 	static final String TRAIN_MARIEN_BRIDGE = "Trains (Marienbrücke)";
 	static final String TRAIN_NIEDERWARTHA_BRIDGE = "Trains (Niederwarthaer Brücke)";
 
