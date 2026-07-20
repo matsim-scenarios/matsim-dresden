@@ -13,6 +13,15 @@
 #   cannot reach in one step, which is what leaves agents parked on zero-duration activities. Its weight
 #   is in prepare-config.xml with the other strategies; the fraction of the run after which it switches
 #   off is DresdenModel.BEST_RESPONSE_DISABLE_FRACTION.
+# threads: parallelism of the run. Sets global.numberOfThreads (replanning and routing),
+#   qsim.numberOfThreads and dsim.threads together, so there is one knob rather than three that can
+#   drift apart. 12 is what input/prepare-config.xml has always set for the first two, so the default
+#   changes nothing. dsim is inert while the mobsim is qsim, but its own default is 0, which means
+#   "use every available processor" -- pinning it too keeps a run's parallelism a property of the
+#   experiment rather than of whichever machine it lands on. Deliberately NOT applied to
+#   eventsManager.numberOfThreads, which is unset (i.e. sequential event handling): switching that on
+#   would change how events are handled, not just how fast, and is a separate decision.
 sim_period_days: 1.125
 last_iteration: 0
 best_response_scheduling: false
+threads: 12

@@ -39,6 +39,13 @@ SIM_PERIOD_DAYS ?= 1.125
 # pass it to the other run targets via ARGS if needed.
 BEST_RESPONSE ?= false
 
+# Parallelism of the run (see the threads dvc parameter): one knob for global.numberOfThreads (replanning,
+# routing), qsim.numberOfThreads and dsim.threads. The default matches what input/prepare-config.xml sets for
+# the first two. dsim's own default is 0, i.e. "use every available processor", so it is pinned here as well --
+# a run's parallelism should come from the experiment, not from whichever machine it lands on. As with
+# BEST_RESPONSE, only wired into run-1pct-notimes, the target the dvc run stage drives.
+THREADS ?= 12
+
 .PHONY: prepare run run-1pct run-0pct
 
 # DVC owns cross-stage invalidation (see dvc.yaml); make only has to build what is genuinely absent.
@@ -418,6 +425,9 @@ run-1pct-notimes: input/prepare-config.xml | $(CLASSPATH)
 	 --config:controller.lastIteration=$(LAST_IT)\
 	 --simulation-period-in-days=$(SIM_PERIOD_DAYS)\
 	 --best-response-scheduling=$(BEST_RESPONSE)\
+	 --config:global.numberOfThreads=$(THREADS)\
+	 --config:qsim.numberOfThreads=$(THREADS)\
+	 --config:dsim.threads=$(THREADS)\
 	 $(ARGS)
 
 # Like run-1pct-notimes, but with the schedule-delay corridor armed in the scoring: per-activity soft anchors at the
