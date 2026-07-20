@@ -400,20 +400,19 @@ public final class VTTSHandler implements ActivityStartEventHandler, ActivityEnd
 				Activity activityEvening = PopulationUtils.createActivityFromLinkId( simData.currentActivityType, null );
 				activityEvening.setStartTime( simData.currentActivityStartTime );
 
-				// Dresden: the first and last activity are activity index 0 and n-1 of the plan; their planned typical
-				// durations (already encoding EncodeTypicalDuration's wrap-around / end-of-period rules) come straight
-				// from the output population, so DresdenActivityScoring scores this first/last pair as the run did.
-				// Edge case: an agent that stalls before reaching the end of its plan realizes fewer main activities
-				// than the plan has, so its last REALIZED activity is not the plan's last one, and the index below
-				// then reads a typical duration belonging to a different activity (a type mismatch this code does not
-				// detect, unlike the middle-activity branch's positional index, which stays a valid prefix). Reading
-				// the plan's last slot anyway is the deliberate choice: only that slot carries EncodeTypicalDuration's
-				// "from its start to the end of the simulation period" encoding, which is the rule this branch scores
-				// by. Rare (a handful of agents in a 1pct run); revisit if stalling ever becomes common.
+				// Dresden: both activities are matched to the plan by position -- the morning one is activity index 0,
+				// the evening one the index the realized sequence has reached, exactly like the middle-activity branch
+				// below and exactly like the plan cursor the run's own DresdenActivityScoring walks. Do NOT reach for
+				// the plan's terminal slot instead: an agent is scored here whenever the simulation ended while it was
+				// at an activity, which is not the same as it being at its last activity. One that stalled mid-plan
+				// would otherwise be scored against the typical duration of an activity it never reached (silently,
+				// when the two happen to share a type). The planned typical durations already encode
+				// EncodeTypicalDuration's wrap-around / end-of-period rules and come straight from the output
+				// population, so this scores the pair as the run did.
 				double typMorning = plannedValue( planned == null ? null : planned.typicalDurations(), 0 );
-				int lastIndex = planned == null ? -1 : planned.typicalDurations().length - 1;
-				double typEvening = plannedValue( planned == null ? null : planned.typicalDurations(), lastIndex );
-				typicalDurationUsed_s = typEvening; // currentActivityType is the evening (last) activity
+				int eveningIndex = simData.trips.size();
+				double typEvening = plannedValue( planned == null ? null : planned.typicalDurations(), eveningIndex );
+				typicalDurationUsed_s = typEvening; // currentActivityType is the evening (last-reached) activity
 
 				// The last activity is scored from its arrival to the end of the day (the wrap-around end for a wrap
 				// plan, otherwise simulationPeriodInDays*24h). Arriving at or after that end (window <= 0) is flagged
@@ -436,7 +435,7 @@ public final class VTTSHandler implements ActivityStartEventHandler, ActivityEnd
 					stampTypicalDuration( activityEvening, typEvening );
 					if ( planned != null ) {
 						stampAnchors( activityMorning, planned, 0 );
-						stampAnchors( activityEvening, planned, lastIndex );
+						stampAnchors( activityEvening, planned, eveningIndex );
 					}
 					scores = marginalSumScoringFunction.getOvernightActivityDelayDisutility( activityMorning, activityEvening, 1.0 );
 				}
