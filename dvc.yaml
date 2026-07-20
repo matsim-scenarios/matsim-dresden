@@ -74,10 +74,11 @@ stages:
       - input/before-calibration/output/dresden-v1.1-activity-facilities.xml.gz
   run:
     # run-1pct-notimes (no made-up opening times) is the structural candidate we vary parameters on.
-    cmd: make run-1pct-notimes SIM_PERIOD_DAYS=${sim_period_days} LAST_IT=${last_iteration}
+    cmd: make run-1pct-notimes SIM_PERIOD_DAYS=${sim_period_days} LAST_IT=${last_iteration} BEST_RESPONSE=${best_response_scheduling}
     params:
       - sim_period_days
       - last_iteration
+      - best_response_scheduling
     deps:
       - Makefile
       - pom.xml

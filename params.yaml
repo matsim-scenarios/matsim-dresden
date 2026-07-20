@@ -7,5 +7,12 @@
 #   it invalidates the plans and re-runs the whole pipeline, not just the simulation.
 # last_iteration: last iteration of the run. Lower it for smoke runs, e.g.
 #   dvc exp run --set-param last_iteration=1
+# best_response_scheduling: keep the best-response scheduling strategy (re-plan the whole day at once,
+#   then re-route), which input/prepare-config.xml declares alongside the other "person" strategies;
+#   false drops it. Meant to supply the coordinated multi-activity retiming that TimeAllocationMutator
+#   cannot reach in one step, which is what leaves agents parked on zero-duration activities. Its weight
+#   is in prepare-config.xml with the other strategies; the fraction of the run after which it switches
+#   off is DresdenModel.BEST_RESPONSE_DISABLE_FRACTION.
 sim_period_days: 1.125
-last_iteration: 500
+last_iteration: 0
+best_response_scheduling: false

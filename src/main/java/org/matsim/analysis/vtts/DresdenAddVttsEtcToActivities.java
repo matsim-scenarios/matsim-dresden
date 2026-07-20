@@ -4,6 +4,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.matsim.api.core.v01.Id;
+import org.matsim.api.core.v01.TransportMode;
 import org.matsim.api.core.v01.Scenario;
 import org.matsim.api.core.v01.population.Activity;
 import org.matsim.api.core.v01.population.Person;
@@ -34,6 +35,7 @@ import picocli.CommandLine;
 import playground.vsp.scoring.IncomeDependentUtilityOfMoneyPersonScoringParameters;
 import tech.tablesaw.api.DoubleColumn;
 import tech.tablesaw.api.NumberColumn;
+import tech.tablesaw.api.StringColumn;
 import tech.tablesaw.api.Table;
 import tech.tablesaw.columns.Column;
 import tech.tablesaw.io.csv.CsvWriteOptions;
@@ -44,10 +46,12 @@ import tech.tablesaw.plotly.traces.HistogramTrace;
 import java.nio.file.Path;
 import java.text.NumberFormat;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 import static java.lang.Math.exp;
 import static org.matsim.application.ApplicationUtils.globFile;
@@ -312,12 +316,23 @@ public class DresdenAddVttsEtcToActivities implements MATSimAppCommand {
 		// determined by the arrival and the day-end rule alone, not by whether the marginal came out computable.
 		int total = tripsTable.rowCount();
 		int zeroDurationActs = tripsTable.doubleColumn( HeadersKN.activityDuration ).isEqualTo( 0. ).size();
+
+		// Split the zero-duration count by whether the agent's day involves pt at all. The best-response scheduler
+		// treats each trip's travel time as a constant, which is exact for the teleported modes and near enough for
+		// car, but wrong for pt, where travel time is a step function of departure time -- so a retiming that looks
+		// like a repair may just move the agent onto a service an hour later. Splitting the metric makes the two
+		// regimes separately visible: the pt-free count is what a travel-time-constant rescheduler can honestly claim,
+		// the pt-exposed count is where the departure-time sensitivity decides the outcome.
+		int zeroDurationActsPtFree = countZeroDurationActs( tripsTable, false );
+		int zeroDurationActsPtExposed = countZeroDurationActs( tripsTable, true );
 		StringBuilder summary = new StringBuilder( System.lineSeparator() );
 		summary.append( countLine( "scoring ok (log branch; in the stats)", okTrips.rowCount(), total ) );
 		summary.append( countLine( "scoring extrapolated (below zero-utility duration; excluded from means)", extrapolatedTrips.rowCount(), total ) );
 		summary.append( countLine( "scoring degenerate (not computable; pipeline alarm, expected 0)", degenerateTrips.rowCount(), total ) );
 		summary.append( countLine( "last activity arriving at/after day end (indicator, not a class)", afterDayEndCount, total ) );
 		summary.append( countLine( "activities with duration 0.0", zeroDurationActs, total ) );
+		summary.append( countLine( "  ... of agents whose day has no pt trip", zeroDurationActsPtFree, total ) );
+		summary.append( countLine( "  ... of agents whose day has a pt trip", zeroDurationActsPtExposed, total ) );
 		System.out.println( summary );
 
 		// Track the zero-duration count as a DVC metric. metrics.json lives at the top of the run output folder (which
@@ -326,7 +341,10 @@ public class DresdenAddVttsEtcToActivities implements MATSimAppCommand {
 		Path metricsPath = outputDir.resolve( "metrics.json" );
 		log.info( "Writing DVC metrics to file: {}", metricsPath );
 		new ObjectMapper().writerWithDefaultPrettyPrinter()
-			.writeValue( metricsPath.toFile(), Map.of( "zero_duration_activity_count", zeroDurationActs ) );
+			.writeValue( metricsPath.toFile(), Map.of(
+				"zero_duration_activity_count", zeroDurationActs,
+				"zero_duration_activity_count_pt_free", zeroDurationActsPtFree,
+				"zero_duration_activity_count_pt_exposed", zeroDurationActsPtExposed ) );
 
 		final Table muttsStats = okTrips.summarize( HeadersKN.muttsh, mean, quartile1, median, quartile3, percentile95 ).apply();
 		System.out.println( System.lineSeparator() + muttsStats + System.lineSeparator() );
@@ -395,6 +413,31 @@ public class DresdenAddVttsEtcToActivities implements MATSimAppCommand {
 
 	private static double asDouble( Object attribute ) {
 		return (attribute instanceof Number number) ? number.doubleValue() : Double.NaN;
+	}
+
+	/**
+	 * Zero-duration activities of the agents whose day does (or does not) contain a pt trip. "Contains pt" is a
+	 * property of the whole day, not of the incoming trip alone: the schedule is a chain, so retiming anywhere shifts
+	 * every downstream departure, and one pt leg is enough to make the constant-travel-time assumption unsafe for all
+	 * of them.
+	 */
+	private static int countZeroDurationActs( Table tripsTable, boolean withPt ) {
+		Set<String> personsWithPt = new HashSet<>();
+		StringColumn persons = tripsTable.stringColumn( HeadersKN.personId );
+		StringColumn modes = tripsTable.stringColumn( HeadersKN.mode );
+		for ( int row = 0; row < tripsTable.rowCount(); row++ ) {
+			if ( TransportMode.pt.equals( modes.get( row ) ) ) {
+				personsWithPt.add( persons.get( row ) );
+			}
+		}
+		DoubleColumn durations = tripsTable.doubleColumn( HeadersKN.activityDuration );
+		int count = 0;
+		for ( int row = 0; row < tripsTable.rowCount(); row++ ) {
+			if ( durations.get( row ) == 0. && personsWithPt.contains( persons.get( row ) ) == withPt ) {
+				count++;
+			}
+		}
+		return count;
 	}
 
 	private static String countLine( String label, int count, int total ) {

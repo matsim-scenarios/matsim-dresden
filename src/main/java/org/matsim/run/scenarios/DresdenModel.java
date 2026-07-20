@@ -40,6 +40,7 @@ import org.matsim.core.config.ConfigUtils;
 import org.matsim.replanning.bestresponse.BestResponseReport;
 import org.matsim.replanning.bestresponse.BestResponseScheduleConfigGroup;
 import org.matsim.replanning.bestresponse.BestResponseScheduleStrategy;
+import org.matsim.core.config.groups.ReplanningConfigGroup;
 import org.matsim.core.config.groups.RoutingConfigGroup.AccessEgressType;
 import org.matsim.core.config.groups.ScoringConfigGroup;
 import org.matsim.core.controler.AbstractModule;
@@ -133,10 +134,14 @@ public class DresdenModel extends MATSimApplication {
 	private boolean mutateAroundInitialEndTimeOnly = false;
 
 	@CommandLine.Option(names="--best-response-scheduling",
-		description = "Experimental: replace the random TimeAllocationMutator with a best-response scheduling " +
-			"strategy that re-plans the whole day at once by optimizing a linearized approximation of the activity " +
-			"scoring (see org.matsim.replanning.bestresponse). Default false.")
+		description = "Experimental: ADD a best-response scheduling strategy that re-plans the whole day at once by " +
+			"optimizing a linearized approximation of the activity scoring, then re-routes (see " +
+			"org.matsim.replanning.bestresponse). It runs alongside the random TimeAllocationMutator rather than " +
+			"replacing it: the mutator keeps exploring locally, the best response supplies the coordinated multi-" +
+			"activity moves the mutator cannot reach in one step. Default false.")
 	private boolean bestResponseScheduling = false;
+
+
 
 	@CommandLine.Option(names="--schedule-delay-scoring",
 		description = "Arm the schedule-delay corridor in the scoring: starting later than the stamped initial " +
@@ -217,17 +222,10 @@ public class DresdenModel extends MATSimApplication {
 		config.timeAllocationMutator().setMutateAroundInitialEndTimeOnly(mutateAroundInitialEndTimeOnly);
 		config.timeAllocationMutator().setAffectingDuration(false);
 
-		// Best-response scheduling: register its config, and -- when enabled -- replace every
-		// TimeAllocationMutator strategy setting (keeping its weight/subpopulation) with the best-response strategy.
-		// The strategy itself is bound in prepareControler.
+		// Best-response scheduling: register its config group. The strategy itself is declared in the config
+		// alongside the other person strategies and resolved in configureBestResponseStrategy; the binding is in
+		// prepareControler.
 		ConfigUtils.addOrGetModule(config, BestResponseScheduleConfigGroup.class).setRandomErrorSigma(bestResponseSigma);
-		if (bestResponseScheduling) {
-			for (var strategySettings : config.replanning().getStrategySettings()) {
-				if ("TimeAllocationMutator".equals(strategySettings.getStrategyName())) {
-					strategySettings.setStrategyName(BestResponseScheduleStrategy.STRATEGY_NAME);
-				}
-			}
-		}
 
 //		config.vspExperimental().setVspDefaultsCheckingLevel( VspDefaultsCheckingLevel.abort );
 
@@ -408,8 +406,41 @@ public class DresdenModel extends MATSimApplication {
 		}
 	}
 
+	/** Fraction of the run's last iteration after which best-response scheduling switches off. Below the global
+	 * replanning.fractionOfIterationsToDisableInnovation (0.9) on purpose: the best response should pull agents out of
+	 * the corners the mutator cannot escape early on, then get out of the way so the run settles into its stochastic
+	 * equilibrium under the usual strategies rather than being held at a near-deterministic schedule. */
+	private static final double BEST_RESPONSE_DISABLE_FRACTION = 0.7;
+
+	/**
+	 * Resolve the best-response scheduling strategy that the config declares alongside the other person strategies:
+	 * drop it unless the run enables it, and otherwise switch it off after {@link #BEST_RESPONSE_DISABLE_FRACTION} of
+	 * the run's last iteration. Runs from {@link #prepareControler} because the last iteration is only final there --
+	 * {@code MATSimApplication} applies the {@code --config:...} overrides after {@code prepareConfig}, and that is how
+	 * the run targets set {@code controller.lastIteration} (prepare-config.xml still says 500). The strategy settings
+	 * reach the {@code StrategyManager}, which the injector builds inside {@code controler.run()}, i.e. after this.
+	 */
+	private void configureBestResponseStrategy(Config config) {
+		List<ReplanningConfigGroup.StrategySettings> declared = config.replanning().getStrategySettings().stream()
+			.filter(settings -> BestResponseScheduleStrategy.STRATEGY_NAME.equals(settings.getStrategyName()))
+			.toList();
+		if (!bestResponseScheduling) {
+			declared.forEach(config.replanning()::removeParameterSet);
+			return;
+		}
+		int lastIteration = config.controller().getLastIteration();
+		int disableAfter = (int) Math.round(BEST_RESPONSE_DISABLE_FRACTION * lastIteration);
+		declared.forEach(settings -> settings.setDisableAfter(disableAfter));
+		log.info("Best-response scheduling enabled: {} strategy setting(s), disabled after iteration {} (fraction {} of "
+				 + "last iteration {}); innovation overall stops at fraction {}.",
+			declared.size(), disableAfter, BEST_RESPONSE_DISABLE_FRACTION, lastIteration,
+			config.replanning().getFractionOfIterationsToDisableInnovation());
+	}
+
 	@Override
 	protected void prepareControler(Controler controler) {
+		configureBestResponseStrategy(controler.getConfig());
+
 		//analyse PersonMoneyEvents
 		controler.addOverridingModule(new PersonMoneyEventsAnalysisModule());
 

@@ -34,6 +34,11 @@ LAST_IT ?= 500
 # Changing it invalidates the prepared plans: re-run the prepare pipeline.
 SIM_PERIOD_DAYS ?= 1.125
 
+# Add the best-response scheduling strategy to the run's replanning (see --best-response-scheduling and the
+# best_response_scheduling dvc parameter). Only wired into run-1pct-notimes, the target the dvc run stage drives;
+# pass it to the other run targets via ARGS if needed.
+BEST_RESPONSE ?= false
+
 .PHONY: prepare run run-1pct run-0pct
 
 # DVC owns cross-stage invalidation (see dvc.yaml); make only has to build what is genuinely absent.
@@ -412,6 +417,7 @@ run-1pct-notimes: input/prepare-config.xml | $(CLASSPATH)
 	 --with-opening-times=false\
 	 --config:controller.lastIteration=$(LAST_IT)\
 	 --simulation-period-in-days=$(SIM_PERIOD_DAYS)\
+	 --best-response-scheduling=$(BEST_RESPONSE)\
 	 $(ARGS)
 
 # Like run-1pct-notimes, but with the schedule-delay corridor armed in the scoring: per-activity soft anchors at the

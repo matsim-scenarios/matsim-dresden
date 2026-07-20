@@ -132,6 +132,18 @@
 			<param name="subpopulation" value="person"/>
 			<param name="weight" value="0.10"/>
 		</parameterset>
+		<!-- Best-response scheduling: re-plan the whole day at once (then re-route), supplying the coordinated
+		     multi-activity retiming that TimeAllocationMutator cannot reach in one +/-30min step and that agents
+		     parked on zero-duration activities need. Runs alongside the mutator, not instead of it, and at a small
+		     weight: it is a near-deterministic attractor and one accepted draw per agent is already enough.
+		     DresdenModel drops this entry unless the run enables it (the best_response_scheduling dvc parameter,
+		     passed on as the best-response-scheduling option), and sets its switch-off iteration there, since that
+		     is a fraction of the run's last iteration and so cannot be written here. -->
+		<parameterset type="strategysettings">
+			<param name="strategyName" value="BestResponseSchedule"/>
+			<param name="subpopulation" value="person"/>
+			<param name="weight" value="0.05"/>
+		</parameterset>
 
 <!--		set in code -->
 <!--		<parameterset type="strategysettings">-->
