@@ -58,8 +58,6 @@ public class BridgeCrossingAnalysisUtils {
 	static final String FERRY_PILLNITZ = "Dresden Fährstelle Pillnitz";
 
 
-	static final String OTHER_STOP = "other";
-
 	static Set<String> getRelevantStops() {
 		Set<String> relevantStops = new HashSet<>();
 		relevantStops.add(SYNAGOGE);
