@@ -305,8 +305,11 @@ public class DresdenAddVttsEtcToActivities implements MATSimAppCommand {
 		log.info( "print summary statistics:");
 
 		// Headline numbers, all counted over the full trips table (each agent's first activity is not in the table,
-		// since an activity enters it via its incoming trip). The zero-duration count includes every class: whether an
-		// activity has zero duration is a property of the mobsim result, not of whether we managed to score it.
+		// since an activity enters it via its incoming trip). The zero-duration count is in the scoring's notion of
+		// activity duration, like the column it counts (see VTTSHandler.TripData#actDur_h): an activity is 0.0 long
+		// when the performing utility was integrated over an empty interval, which for the last activity of the day
+		// means arriving exactly at the day end. It includes every scoring-input class, since that interval is
+		// determined by the arrival and the day-end rule alone, not by whether the marginal came out computable.
 		int total = tripsTable.rowCount();
 		int zeroDurationActs = tripsTable.doubleColumn( HeadersKN.activityDuration ).isEqualTo( 0. ).size();
 		StringBuilder summary = new StringBuilder( System.lineSeparator() );

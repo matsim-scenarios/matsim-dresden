@@ -81,7 +81,13 @@ public final class VTTSHandler implements ActivityStartEventHandler, ActivityEnd
 		public double mUTTSh;
 		public String actType;
 		public double actTypDur_h;
-		/** NaN until the activity following this trip has been seen, so an unscored trip is not reported as a zero-duration activity. */
+		/**
+		 * Duration of the activity following this trip in the <em>scoring's</em> notion, not the mobsim's: the interval
+		 * over which the performing utility is integrated. For a middle activity the two coincide, but the last
+		 * activity of the day has no mobsim end at all -- it is scored from its arrival to the day end (the wrap-around
+		 * end for a wrap plan, otherwise simulationPeriodInDays*24h), a convention the mobsim knows nothing about.
+		 * NaN until the activity has been seen, so an unscored trip is not reported as a zero-duration activity.
+		 */
 		public double actDur_h = Double.NaN;
 		public double actScore;
 		/**
@@ -373,7 +379,14 @@ public final class VTTSHandler implements ActivityStartEventHandler, ActivityEnd
 
 			PlannedActivities planned = this.plannedActivities.get( personId );
 			boolean underflow;
-			double scoringWindow_s; // realized duration as the scoring sees it; the classification input
+			// The interval the performing utility is integrated over, i.e. the duration in the scoring's own terms:
+			// arrival to departure for a middle activity, arrival to the day end for the last one. Drives both the
+			// reported actDur_h and the scoring-input classification, so those cannot disagree about which interval
+			// they describe. Caveat for both consumers: DresdenActivityScoring additionally clips this interval to the
+			// activity type's opening hours (and collapses it when the type is closed throughout), which is not
+			// reproduced here -- exact as long as no opening/closing times are configured, as in this scenario, and
+			// the place to extend if they ever are.
+			double scoringWindow_s;
 			MarginalSumScoringFunction.Scores scores = null;
 			simData.trips.getLast().afterDayEnd = false;
 			if( activityEndTime.isUndefined() ){
@@ -390,6 +403,13 @@ public final class VTTSHandler implements ActivityStartEventHandler, ActivityEnd
 				// Dresden: the first and last activity are activity index 0 and n-1 of the plan; their planned typical
 				// durations (already encoding EncodeTypicalDuration's wrap-around / end-of-period rules) come straight
 				// from the output population, so DresdenActivityScoring scores this first/last pair as the run did.
+				// Edge case: an agent that stalls before reaching the end of its plan realizes fewer main activities
+				// than the plan has, so its last REALIZED activity is not the plan's last one, and the index below
+				// then reads a typical duration belonging to a different activity (a type mismatch this code does not
+				// detect, unlike the middle-activity branch's positional index, which stays a valid prefix). Reading
+				// the plan's last slot anyway is the deliberate choice: only that slot carries EncodeTypicalDuration's
+				// "from its start to the end of the simulation period" encoding, which is the rule this branch scores
+				// by. Rare (a handful of agents in a 1pct run); revisit if stalling ever becomes common.
 				double typMorning = plannedValue( planned == null ? null : planned.typicalDurations(), 0 );
 				int lastIndex = planned == null ? -1 : planned.typicalDurations().length - 1;
 				double typEvening = plannedValue( planned == null ? null : planned.typicalDurations(), lastIndex );
@@ -411,8 +431,6 @@ public final class VTTSHandler implements ActivityStartEventHandler, ActivityEnd
 				underflow = isUnderflowingTypicalDuration( scoringParameterSet, simData.firstActivityType, typMorning )
 					|| isUnderflowingTypicalDuration( scoringParameterSet, simData.currentActivityType, typEvening );
 
-				simData.trips.getLast().actDur_h = (simData.firstActivityEndTime + 3600.*24 - simData.currentActivityStartTime)/3600. ;
-
 				if ( !underflow ) {
 					stampTypicalDuration( activityMorning, typMorning );
 					stampTypicalDuration( activityEvening, typEvening );
@@ -425,6 +443,13 @@ public final class VTTSHandler implements ActivityStartEventHandler, ActivityEnd
 
 			} else{
 				// The activity has an end time indicating a 'normal' activity.
+
+				// Edge case: for an agent that ends its last activity and then stalls on the following trip, that
+				// activity has an end time and lands here, i.e. it is scored as a middle activity (over its realized
+				// start-to-end window) rather than by the last-activity rule the run's own scoring applied to it. The
+				// stalled trip itself produces no row (it is dropped as an incomplete plan further up), so the
+				// discrepancy is confined to this one row per stalled agent. Rare, and not worth reconstructing the
+				// run's stuck-agent treatment offline; noted so the rows are not mistaken for last activities.
 
 				Activity activity = PopulationUtils.createActivityFromLinkId( simData.currentActivityType, null );
 				activity.setStartTime( simData.currentActivityStartTime );
@@ -439,8 +464,6 @@ public final class VTTSHandler implements ActivityStartEventHandler, ActivityEnd
 				underflow = isUnderflowingTypicalDuration( scoringParameterSet, simData.currentActivityType, typ );
 				scoringWindow_s = activityEndTime.seconds() - simData.currentActivityStartTime;
 
-				simData.trips.getLast().actDur_h = (activityEndTime.seconds() - simData.currentActivityStartTime)/3600. ;
-
 				if ( !underflow ) {
 					stampTypicalDuration( activity, typ );
 					if ( planned != null ) {
@@ -449,6 +472,14 @@ public final class VTTSHandler implements ActivityStartEventHandler, ActivityEnd
 					scores = marginalSumScoringFunction.getNormalActivityDelayDisutility( personId, activity, 1.0 );
 				}
 			}
+
+			// Report the same interval that was just classified, rather than recomputing the duration independently:
+			// the column is the scoring's notion of activity duration (see TripData#actDur_h), so it has to follow the
+			// day-end rule the scoring actually applied. Computing it separately had applied the wrap-around end
+			// unconditionally, which in this scenario (EncodeTypicalDuration splits home into home_morning /
+			// home_evening, so the first and last type never match, and the wrap branch never fires) inflated every
+			// last activity by the morning activity's duration.
+			simData.trips.getLast().actDur_h = scoringWindow_s / 3600.;
 
 			// Classify the scoring input (see TripData.scoringInputClass): "degenerate" = not computable (zero-utility
 			// underflow or a non-finite score; a pipeline alarm, expected ~0); "extrapolated" = realized duration below
