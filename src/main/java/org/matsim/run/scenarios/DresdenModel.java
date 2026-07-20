@@ -61,7 +61,7 @@ import org.matsim.simwrapper.SimWrapperConfigGroup;
 import org.matsim.simwrapper.SimWrapperModule;
 import org.matsim.smallScaleCommercialTrafficGeneration.GenerateSmallScaleCommercialTrafficDemand;
 import org.matsim.smallScaleCommercialTrafficGeneration.prepare.CreateDataDistributionOfStructureData;
-import org.matsim.store.PlanSnapshotWriterDuckDB;
+import org.matsim.store.PlanSnapshotWriter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
@@ -437,7 +437,7 @@ public class DresdenModel extends MATSimApplication {
 				Multibinder.newSetBinder( binder(), DashboardProvider.class ).addBinding().toInstance( dashboardProvider );
 			}
 		});
-		controler.addControllerListener(new PlanSnapshotWriterDuckDB());
+		controler.addControllerListener(new PlanSnapshotWriter());
 	}
 
 	/**

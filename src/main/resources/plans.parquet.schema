@@ -1,0 +1,75 @@
+// Parquet schema for a plan-memory snapshot. THIS FILE IS THE CONTRACT: PlanSnapshotWriter parses
+// it at startup (MessageTypeParser) and writes straight to a RecordConsumer against it, so the
+// physical layout of the file is exactly what is written here -- no intermediate schema language,
+// no converter's opinions in between.
+//
+// Grain is ONE ROW PER PLAN; a person's choice set is the group of rows sharing personId. A plan's
+// elements are ONE ordered list, interleaved activities and legs, exactly as <plan> holds one
+// interleaved child sequence in plans.xml. There is no sequence column: the array order IS the
+// order (recover the index in DuckDB with generate_subscripts(elements, 1) next to the UNNEST).
+//
+// There is no iteration field either: a set of plans has no intrinsic iteration. When the
+// ControlerListener writes a snapshot the iteration lives in the ITERS/it.NNN/ path -- recover it
+// with read_parquet(..., filename := true). A standalone-converted plans file has no iteration.
+//
+// Field notes:
+//   score        null pre-scoring
+//   *Attributes  the entity's getAttributes(), rendered exactly as the plans XML renders them
+//                (MATSim AttributeConverters), e.g. subpopulation, carAvail, income, SNZ_*,
+//                typicalDuration, totalRouteCost. Absent (not empty) when the entity has none.
+//   kind         'activity' or 'leg'; the fields of the other kind are absent
+//   routingMode  Leg.getRoutingMode(), the trip's main mode -- a dedicated field, NOT an attribute
+//   route        legs only, teleported or network; absent on activities and on unrouted legs
+//   links        ordered link ids; empty for a teleported leg (a route just is a sequence of links)
+//   times        raw seconds, as MATSim holds them; absent where the OptionalTime is undefined
+message MatsimPlans {
+  required binary personId (STRING);
+  required int32 planIdx;
+  required boolean selected;
+  optional double score;
+  optional group personAttributes (MAP) {
+    repeated group key_value {
+      required binary key (STRING);
+      required binary value (STRING);
+    }
+  }
+  optional group planAttributes (MAP) {
+    repeated group key_value {
+      required binary key (STRING);
+      required binary value (STRING);
+    }
+  }
+  required group elements (LIST) {
+    repeated group list {
+      required group element {
+        required binary kind (STRING);
+        optional binary actType (STRING);
+        optional binary link (STRING);
+        optional double startTime;
+        optional double endTime;
+        optional double maxDuration;
+        optional binary mode (STRING);
+        optional binary routingMode (STRING);
+        optional double travTime;
+        optional group route {
+          optional binary routeType (STRING);
+          optional double distance;
+          optional double travTime;
+          optional binary startLink (STRING);
+          optional binary endLink (STRING);
+          required group links (LIST) {
+            repeated group list {
+              required binary element (STRING);
+            }
+          }
+        }
+        optional group attributes (MAP) {
+          repeated group key_value {
+            required binary key (STRING);
+            required binary value (STRING);
+          }
+        }
+      }
+    }
+  }
+}

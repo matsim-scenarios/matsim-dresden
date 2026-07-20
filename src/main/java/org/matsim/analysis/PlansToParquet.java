@@ -4,7 +4,7 @@ import org.matsim.api.core.v01.population.Population;
 import org.matsim.application.MATSimAppCommand;
 import org.matsim.core.controler.Controler;
 import org.matsim.core.population.PopulationUtils;
-import org.matsim.store.PlanSnapshotWriterDuckDB;
+import org.matsim.store.PlanSnapshotWriter;
 import picocli.CommandLine;
 
 import java.nio.file.Path;
@@ -13,7 +13,7 @@ import static org.matsim.application.ApplicationUtils.globFile;
 
 /**
  * Converts a MATSim plans XML (initial, output, or experienced plans; plain, .gz or .zst)
- * into the plan-snapshot parquet format written by {@link PlanSnapshotWriterDuckDB}.
+ * into the plan-snapshot parquet format written by {@link PlanSnapshotWriter}.
  *
  * Two modes:
  * <ul>
@@ -78,7 +78,7 @@ public class PlansToParquet implements MATSimAppCommand {
 			out = outputFolder.resolve(runPrefix + "output_" + stem + ".parquet").toString();
 		}
 		Population population = PopulationUtils.readPopulation(in);
-		new PlanSnapshotWriterDuckDB().write(population, out);
+		new PlanSnapshotWriter().write(population, out);
 		return 0;
 	}
 }

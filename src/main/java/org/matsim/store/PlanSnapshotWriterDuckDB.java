@@ -21,6 +21,12 @@ import java.util.Map;
  * Plan-memory snapshot writer using ONLY the DuckDB JDBC driver (single fat jar,
  * no hadoop-common, no parquet-mr, no Arrow).
  *
+ * NO LONGER THE DEFAULT — kept for reference and as the cross-check in
+ * {@code PlanSnapshotWriterTest}. {@link PlanSnapshotWriter} produces the same table and
+ * measured ~10x faster with flat memory, where this one needs multiple GB of DuckDB working memory
+ * per 100k plans (staging + the list()/struct_pack aggregations materialize everything before the
+ * first byte is written) and hits DuckDB's memory limit somewhere above ~200k plans. See that class.
+ *
  * Grain is ONE ROW PER PLAN: personId/planIdx/selected/score are flat columns, and
  * a person's choice set is reconstructed with {@code GROUP BY personId}. Only the
  * intra-plan structure stays nested — activities and legs are LIST&lt;STRUCT&gt;, and a
@@ -32,8 +38,10 @@ import java.util.Map;
  * experienced) has no intrinsic iteration. When the {@link IterationEndsListener}
  * writes one, the iteration lives in the {@code ITERS/it.NNN/} path; recover it in
  * analytics from the filename (read_parquet(..., filename := true)). See
- * src/main/resources/plans.avsc for the intended contract (hand-maintained; nothing
- * generates/validates against it — {@code PlanSnapshotWriterDuckDBTest} is the drift guard).
+ * src/main/resources/plans.parquet.schema for the current contract — but note that is the schema of
+ * {@link PlanSnapshotWriter}, which regrouped activities[]+legs[] into one ordered elements[] list;
+ * this writer still emits the older split shape, and PlanSnapshotWriterTest asserts the two carry
+ * the same content.
  *
  * Because the DuckDB Java Appender cleanly appends only SCALAR values (not nested
  * LIST&lt;STRUCT&lt;...&gt;&gt; cells), we don't build the nesting in Java. Instead:

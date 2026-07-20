@@ -46,6 +46,17 @@
 		</repository>
 	</distributionManagement>
 
+	<dependencyManagement>
+		<dependencies>
+			<!-- parquet-hadoop wants 1.6, geotools 1.5.4; converge on 1.6 to satisfy RequireUpperBoundDeps -->
+			<dependency>
+				<groupId>commons-pool</groupId>
+				<artifactId>commons-pool</artifactId>
+				<version>1.6</version>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
+
 	<dependencies>
 
 		<!-- Core dependencies, don't remove! -->
@@ -80,7 +91,30 @@
 			<artifactId>duckdb_jdbc</artifactId>
 			<version>1.5.4.0</version>
 		</dependency>
-
+		<dependency>
+			<groupId>org.apache.parquet</groupId>
+			<artifactId>parquet-hadoop</artifactId>
+			<version>1.17.1</version>
+		</dependency>
+		<!-- used directly by ZstdCodecFactory; also comes in transitively via matsim -->
+		<dependency>
+			<groupId>com.github.luben</groupId>
+			<artifactId>zstd-jni</artifactId>
+			<version>1.5.7-7</version>
+		</dependency>
+		<!--
+			Compile-time only: ParquetWriter.Builder declares an abstract getWriteSupport(Configuration)
+			and ParquetWriter has Path-typed constructors, so javac must see those Hadoop types even
+			though we run entirely Hadoop-free (LocalOutputFile + PlainParquetConfiguration + our own
+			ZstdCodecFactory). Single shaded jar, no transitive deps, and `provided` keeps it out of
+			the runtime/assembly classpath.
+		-->
+		<dependency>
+			<groupId>org.apache.hadoop</groupId>
+			<artifactId>hadoop-client-api</artifactId>
+			<version>3.4.1</version>
+			<scope>provided</scope>
+		</dependency>
 		<!-- Custom dependencies -->
 
 

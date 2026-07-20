@@ -13,6 +13,20 @@ CREATE OR REPLACE VIEW output_plans AS
     SELECT * FROM read_parquet('*output_plans.parquet');
 -- (future files: just add another CREATE VIEW ... here)
 
+-- The plan's elements, one row each, in plan order. A plan row carries ONE ordered elements[]
+-- array (activities and legs interleaved, as in the XML), so unrolling it is a single UNNEST --
+-- no UNION ALL, no null-padding to make two branches line up. The array position is the plan
+-- element index, recovered with generate_subscripts(); the parquet has no sequence column.
+-- e.kind is 'activity' or 'leg'; the fields of the other kind are NULL.
+-- NB seq is 1-BASED (it is the array subscript, so elements[seq] is this element). The old
+-- activities[]/legs[] schema had a 0-based `sequence` column, so seq values here are the old
+-- ones + 1; everything else these views produce is unchanged.
+CREATE OR REPLACE VIEW plan_elements AS
+    SELECT personId, planIdx, selected, score, personAttributes,
+           generate_subscripts(elements, 1) AS seq,
+           unnest(elements) AS e
+    FROM experienced_plans;
+
 -- The "person table" the plan-grain schema doesn't have: one row per person with the
 -- generic person attributes (subpopulation, carAvail, income, SNZ_*, ...). Person attributes
 -- are rolled out onto every plan row, so this just dedups them back to one row per person.
@@ -28,34 +42,23 @@ CREATE OR REPLACE VIEW persons AS
 -- mode if routingMode is absent. trav_s / dist_m accumulate over ALL stage legs. Times are
 -- raw seconds -- wrap with hms() for HH:MM:SS display (see trip_chain).
 CREATE OR REPLACE VIEW experienced_trips AS
-    WITH elements AS (
-        SELECT personId, a.sequence AS seq, TRUE AS is_act, a.actType AS name, NULL::VARCHAR AS routing_mode,
-               a.startTime AS t_start, a.endTime AS t_end,
-               NULL::DOUBLE AS travTime, NULL::DOUBLE AS distance,
-               (a.actType NOT LIKE '%interaction%') AS is_real
-        FROM experienced_plans, UNNEST(activities) AS t(a)
-        UNION ALL
-        SELECT personId, l.sequence, FALSE, l.mode, l.routingMode,
-               NULL::DOUBLE, NULL::DOUBLE, l.travTime, l.route.distance, FALSE
-        FROM experienced_plans, UNNEST(legs) AS t(l)
-    ),
-    ranked AS (   -- real_rank = # real activities seen so far within the person
-        SELECT *, sum(CASE WHEN is_act AND is_real THEN 1 ELSE 0 END)
+    WITH ranked AS (   -- real_rank = # real (non-interaction) activities seen so far within the person
+        SELECT *, sum(CASE WHEN e.kind = 'activity' AND e.actType NOT LIKE '%interaction%' THEN 1 ELSE 0 END)
                       OVER (PARTITION BY personId ORDER BY seq) AS real_rank
-        FROM elements
+        FROM plan_elements
     ),
     real_acts AS (   -- the trip boundaries (rank r within person)
-        SELECT personId, real_rank AS r, name AS actType, t_start, t_end
-        FROM ranked WHERE is_act AND is_real
+        SELECT personId, real_rank AS r, e.actType, e.startTime AS t_start, e.endTime AS t_end
+        FROM ranked WHERE e.kind = 'activity' AND e.actType NOT LIKE '%interaction%'
     ),
     trip_legs AS (   -- stage legs grouped into their trip (a leg's real_rank = its trip id)
         SELECT personId, real_rank AS trip_id,
-               coalesce(max(routing_mode), arg_max(name, coalesce(distance, 0))) AS main_mode,
-               sum(travTime) AS trav_s, sum(distance) AS dist_m,
-               -- distance of the main-mode leg(s) only (name = routingMode), i.e. excluding access/egress walk
-               sum(distance) FILTER (WHERE name = routing_mode) AS main_dist_m,
-               list(name ORDER BY seq) AS stages
-        FROM ranked WHERE NOT is_act GROUP BY personId, real_rank
+               coalesce(max(e.routingMode), arg_max(e.mode, coalesce(e.route.distance, 0))) AS main_mode,
+               sum(e.travTime) AS trav_s, sum(e.route.distance) AS dist_m,
+               -- distance of the main-mode leg(s) only (mode = routingMode), i.e. excluding access/egress walk
+               sum(e.route.distance) FILTER (WHERE e.mode = e.routingMode) AS main_dist_m,
+               list(e.mode ORDER BY seq) AS stages
+        FROM ranked WHERE e.kind = 'leg' GROUP BY personId, real_rank
     )
     SELECT a.personId, a.r AS trip,
            a.actType AS from_act, a.t_end AS depart,
@@ -78,12 +81,12 @@ CREATE OR REPLACE VIEW experienced_trips AS
 -- modelled -- activities stay exactly as the experienced plan has them. Times/durations are raw
 -- seconds (format with hms()); personAttributes lets you filter by e.g. subpopulation without a join.
 CREATE OR REPLACE VIEW experienced_activities AS
-    SELECT personId, a.sequence AS seq, a.actType, a.link,
-           a.startTime, a.endTime,
-           a.endTime - a.startTime AS eff_duration,   -- NULL iff start or end missing (day's first/last)
+    SELECT personId, seq, e.actType, e.link,
+           e.startTime, e.endTime,
+           e.endTime - e.startTime AS eff_duration,   -- NULL iff start or end missing (day's first/last)
            personAttributes
-    FROM experienced_plans, UNNEST(activities) AS t(a)
-    WHERE a.actType NOT LIKE '%interaction%'
+    FROM plan_elements
+    WHERE e.kind = 'activity' AND e.actType NOT LIKE '%interaction%'
     ORDER BY personId, seq;   -- naturally sorted, like the plans (personId, then sequence)
 
 -- ---- helpers ---------------------------------------------------------------
@@ -98,18 +101,12 @@ CREATE OR REPLACE MACRO hms(t) AS to_seconds(t::BIGINT);
 
 -- Full experienced day of one person: activities and legs interleaved by sequence.
 CREATE OR REPLACE MACRO plan_chain(pid) AS TABLE
-    WITH p AS (SELECT * FROM experienced_plans WHERE personId = pid::VARCHAR)
-    SELECT seq, kind, detail, link, hms(t_start) AS start, hms(t_end) AS "end",
-           round(travTime) AS trav_s, round(distance) AS dist_m
-    FROM (
-        SELECT a.sequence AS seq, 'act' AS kind, a.actType AS detail, a.link AS link,
-               a.startTime AS t_start, a.endTime AS t_end, NULL::DOUBLE AS travTime, NULL::DOUBLE AS distance
-        FROM p, UNNEST(activities) AS t(a)
-        UNION ALL
-        SELECT l.sequence, 'leg', l.mode, l.route.startLink || '->' || l.route.endLink,
-               NULL::DOUBLE, NULL::DOUBLE, l.travTime, l.route.distance
-        FROM p, UNNEST(legs) AS t(l)
-    )
+    SELECT seq, e.kind,
+           coalesce(e.actType, e.mode) AS detail,
+           coalesce(e.link, e.route.startLink || '->' || e.route.endLink) AS link,
+           hms(e.startTime) AS start, hms(e.endTime) AS "end",
+           round(e.travTime) AS trav_s, round(e.route.distance) AS dist_m
+    FROM plan_elements WHERE personId = pid::VARCHAR
     ORDER BY seq;
 
 -- One person's experienced day as trips (see the experienced_trips view), times formatted.
