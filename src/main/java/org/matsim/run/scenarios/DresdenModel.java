@@ -109,6 +109,14 @@ public class DresdenModel extends MATSimApplication {
 	private static final double FALLBACK_TYPICAL_DURATION = 2 * 3600;
 	private static final Logger log = LoggerFactory.getLogger(DresdenModel.class);
 
+	/**
+	 * Wall-clock start of this command, taken at construction, i.e. as early as the model can observe itself.
+	 * Threaded into the post-processing so the run can report how long it took as a metric; see
+	 * {@link DresdenAddVttsEtcToActivities}. A field initializer rather than a constructor statement so it covers
+	 * both constructors.
+	 */
+	private final long startNanoTime = System.nanoTime();
+
 	@CommandLine.Option(names = "--emissions",
 		description = "Define if emission analysis should be performed or not" )
 	private EmissionsAnalysisHandling emissions = EmissionsAnalysisHandling.RUN_EMISSIONS_ANALYSIS;
@@ -480,7 +488,7 @@ public class DresdenModel extends MATSimApplication {
 	@Override
 	protected List<MATSimAppCommand> preparePostProcessing(Path outputFolder, String runId) {
 		return List.of(
-			new DresdenAddVttsEtcToActivities(outputFolder, runId, simulationPeriodInDays),
+			new DresdenAddVttsEtcToActivities(outputFolder, runId, simulationPeriodInDays, startNanoTime),
 			new PlansToParquet(outputFolder, runId, Controler.DefaultFiles.population.getFilename()),
 			new PlansToParquet(outputFolder, runId, Controler.DefaultFiles.experiencedPlans.getFilename()),
 			new WriteDuckDbQueries(outputFolder)

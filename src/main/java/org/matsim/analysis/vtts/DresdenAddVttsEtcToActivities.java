@@ -44,9 +44,11 @@ import tech.tablesaw.plotly.components.Layout;
 import tech.tablesaw.plotly.traces.HistogramTrace;
 
 import java.nio.file.Path;
+import java.time.Duration;
 import java.text.NumberFormat;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -91,6 +93,12 @@ public class DresdenAddVttsEtcToActivities implements MATSimAppCommand {
 		"supplied to match the analyzed run: current runs use 1.125 (27:00, the default here); v1.1 used 1.0 (24:00).")
 	private double simulationPeriodInDays = DresdenModel.DEFAULT_SIMULATION_PERIOD_IN_DAYS;
 
+	/**
+	 * Wall-clock start of the run this analysis post-processes ({@link System#nanoTime}), or null when the analysis is
+	 * invoked standalone and there is no run to time. Only set through the programmatic constructor.
+	 */
+	private Long runStartNanoTime;
+
 	public DresdenAddVttsEtcToActivities() {}
 
 	/**
@@ -100,9 +108,18 @@ public class DresdenAddVttsEtcToActivities implements MATSimAppCommand {
 	 * not persisted to the output config, so it must be threaded in from the model (see the option's description).
 	 */
 	public DresdenAddVttsEtcToActivities( Path path, String runId, double simulationPeriodInDays ) {
+		this( path, runId, simulationPeriodInDays, null );
+	}
+
+	/**
+	 * As above, plus the run's wall-clock start ({@link System#nanoTime}), so the metrics this writes can report how
+	 * long the run took. See {@code DresdenModel#startNanoTime}.
+	 */
+	public DresdenAddVttsEtcToActivities( Path path, String runId, double simulationPeriodInDays, Long runStartNanoTime ) {
 		this.path = path;
 		this.runId = runId;
 		this.simulationPeriodInDays = simulationPeriodInDays;
+		this.runStartNanoTime = runStartNanoTime;
 	}
 
 	public static void main(String[] args) {
@@ -340,11 +357,21 @@ public class DresdenAddVttsEtcToActivities implements MATSimAppCommand {
 		// step of DresdenModel -- no separate stage. The key matches the metric declared in dvc.yaml.
 		Path metricsPath = outputDir.resolve( "metrics.json" );
 		log.info( "Writing DVC metrics to file: {}", metricsPath );
-		new ObjectMapper().writerWithDefaultPrettyPrinter()
-			.writeValue( metricsPath.toFile(), Map.of(
-				"zero_duration_activity_count", zeroDurationActs,
-				"zero_duration_activity_count_pt_free", zeroDurationActsPtFree,
-				"zero_duration_activity_count_pt_exposed", zeroDurationActsPtExposed ) );
+		Map<String, Number> metrics = new LinkedHashMap<>();
+		metrics.put( "zero_duration_activity_count", zeroDurationActs );
+		metrics.put( "zero_duration_activity_count_pt_free", zeroDurationActsPtFree );
+		metrics.put( "zero_duration_activity_count_pt_exposed", zeroDurationActsPtExposed );
+		if ( runStartNanoTime != null ) {
+			// Wall clock of the whole model command, from its construction to here: scenario preparation, all
+			// iterations, and the post-processing that runs before this analysis. Not just the mobsim -- this is the
+			// number that decides how long an experiment takes, and comparing it across experiments is only meaningful
+			// alongside the "threads" parameter, which pins the parallelism the run was allowed.
+			double wallClockSeconds = ( System.nanoTime() - runStartNanoTime ) / 1_000_000_000.;
+			metrics.put( "run_wall_clock_seconds", Math.round( wallClockSeconds ) );
+			log.info( "Run wall clock: {} s ({})", Math.round( wallClockSeconds ),
+				Duration.ofSeconds( Math.round( wallClockSeconds ) ) );
+		}
+		new ObjectMapper().writerWithDefaultPrettyPrinter().writeValue( metricsPath.toFile(), metrics );
 
 		final Table muttsStats = okTrips.summarize( HeadersKN.muttsh, mean, quartile1, median, quartile3, percentile95 ).apply();
 		System.out.println( System.lineSeparator() + muttsStats + System.lineSeparator() );
