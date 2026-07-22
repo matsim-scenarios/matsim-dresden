@@ -21,13 +21,17 @@ import java.util.List;
  * </pre>
  * so every {@code start_i} and {@code end_i} is an affine function of the {@code d_j}. The variables are therefore the
  * {@code d_i >= 0}; the non-negativity is what structurally rules out the zero/negative-duration garbling the random
- * time mutator produces. Where the last activity's "duration" is needed for scoring (the wrap-around term below), the
- * affine expression {@code dayEnd - start_lastActivity} stands in for it -- no variable, no constraint.
+ * time mutator produces. The last activity's duration is not a separate variable but follows from the others: the
+ * affine expression {@code dayEnd - start_lastActivity} stands in for it wherever it is scored -- no variable, no
+ * constraint, but a regular presence in the objective (see below).
  *
  * <h3>Objective (maximize approximate utility = minimize penalty)</h3>
  * A piecewise-linear penalty per activity, linear in the variables so the whole thing is an LP:
  * <ul>
- *   <li><b>Duration deviation</b> around the typical duration {@code t*}, for every activity except the last:
+ *   <li><b>Duration deviation</b> around the typical duration {@code t*}, for every activity: for the last activity
+ *   of a non-wrap-around plan the implied duration {@code dayEnd - start_lastActivity} takes the place of {@code d_i}
+ *   (it is just a regular, separate activity; only its duration happens to be determined by the others), so its
+ *   preferred duration shapes the schedule like everyone else's. The penalty is
  *   {@code durShortSlope*(t* - d_i)} if shorter, {@code durLongSlope*(d_i - t*)} if longer -- with a second, steeper
  *   under-run segment: shortfall beyond half of {@code t*} costs {@code durVeryShortSlope} per second. This mirrors
  *   the increasing marginal utility of the concave Charypar-Nagel performing term at short durations (its marginal at
@@ -35,7 +39,7 @@ import java.util.List;
  *   squeezing an activity toward zero a last resort instead of a free tie-breaking vertex. (Linearize with the
  *   standard split into non-negative under/over parts, the first under part capped at half of {@code t*}.)</li>
  *   <li><b>Wrap-around</b> ({@link #wrapAround}; first and last activity have the same type): MATSim scores the pair
- *   as one activity, so instead of an individual first-activity term there is one joint duration term on
+ *   as one activity, so instead of individual first- and last-activity terms there is one joint duration term on
  *   {@code d_0 + (dayEnd - start_lastActivity)} around the combined wrapped typical duration (stamped on the first
  *   activity, see {@link org.matsim.prepare.EncodeTypicalDuration}). Note that {@code d_0} cancels out of this
  *   expression (a longer morning stay delays the evening return 1:1), so the joint term constrains only the middle

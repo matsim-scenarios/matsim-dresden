@@ -27,8 +27,13 @@ import java.util.List;
  *   <li>duration term of activity i: {@code d_i + u1 + u2 - o = t*_i} with {@code u1 <= t*_i/2}, cost
  *   {@code durShortSlope*u1 + durVeryShortSlope*u2 + durLongSlope*o} (the convex two-segment under-run penalty; the
  *   cheaper {@code u1} fills up first in the minimization, so the split is automatically consistent);</li>
- *   <li>joint wrap-around term (replaces the first activity's individual term): the pair's total duration
- *   {@code D = d_0 + (dayEnd - start_last)} is affine with {@code d_0} cancelling, so
+ *   <li>duration term of the last activity (non-wrap-around plans): the last duration is not a free variable but
+ *   follows from the others as {@code d_last = dayEnd - start_last = (dayEnd - dayStart - totalTravel) - sum_i d_i},
+ *   so its deviation from its typical duration enters the objective like everyone else's:
+ *   {@code -sum_(i=0..m-1) d_i + u1 + u2 - o = t*_last - (dayEnd - dayStart - totalTravel)}, again with
+ *   {@code u1 <= t*_last/2};</li>
+ *   <li>joint wrap-around term (replaces the individual terms of both the first and the last activity): the pair's
+ *   total duration {@code D = d_0 + (dayEnd - start_last)} is affine with {@code d_0} cancelling, so
  *   {@code -sum_(i=1..m-1) d_i + u1 + u2 - o = t*_wrap - (dayEnd - dayStart - totalTravel)}, again with
  *   {@code u1 <= t*_wrap/2};</li>
  *   <li>end-time anchor of activity i: {@code end_i = dayStart + sum_(j<=i)(travel_j + d_j)}, split as
@@ -60,6 +65,9 @@ public final class LpScheduleSolver implements ScheduleSolver {
 		// The joint wrap term is only a term when it contains a variable (some middle activity); for a two-activity
 		// wrap plan it is a constant and drops out.
 		boolean jointWrapTerm = problem.wrapAround && m >= 2;
+		// Without wrap-around the last activity is a separate activity whose duration follows from the others
+		// (dayEnd - start_last); its deviation from its typical duration is penalized like everyone else's.
+		boolean lastDurationTerm = !problem.wrapAround && m >= 1;
 
 		int nVars = m;
 		for ( int i = 0; i < m; i++ ) {
@@ -71,6 +79,9 @@ public final class LpScheduleSolver implements ScheduleSolver {
 			}
 		}
 		if ( jointWrapTerm ) {
+			nVars += 3;
+		}
+		if ( lastDurationTerm ) {
 			nVars += 3;
 		}
 
@@ -137,6 +148,28 @@ public final class LpScheduleSolver implements ScheduleSolver {
 			cost[o] = first.durLongSlope;
 		}
 
+		if ( lastDurationTerm ) {
+			// d_last = (dayEnd - dayStart - totalTravel) - sum_(i=0..m-1) d_i, so:
+			// -sum_(i=0..m-1) d_i + u1 + u2 - o = t*_last - (dayEnd - dayStart - totalTravel), u1 <= t*_last/2
+			ScheduleProblem.Act last = problem.activities.get( n - 1 );
+			int u1 = nextVar++, u2 = nextVar++, o = nextVar++;
+			double[] row = new double[nVars];
+			for ( int i = 0; i < m; i++ ) {
+				row[i] = -1.;
+			}
+			row[u1] = 1.;
+			row[u2] = 1.;
+			row[o] = -1.;
+			constraints.add( new LinearConstraint( row, Relationship.EQ,
+				last.typicalDuration - ( problem.dayEnd - problem.dayStart - totalTravel ) ) );
+			double[] cap = new double[nVars];
+			cap[u1] = 1.;
+			constraints.add( new LinearConstraint( cap, Relationship.LEQ, last.typicalDuration / 2. ) );
+			cost[u1] = last.durShortSlope;
+			cost[u2] = last.durVeryShortSlope;
+			cost[o] = last.durLongSlope;
+		}
+
 		double[] durations;
 		if ( constraints.isEmpty() ) {
 			durations = fallback( problem ); // degenerate (e.g. two-activity wrap plan without any anchor)
@@ -158,8 +191,9 @@ public final class LpScheduleSolver implements ScheduleSolver {
 			}
 		}
 
-		// The last activity's entry is informational only (write-back leaves it unscheduled): its wrap-around share
-		// of the day, i.e. from its arrival to the end of the day.
+		// The last activity's duration follows from the others: from its arrival to the end of the day. Write-back
+		// leaves the activity itself unscheduled (open overnight activity), but the value is the one whose deviation
+		// from the typical duration was penalized above (non-wrap plans) resp. entered the joint wrap term.
 		double startLast = problem.dayStart + totalTravel;
 		for ( int i = 0; i < m; i++ ) {
 			startLast += durations[i];
