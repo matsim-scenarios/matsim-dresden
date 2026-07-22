@@ -22,6 +22,6 @@
 #   eventsManager.numberOfThreads, which is unset (i.e. sequential event handling): switching that on
 #   would change how events are handled, not just how fast, and is a separate decision.
 sim_period_days: 1.125
-last_iteration: 0
-best_response_scheduling: false
+last_iteration: 2000
+best_response_scheduling: true
 threads: 12
