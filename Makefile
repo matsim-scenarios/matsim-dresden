@@ -39,6 +39,13 @@ SIM_PERIOD_DAYS ?= 1.125
 # pass it to the other run targets via ARGS if needed.
 BEST_RESPONSE ?= false
 
+# Replace the TimeAllocationMutator with the Dirichlet schedule sampler (see --dirichlet-sampling and the
+# dirichlet_sampling / dirichlet_concentration dvc parameters). DIRICHLET_C is the concentration c: 0 samples
+# uniformly among the feasible schedules, larger values concentrate around the typical-duration shares. As with
+# BEST_RESPONSE, only wired into run-1pct-notimes, the target the dvc run stage drives.
+DIRICHLET ?= false
+DIRICHLET_C ?= 0
+
 # Parallelism of the run (see the threads dvc parameter): one knob for global.numberOfThreads (replanning,
 # routing), qsim.numberOfThreads and dsim.threads. The default matches what input/prepare-config.xml sets for
 # the first two. dsim's own default is 0, i.e. "use every available processor", so it is pinned here as well --
@@ -425,6 +432,8 @@ run-1pct-notimes: input/prepare-config.xml | $(CLASSPATH)
 	 --config:controller.lastIteration=$(LAST_IT)\
 	 --simulation-period-in-days=$(SIM_PERIOD_DAYS)\
 	 --best-response-scheduling=$(BEST_RESPONSE)\
+	 --dirichlet-sampling=$(DIRICHLET)\
+	 --dirichlet-concentration=$(DIRICHLET_C)\
 	 --config:global.numberOfThreads=$(THREADS)\
 	 --config:qsim.numberOfThreads=$(THREADS)\
 	 --config:dsim.threads=$(THREADS)\

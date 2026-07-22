@@ -13,6 +13,17 @@
 #   cannot reach in one step, which is what leaves agents parked on zero-duration activities. Its weight
 #   is in prepare-config.xml with the other strategies; the fraction of the run after which it switches
 #   off is DresdenModel.BEST_RESPONSE_DISABLE_FRACTION.
+# dirichlet_sampling: REPLACE the TimeAllocationMutator with the Dirichlet schedule sampler: each
+#   replanning draws a whole new feasible day at once (durations ~ T * Dirichlet(alpha) over the day's
+#   time budget T = day minus travel) instead of perturbing one end time. Bound under the mutator's
+#   strategy name, so its weight in prepare-config.xml and the annealing apply unchanged. Requires the
+#   fully duration-based, non-wrap-around population (EndTimeToDuration / SplitWrapAroundActivities);
+#   the sampler throws on end-time anchors or wrap-around plans. Independent of
+#   best_response_scheduling (different strategy slots; both can be on).
+# dirichlet_concentration: concentration c >= 0 of that sampler, alpha_i = 1 + c * typical_i /
+#   sum(typicals). 0 = uniform among the feasible schedules (typical durations ignored); larger c
+#   concentrates the draws around the typical-duration shares of the day, degenerating to the
+#   deterministic proportional fit as c grows (c acts as a prior sample size).
 # threads: parallelism of the run. Sets global.numberOfThreads (replanning and routing),
 #   qsim.numberOfThreads and dsim.threads together, so there is one knob rather than three that can
 #   drift apart. 12 is what input/prepare-config.xml has always set for the first two, so the default
@@ -22,6 +33,8 @@
 #   eventsManager.numberOfThreads, which is unset (i.e. sequential event handling): switching that on
 #   would change how events are handled, not just how fast, and is a separate decision.
 sim_period_days: 1.125
-last_iteration: 0
+last_iteration: 2000
 best_response_scheduling: false
+dirichlet_sampling: true
+dirichlet_concentration: 0.0
 threads: 12

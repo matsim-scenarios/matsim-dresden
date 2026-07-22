@@ -40,6 +40,9 @@ import org.matsim.core.config.ConfigUtils;
 import org.matsim.replanning.bestresponse.BestResponseReport;
 import org.matsim.replanning.bestresponse.BestResponseScheduleConfigGroup;
 import org.matsim.replanning.bestresponse.BestResponseScheduleStrategy;
+import org.matsim.replanning.bestresponse.DirichletSamplingConfigGroup;
+import org.matsim.replanning.bestresponse.DirichletSamplingStrategy;
+import org.matsim.core.replanning.strategies.DefaultPlanStrategiesModule;
 import org.matsim.core.config.groups.ReplanningConfigGroup;
 import org.matsim.core.config.groups.RoutingConfigGroup.AccessEgressType;
 import org.matsim.core.config.groups.ScoringConfigGroup;
@@ -172,6 +175,22 @@ public class DresdenModel extends MATSimApplication {
 			"--best-response-scheduling.")
 	private double bestResponseSigma = 0.0;
 
+	@CommandLine.Option(names="--dirichlet-sampling",
+		description = "Experimental: REPLACE the TimeAllocationMutator with a Dirichlet schedule sampler: instead of " +
+			"randomly perturbing one end time, each replanning draws a whole new feasible day (durations sampled " +
+			"from a Dirichlet distribution over the day's time budget; see " +
+			"org.matsim.replanning.bestresponse.DirichletScheduleSampler). Bound under the mutator's strategy name, " +
+			"so its configured weight and the annealing apply unchanged. Requires a fully duration-based, " +
+			"non-wrap-around population; the sampler throws on end-time anchors and wrap-around plans. Default false.")
+	private boolean dirichletSampling = false;
+
+	@CommandLine.Option(names="--dirichlet-concentration",
+		description = "Concentration c >= 0 of the Dirichlet schedule sampler (see --dirichlet-sampling): " +
+			"alpha_i = 1 + c * typical_i / sum(typicals). c=0 samples uniformly among the feasible schedules " +
+			"(typical durations ignored); larger c concentrates the draws around the typical-duration shares of the " +
+			"day (c acts as a prior sample size). Default 0.")
+	private double dirichletConcentration = 0.0;
+
 //	TODO: remove before release
 //	@CommandLine.Option(names="--ride-alpha", description = "alpha value for ride. For calibration only! To be removed before release.")
 	private final double rideAlpha = 1.;
@@ -234,6 +253,10 @@ public class DresdenModel extends MATSimApplication {
 		// alongside the other person strategies and resolved in configureBestResponseStrategy; the binding is in
 		// prepareControler.
 		ConfigUtils.addOrGetModule(config, BestResponseScheduleConfigGroup.class).setRandomErrorSigma(bestResponseSigma);
+
+		// Dirichlet schedule sampling: register its config group. The strategy replaces TimeAllocationMutator under
+		// its own name when enabled; the binding is in prepareControler.
+		ConfigUtils.addOrGetModule(config, DirichletSamplingConfigGroup.class).setConcentration(dirichletConcentration);
 
 //		config.vspExperimental().setVspDefaultsCheckingLevel( VspDefaultsCheckingLevel.abort );
 
@@ -467,6 +490,15 @@ public class DresdenModel extends MATSimApplication {
 //				best-response scheduling strategy, selected via --best-response-scheduling; the binding is
 //				harmless when unused (a strategy is only instantiated if referenced by a strategysettings entry).
 				addPlanStrategyBinding(BestResponseScheduleStrategy.STRATEGY_NAME).toProvider(BestResponseScheduleStrategy.class);
+
+//				Dirichlet schedule sampling (--dirichlet-sampling) replaces the TimeAllocationMutator: bound under
+//				the mutator's own strategy name, so the weight/subpopulation declared in prepare-config.xml and the
+//				annealing keep applying. Unlike the best-response binding above this one MUST be conditional --
+//				binding the name at all is what overrides the default mutator.
+				if (dirichletSampling) {
+					addPlanStrategyBinding(DefaultPlanStrategiesModule.DefaultStrategy.TimeAllocationMutator)
+						.toProvider(DirichletSamplingStrategy.class);
+				}
 
 				addTravelTimeBinding(TransportMode.ride).to(carTravelTime());
 				addTravelDisutilityFactoryBinding(TransportMode.ride).to(carTravelDisutilityFactoryKey());
