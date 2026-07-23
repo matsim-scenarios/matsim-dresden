@@ -357,9 +357,13 @@ public class DresdenModel extends MATSimApplication {
 //		random-walk instead of exploring around a fixed point). Both anchors are what DresdenActivityScoring reads as
 //		the per-activity latestStartTime / earliestEndTime of the schedule-delay corridor (armed via
 //		--schedule-delay-scoring). Stamping only where absent keeps the original anchors across restarts (output
-//		plans carry the attributes) and lets preprocessing override. Unconditional: the extra activity attributes
-//		change nothing unless one of those consumers is active.
-		stampScheduleAnchors(scenario);
+//		plans carry the attributes) and lets preprocessing override. Only stamped when the schedule-delay corridor
+//		is armed: an anchor that nothing will use is not harmless -- the Dirichlet schedule sampler correctly
+//		refuses plans carrying end-time anchors -- and the anchored mutator / best-response modes are run together
+//		with schedule-delay scoring anyway.
+		if (scheduleDelayScoring) {
+			stampScheduleAnchors(scenario);
+		}
 
 //		Splitting the first and last act of the day into separate _morning and _evening act types (to switch off
 //		wrap-around scoring) is now done during population preparation, see the split-wrap-around-activities step.
