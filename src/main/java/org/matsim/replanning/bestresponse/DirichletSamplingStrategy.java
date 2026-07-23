@@ -34,7 +34,7 @@ public final class DirichletSamplingStrategy implements Provider<PlanStrategy> {
 		PlanStrategyImpl strategy = new PlanStrategyImpl( new RandomPlanSelector<>() );
 		double dayEnd = scenarioConfigGroup.getSimulationPeriodInDays() * 24. * 3600.;
 		strategy.addStrategyModule( new DirichletSamplingModule(
-			globalConfigGroup, scoringConfigGroup, dirichletSamplingConfigGroup.getConcentration(), dayEnd ) );
+			globalConfigGroup, scoringConfigGroup, dirichletSamplingConfigGroup.getInverseTemperature(), dayEnd ) );
 		return strategy;
 	}
 }

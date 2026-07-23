@@ -16,14 +16,17 @@
 # dirichlet_sampling: REPLACE the TimeAllocationMutator with the Dirichlet schedule sampler: each
 #   replanning draws a whole new feasible day at once (durations ~ T * Dirichlet(alpha) over the day's
 #   time budget T = day minus travel) instead of perturbing one end time. Bound under the mutator's
-#   strategy name, so its weight in prepare-config.xml and the annealing apply unchanged. Requires the
-#   fully duration-based, non-wrap-around population (EndTimeToDuration / SplitWrapAroundActivities);
-#   the sampler throws on end-time anchors or wrap-around plans. Independent of
-#   best_response_scheduling (different strategy slots; both can be on).
-# dirichlet_concentration: concentration c >= 0 of that sampler, alpha_i = 1 + c * typical_i /
-#   sum(typicals). 0 = uniform among the feasible schedules (typical durations ignored); larger c
-#   concentrates the draws around the typical-duration shares of the day, degenerating to the
-#   deterministic proportional fit as c grows (c acts as a prior sample size).
+#   strategy name, so its weight in prepare-config.xml and the annealing apply unchanged. Only for
+#   non-wrap-around plans without end-time anchors (SplitWrapAroundActivities preprocessing; no
+#   schedule_delay anchors); the sampler throws otherwise. Independent of best_response_scheduling
+#   (different strategy slots; both can be on).
+# dirichlet_inverse_temperature: inverse temperature (1/utils, >= 0) of that sampler, alpha_i =
+#   1 + invTemp * beta_perf * typical_i -- i.e. the exact Boltzmann distribution of the Charypar-Nagel
+#   performing utility over the feasible schedules. 0 = uniform (typical durations ignored); 1 = the
+#   temperature of ChangeExpBeta plan selection (default beta = 1/util), i.e. proposals matched to the
+#   choice dynamics; larger values approach the deterministic proportional fit of the typicals. Each
+#   activity's alpha depends only on its own typical duration, so the relative spread (and the risk of
+#   being drawn far below the proportional share) is independent of how many activities the plan has.
 # threads: parallelism of the run. Sets global.numberOfThreads (replanning and routing),
 #   qsim.numberOfThreads and dsim.threads together, so there is one knob rather than three that can
 #   drift apart. 12 is what input/prepare-config.xml has always set for the first two, so the default
@@ -36,5 +39,5 @@ sim_period_days: 1.125
 last_iteration: 2000
 best_response_scheduling: false
 dirichlet_sampling: true
-dirichlet_concentration: 0.0
+dirichlet_inverse_temperature: 0.0
 threads: 12

@@ -40,11 +40,13 @@ SIM_PERIOD_DAYS ?= 1.125
 BEST_RESPONSE ?= false
 
 # Replace the TimeAllocationMutator with the Dirichlet schedule sampler (see --dirichlet-sampling and the
-# dirichlet_sampling / dirichlet_concentration dvc parameters). DIRICHLET_C is the concentration c: 0 samples
-# uniformly among the feasible schedules, larger values concentrate around the typical-duration shares. As with
-# BEST_RESPONSE, only wired into run-1pct-notimes, the target the dvc run stage drives.
+# dirichlet_sampling / dirichlet_inverse_temperature dvc parameters). DIRICHLET_INV_TEMP is the inverse
+# temperature (1/utils) of the sampled Boltzmann distribution of the performing utility: 0 samples uniformly
+# among the feasible schedules, 1 matches the ChangeExpBeta selection temperature, larger values approach the
+# proportional fit of the typicals. As with BEST_RESPONSE, only wired into run-1pct-notimes, the target the
+# dvc run stage drives.
 DIRICHLET ?= false
-DIRICHLET_C ?= 0
+DIRICHLET_INV_TEMP ?= 0
 
 # Parallelism of the run (see the threads dvc parameter): one knob for global.numberOfThreads (replanning,
 # routing), qsim.numberOfThreads and dsim.threads. The default matches what input/prepare-config.xml sets for
@@ -433,7 +435,7 @@ run-1pct-notimes: input/prepare-config.xml | $(CLASSPATH)
 	 --simulation-period-in-days=$(SIM_PERIOD_DAYS)\
 	 --best-response-scheduling=$(BEST_RESPONSE)\
 	 --dirichlet-sampling=$(DIRICHLET)\
-	 --dirichlet-concentration=$(DIRICHLET_C)\
+	 --dirichlet-inverse-temperature=$(DIRICHLET_INV_TEMP)\
 	 --config:global.numberOfThreads=$(THREADS)\
 	 --config:qsim.numberOfThreads=$(THREADS)\
 	 --config:dsim.threads=$(THREADS)\

@@ -4,22 +4,35 @@ import java.util.Random;
 
 /**
  * Samples a schedule instead of optimizing one: the durations of all n activities (including the last one's implied
- * share of the day) are drawn from a Dirichlet distribution over the feasible domain. For a duration-based,
- * non-wrap-around plan that domain is exactly the scaled standard simplex {@code {d >= 0, sum d_i = T}} with
+ * share of the day) are drawn from a Dirichlet distribution over the feasible domain. For a non-wrap-around plan
+ * without end-time anchors that domain is exactly the scaled standard simplex {@code {d >= 0, sum d_i = T}} with
  * {@code T = dayEnd - dayStart - totalTravel}, so the draw is always a feasible whole-day schedule -- the sampling
  * counterpart of the coordinated multi-activity move the {@link LpScheduleSolver} makes deterministically.
  *
- * <h3>Distribution</h3>
- * {@code d = T * Dirichlet(alpha)} with {@code alpha_i = 1 + c * t*_i / sum_j t*_j}. The concentration {@code c >= 0}
- * is a slider between exploration and preference:
+ * <h3>Distribution: Boltzmann sampling of the Charypar-Nagel performing utility</h3>
+ * {@code d = T * Dirichlet(alpha)} with {@code alpha_i = 1 + inverseTemperature * durShortSlope_i * t*_i}. The
+ * Dirichlet density on the simplex is {@code exp(sum (alpha_i - 1) * ln d_i)}, and the Charypar-Nagel performing
+ * utility has exactly that log shape, {@code sum beta_perf * t*_i * ln(d_i / ..)}, so this samples the exact
+ * Boltzmann distribution {@code exp(U_perf / mu)} of the true (concave, unlinearized) performing term at temperature
+ * {@code mu = 1 / inverseTemperature} [utils]. The coefficient {@code beta_perf * t*_i} is taken from the problem
+ * itself: {@link ScheduleProblem.Act#durShortSlope} is the performing marginal at the typical duration (utils/s), as
+ * derived from the scoring config by the extraction -- the same source the LP slopes come from.
+ * <p>
+ * The inverse temperature [1/utils] is a slider between exploration and preference:
  * <ul>
- *   <li>{@code c = 0}: {@code Dirichlet(1,..,1)}, i.e. the uniform distribution on the feasible simplex -- every
- *   feasible schedule is equally likely, typical durations are ignored;</li>
- *   <li>{@code c > 0}: mean share {@code (1 + c*p_i) / (n + c)} with {@code p_i = t*_i / sum t*}, i.e. {@code c}
- *   acts as a prior sample size pulling the shares toward the typical-duration proportions;</li>
- *   <li>{@code c -> infinity}: degenerates to the deterministic proportional fit of the typical durations into the
- *   available budget (which is the no-anchor best response whenever the typicals exactly fill the day).</li>
+ *   <li>{@code 0}: {@code Dirichlet(1,..,1)}, the uniform distribution on the feasible simplex -- every feasible
+ *   schedule is equally likely, typical durations are ignored;</li>
+ *   <li>{@code 1}: the temperature at which {@code ChangeExpBeta} plan selection (default beta = 1/util) operates,
+ *   i.e. proposals matched to the choice dynamics;</li>
+ *   <li>{@code -> infinity}: degenerates to the utility-maximizing proportional fit {@code d_i = t*_i / sum t* * T}
+ *   (the distribution's mode for any positive inverse temperature).</li>
  * </ul>
+ * Because each {@code alpha_i} depends only on the activity's own typical duration -- not on how crowded the day is
+ * -- an activity's <em>relative</em> spread ({@code ~ 1/sqrt(alpha_i)}) and its risk of being drawn far below its
+ * proportional share are independent of the number of activities in the plan; crowding is absorbed by the common
+ * scale factor, i.e. proportionally by everyone. (A globally normalized concentration would instead dilute toward
+ * uniform as the day fills.) For any positive inverse temperature the density vanishes at zero duration.
+ * <p>
  * Sampling is via normalized Gamma draws (Marsaglia-Tsang); {@code alpha_i >= 1} always, so no boosting is needed.
  *
  * <h3>Scope</h3>
@@ -34,14 +47,14 @@ import java.util.Random;
  */
 public final class DirichletScheduleSampler implements ScheduleSolver {
 
-	private final double concentration;
+	private final double inverseTemperature;
 	private final Random random;
 
-	public DirichletScheduleSampler( double concentration, Random random ) {
-		if ( concentration < 0. ) {
-			throw new IllegalArgumentException( "Dirichlet concentration must be >= 0, got " + concentration );
+	public DirichletScheduleSampler( double inverseTemperature, Random random ) {
+		if ( inverseTemperature < 0. ) {
+			throw new IllegalArgumentException( "Dirichlet inverse temperature must be >= 0, got " + inverseTemperature );
 		}
-		this.concentration = concentration;
+		this.inverseTemperature = inverseTemperature;
 		this.random = random;
 	}
 
@@ -52,7 +65,7 @@ public final class DirichletScheduleSampler implements ScheduleSolver {
 				+ "run SplitWrapAroundActivities in preprocessing." );
 		}
 		int n = problem.activities.size();
-		double totalTravel = 0., totalTypical = 0.;
+		double totalTravel = 0.;
 		for ( ScheduleProblem.Act act : problem.activities ) {
 			if ( act.targetEndTime.isDefined() ) {
 				throw new UnsupportedOperationException( "DirichletScheduleSampler supports only plans without "
@@ -60,7 +73,6 @@ public final class DirichletScheduleSampler implements ScheduleSolver {
 					+ "attribute, stamped for the schedule-delay corridor / anchored replanning modes)." );
 			}
 			totalTravel += act.travelTimeBefore;
-			totalTypical += act.typicalDuration;
 		}
 		double budget = problem.dayEnd - problem.dayStart - totalTravel;
 		if ( budget <= 0. ) {
@@ -71,7 +83,8 @@ public final class DirichletScheduleSampler implements ScheduleSolver {
 		double[] durations = new double[n];
 		double sum = 0.;
 		for ( int i = 0; i < n; i++ ) {
-			double alpha = 1. + ( totalTypical > 0. ? concentration * problem.activities.get( i ).typicalDuration / totalTypical : 0. );
+			ScheduleProblem.Act act = problem.activities.get( i );
+			double alpha = 1. + inverseTemperature * act.durShortSlope * act.typicalDuration;
 			durations[i] = gamma( alpha );
 			sum += durations[i];
 		}

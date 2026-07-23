@@ -184,12 +184,14 @@ public class DresdenModel extends MATSimApplication {
 			"non-wrap-around population; the sampler throws on end-time anchors and wrap-around plans. Default false.")
 	private boolean dirichletSampling = false;
 
-	@CommandLine.Option(names="--dirichlet-concentration",
-		description = "Concentration c >= 0 of the Dirichlet schedule sampler (see --dirichlet-sampling): " +
-			"alpha_i = 1 + c * typical_i / sum(typicals). c=0 samples uniformly among the feasible schedules " +
-			"(typical durations ignored); larger c concentrates the draws around the typical-duration shares of the " +
-			"day (c acts as a prior sample size). Default 0.")
-	private double dirichletConcentration = 0.0;
+	@CommandLine.Option(names="--dirichlet-inverse-temperature",
+		description = "Inverse temperature (1/utils, >= 0) of the Dirichlet schedule sampler (see " +
+			"--dirichlet-sampling): the sampler draws from the Boltzmann distribution of the Charypar-Nagel " +
+			"performing utility, alpha_i = 1 + invTemp * beta_perf * typical_i. 0 samples uniformly among the " +
+			"feasible schedules (typical durations ignored); 1 matches the temperature of ChangeExpBeta plan " +
+			"selection (default beta = 1/util); larger values approach the deterministic proportional fit of the " +
+			"typicals. Default 0.")
+	private double dirichletInverseTemperature = 0.0;
 
 //	TODO: remove before release
 //	@CommandLine.Option(names="--ride-alpha", description = "alpha value for ride. For calibration only! To be removed before release.")
@@ -256,7 +258,7 @@ public class DresdenModel extends MATSimApplication {
 
 		// Dirichlet schedule sampling: register its config group. The strategy replaces TimeAllocationMutator under
 		// its own name when enabled; the binding is in prepareControler.
-		ConfigUtils.addOrGetModule(config, DirichletSamplingConfigGroup.class).setConcentration(dirichletConcentration);
+		ConfigUtils.addOrGetModule(config, DirichletSamplingConfigGroup.class).setInverseTemperature(dirichletInverseTemperature);
 
 //		config.vspExperimental().setVspDefaultsCheckingLevel( VspDefaultsCheckingLevel.abort );
 

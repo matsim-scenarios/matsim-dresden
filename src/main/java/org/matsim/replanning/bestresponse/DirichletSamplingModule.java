@@ -20,14 +20,14 @@ import java.util.Random;
 public final class DirichletSamplingModule extends AbstractMultithreadedModule {
 
 	private final ScoringConfigGroup scoringConfigGroup;
-	private final double concentration;
+	private final double inverseTemperature;
 	private final double dayEnd;
 
 	public DirichletSamplingModule( GlobalConfigGroup globalConfigGroup, ScoringConfigGroup scoringConfigGroup,
-									double concentration, double dayEnd ) {
+									double inverseTemperature, double dayEnd ) {
 		super( globalConfigGroup );
 		this.scoringConfigGroup = scoringConfigGroup;
-		this.concentration = concentration;
+		this.inverseTemperature = inverseTemperature;
 		this.dayEnd = dayEnd;
 	}
 
@@ -35,6 +35,6 @@ public final class DirichletSamplingModule extends AbstractMultithreadedModule {
 	public PlanAlgorithm getPlanAlgoInstance() {
 		Random random = MatsimRandom.getLocalInstance();
 		return new BestResponseSchedulePlanAlgorithm( scoringConfigGroup,
-			new DirichletScheduleSampler( concentration, random ), 0., dayEnd, random );
+			new DirichletScheduleSampler( inverseTemperature, random ), 0., dayEnd, random );
 	}
 }

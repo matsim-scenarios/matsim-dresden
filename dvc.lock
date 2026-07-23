@@ -54,8 +54,8 @@ stages:
     deps:
     - path: Makefile
       hash: md5
-      md5: 0f78cd8121dc068f427c516feb745bf3
-      size: 29929
+      md5: 9b661cce1312720df4223eeb1f86f654
+      size: 30094
     - path: input/gtfs
       hash: md5
       md5: 31f000198d1738d565b89e73733bd9ed.dir
@@ -94,8 +94,8 @@ stages:
     deps:
     - path: Makefile
       hash: md5
-      md5: 0f78cd8121dc068f427c516feb745bf3
-      size: 29929
+      md5: 9b661cce1312720df4223eeb1f86f654
+      size: 30094
     - path: input/20250123_Teilmodell_Hoyerswerda
       hash: md5
       md5: 3272a2301c12051831ba875bcb5641e3.dir
@@ -174,8 +174,8 @@ stages:
     deps:
     - path: Makefile
       hash: md5
-      md5: 0f78cd8121dc068f427c516feb745bf3
-      size: 29929
+      md5: 9b661cce1312720df4223eeb1f86f654
+      size: 30094
     - path: input/before-calibration/output/prepare-100pct-short-trips.plans.xml.gz
       hash: md5
       md5: 153fd388f346ac4cc658485b98455a82
@@ -189,12 +189,13 @@ stages:
       md5: 500641ad08e915b0658e69143fdc0912
       size: 103601959
   run:
-    cmd: make run-1pct-notimes SIM_PERIOD_DAYS=1.125 LAST_IT=0
+    cmd: make run-1pct-notimes SIM_PERIOD_DAYS=1.125 LAST_IT=1 BEST_RESPONSE=false
+      DIRICHLET=true DIRICHLET_C=0.0 THREADS=12
     deps:
     - path: Makefile
       hash: md5
-      md5: 0317c6505a0074d5d098c69331219ed5
-      size: 28386
+      md5: 0f78cd8121dc068f427c516feb745bf3
+      size: 29929
     - path: input/before-calibration/output/dresden-v1.1-1pct.plans-initial.xml.gz
       hash: md5
       md5: 9ae31b2b0d6eadb208779e47b7f9a939
@@ -217,34 +218,38 @@ stages:
       size: 229677
     - path: input/prepare-config.xml
       hash: md5
-      md5: 04fa53cdec2e200ed69917f4c3ea33b5
-      size: 11125
+      md5: eb10166fa182a5a70b623a895077b5f7
+      size: 12061
     - path: pom.xml
       hash: md5
       md5: 4e53efbbdecd506d9ab6aca5eaa589fb
       size: 10749
     - path: src/main/java
       hash: md5
-      md5: 93c5af530a52956a380da29026c3ab46.dir
-      size: 293104
-      nfiles: 40
+      md5: c7ebdde8c59fa735042bb1cca1f9f078.dir
+      size: 319727
+      nfiles: 44
     params:
       params.yaml:
-        last_iteration: 0
+        best_response_scheduling: false
+        dirichlet_concentration: 0.0
+        dirichlet_sampling: true
+        last_iteration: 1
         sim_period_days: 1.125
+        threads: 12
     outs:
     - path: output/dresden-v1.1-1pct-notimes
       hash: md5
-      md5: 3015a66ed6c85cac75af057cf0b5843f.dir
-      size: 435067178
-      nfiles: 74
+      md5: 5231c8ac04a208c3efd5c616952e1069.dir
+      size: 569249460
+      nfiles: 102
   short_trips:
     cmd: make input/before-calibration/output/prepare-100pct-short-trips.plans.xml.gz
     deps:
     - path: Makefile
       hash: md5
-      md5: 0f78cd8121dc068f427c516feb745bf3
-      size: 29929
+      md5: 9b661cce1312720df4223eeb1f86f654
+      size: 30094
     - path: input/20250123_Teilmodell_Hoyerswerda
       hash: md5
       md5: 3272a2301c12051831ba875bcb5641e3.dir
@@ -286,8 +291,8 @@ stages:
     deps:
     - path: Makefile
       hash: md5
-      md5: 0f78cd8121dc068f427c516feb745bf3
-      size: 29929
+      md5: 9b661cce1312720df4223eeb1f86f654
+      size: 30094
     - path: input/osm
       hash: md5
       md5: a9feb92fc645e4a87ddaa273e13e6425.dir
