@@ -137,11 +137,12 @@ public final class BestResponseSchedulePlanAlgorithm implements PlanAlgorithm {
 			double typicalDuration = typicalDuration( activity );
 
 			OptionalTime targetEndTime = targetEndTime( activity );
-			if ( i == 0 && wrapAround && targetEndTime.isUndefined() && activity.getMaximumDuration().isDefined() ) {
+			if ( i == 0 && wrapAround && targetEndTime.isUndefined() ) {
 				// A wrap-around first activity appears in the objective only through its anchor (its duration cancels
 				// out of the joint wrap-around term); without one its duration would be arbitrary. Anchor it at its
-				// current position.
-				targetEndTime = OptionalTime.defined( activity.getMaximumDuration().seconds() );
+				// current position -- deliberately plan state rather than preference (see targetEndTime): this is a
+				// regularizer, not a target. The first activity starts at dayStart, so a maximum duration is its end.
+				targetEndTime = activity.getEndTime().isDefined() ? activity.getEndTime() : activity.getMaximumDuration();
 			}
 			if ( targetEndTime.isDefined() ) {
 				targetEndTime = OptionalTime.defined( Math.max( 0., perturb( targetEndTime.seconds() ) ) );
@@ -173,17 +174,22 @@ public final class BestResponseSchedulePlanAlgorithm implements PlanAlgorithm {
 	}
 
 	/**
-	 * Desired end time (scheduling anchor): the {@code initialEndTime} attribute (stored by the random time mutator when
-	 * mutate-around-initial is on), else the activity's current end time. TODO(project): stamp a stable target-end-time
-	 * attribute in preprocessing (as {@link EncodeTypicalDuration} does for typical durations) rather than relying on a
-	 * mutator side effect or the drifting current value.
+	 * Desired end time (scheduling anchor): the {@code initialEndTime} attribute, or undefined. Deliberately NOT the
+	 * activity's own end time: whether an activity is defined by an end time or by a duration only matters for how the
+	 * mobsim executes the current (random) plan, not for planning -- the plan's times encode a candidate, the anchor
+	 * attribute encodes a <em>preference</em>, and normally only the score measures how well the one matches the
+	 * other. This planner and the {@link DirichletScheduleSampler} are atypical in reading the preference directly, so
+	 * they must read only the preference; falling back to the plan's end time would (e.g.) make the sampler refuse a
+	 * plan merely for being end-time-based. TODO(project): stamp the target-end-time attribute in preprocessing (as
+	 * {@link EncodeTypicalDuration} does for typical durations) rather than relying on a mutator side effect or the
+	 * conditional stamping at startup.
 	 */
 	private static OptionalTime targetEndTime( Activity activity ) {
 		Object attribute = activity.getAttributes().getAttribute( MutateActivityTimeAllocation.INITIAL_END_TIME_ATTRIBUTE );
 		if ( attribute instanceof Number number ) {
 			return OptionalTime.defined( number.doubleValue() );
 		}
-		return activity.getEndTime();
+		return OptionalTime.undefined();
 	}
 
 	/** Rebuild the schedule from the chosen durations and write it back, each activity staying in its class. */

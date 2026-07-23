@@ -23,10 +23,11 @@ import java.util.Random;
  * Sampling is via normalized Gamma draws (Marsaglia-Tsang); {@code alpha_i >= 1} always, so no boosting is needed.
  *
  * <h3>Scope</h3>
- * Only duration-based, non-wrap-around plans: a defined end-time anchor or a wrap-around plan means the feasible
- * domain is not the plain simplex (and the anchor should shape the distribution, which this sampler cannot do), so
- * {@link #solve} throws rather than silently ignoring the preference. Use with populations preprocessed by
- * {@code EndTimeToDuration} / {@code SplitWrapAroundActivities}.
+ * Only non-wrap-around plans without end-time anchors. An anchor (the initialEndTime attribute -- a scheduling
+ * <em>preference</em>, as opposed to the plan's own end times, which merely encode the current candidate plan and are
+ * rewritten anyway) should shape the distribution, which this sampler cannot do; a wrap-around pair shares one joint
+ * duration, which is not the plain simplex. {@link #solve} throws in both cases rather than silently ignoring the
+ * preference; wrap-around plans are avoided by preprocessing with {@code SplitWrapAroundActivities}.
  * <p>
  * NOT stateless: carries its own {@link Random}, so use one instance per worker thread (see
  * {@link DirichletSamplingModule}).
@@ -54,9 +55,9 @@ public final class DirichletScheduleSampler implements ScheduleSolver {
 		double totalTravel = 0., totalTypical = 0.;
 		for ( ScheduleProblem.Act act : problem.activities ) {
 			if ( act.targetEndTime.isDefined() ) {
-				throw new UnsupportedOperationException( "DirichletScheduleSampler supports only duration-based plans "
-					+ "without end-time anchors; activity of type '" + act.type + "' has a target end time. "
-					+ "Run EndTimeToDuration in preprocessing." );
+				throw new UnsupportedOperationException( "DirichletScheduleSampler supports only plans without "
+					+ "end-time anchors; activity of type '" + act.type + "' carries one (the initialEndTime "
+					+ "attribute, stamped for the schedule-delay corridor / anchored replanning modes)." );
 			}
 			totalTravel += act.travelTimeBefore;
 			totalTypical += act.typicalDuration;
