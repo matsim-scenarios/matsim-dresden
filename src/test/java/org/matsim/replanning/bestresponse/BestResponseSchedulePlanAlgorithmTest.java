@@ -101,6 +101,28 @@ class BestResponseSchedulePlanAlgorithmTest {
 		assertEquals( 1800., travel[2], 1e-9 );
 	}
 
+	/**
+	 * Travel times are simulated state and start in disequilibrium (a missed pt connection can turn a trip into many
+	 * hours). A day whose travel alone fills the simulation period has no feasible schedule; re-timing must leave the
+	 * plan unchanged rather than throw (only configuration errors throw) or write a garbage schedule.
+	 */
+	@Test
+	void travelFillingTheDayLeavesThePlanUnchanged() {
+		Plan plan = garbledWrapAroundPlan();
+		for ( var element : plan.getPlanElements() ) {
+			if ( element instanceof Leg leg ) {
+				leg.setTravelTime( 50000. ); // 2 x 50000s > 86400s
+			}
+		}
+
+		algorithm( 0., 1 ).run( plan );
+
+		Activity home1 = (Activity) plan.getPlanElements().get( 0 );
+		Activity work = (Activity) plan.getPlanElements().get( 2 );
+		assertEquals( 28800., home1.getEndTime().seconds(), 1e-9 );
+		assertEquals( 25200., work.getEndTime().seconds(), 1e-9, "the garbled end time must survive untouched" );
+	}
+
 	@Test
 	void sigmaZeroIsDeterministicAndSigmaPositiveExplores() {
 		Plan a = garbledWrapAroundPlan(), b = garbledWrapAroundPlan(), c = garbledWrapAroundPlan();

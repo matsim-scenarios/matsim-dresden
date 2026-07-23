@@ -15,6 +15,7 @@ import org.matsim.prepare.EncodeTypicalDuration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Best-response replanning algorithm: instead of randomly mutating one end time (as
@@ -73,6 +74,9 @@ public final class BestResponseSchedulePlanAlgorithm implements PlanAlgorithm {
 			scoringConfigGroup.getPerforming_utils_hr() ) / 3600.;
 	}
 
+	/** Cap on the travel-fills-the-day warnings; disequilibrium travel times can hit many agents in early iterations. */
+	private static final AtomicInteger infeasibleTravelWarnings = new AtomicInteger();
+
 	@Override
 	public void run( Plan plan ) {
 		List<Activity> activities = TripStructureUtils.getActivities( plan, TripStructureUtils.StageActivityHandling.ExcludeStageActivities );
@@ -81,6 +85,25 @@ public final class BestResponseSchedulePlanAlgorithm implements PlanAlgorithm {
 		}
 
 		double[] travelBefore = travelTimesBeforeEachActivity( plan, activities.size() );
+
+		// Travel times are simulated state, not input: the iterations start in disequilibrium, where e.g. a missed
+		// pt connection can turn a trip into many hours. If travel alone fills the simulation period, no schedule
+		// is feasible and re-timing is pointless -- keep the plan unchanged (the strategy operates on a copy, which
+		// then merely duplicates its original) and leave it to re-routing / mode choice and the scoring to sort the
+		// travel out. Deliberately not an exception: only configuration errors throw, and this is plan state.
+		double totalTravel = 0.;
+		for ( double t : travelBefore ) {
+			totalTravel += t;
+		}
+		if ( totalTravel >= dayEnd ) {
+			int count = infeasibleTravelWarnings.incrementAndGet();
+			if ( count <= 10 ) {
+				log.warn( "Travel time ({}s) fills the simulation period ({}s) for person {}; leaving the plan unchanged.{}",
+					totalTravel, dayEnd, plan.getPerson() == null ? "?" : plan.getPerson().getId(),
+					count == 10 ? " Further warnings of this kind are suppressed." : "" );
+			}
+			return;
+		}
 
 		ScheduleProblem problem = extractProblem( activities, travelBefore );
 		double[] durations = solver.solve( problem );

@@ -76,8 +76,10 @@ public final class DirichletScheduleSampler implements ScheduleSolver {
 		}
 		double budget = problem.dayEnd - problem.dayStart - totalTravel;
 		if ( budget <= 0. ) {
-			throw new IllegalStateException( "Travel time (" + totalTravel + "s) fills or exceeds the day ("
-				+ ( problem.dayEnd - problem.dayStart ) + "s); no time budget left to sample a schedule from." );
+			// Not a data condition: the caller skips travel-filled days before extraction (see
+			// BestResponseSchedulePlanAlgorithm.run), so reaching this is a caller bug.
+			throw new IllegalArgumentException( "Non-positive time budget (" + budget + "s): the caller must skip "
+				+ "plans whose travel fills the simulation period instead of sampling a schedule for them." );
 		}
 
 		double[] durations = new double[n];
