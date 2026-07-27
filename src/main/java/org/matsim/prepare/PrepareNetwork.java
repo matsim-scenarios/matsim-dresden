@@ -3,15 +3,22 @@ package org.matsim.prepare;
 import com.google.common.collect.Sets;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.locationtech.jts.geom.Geometry;
+import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.TransportMode;
 import org.matsim.api.core.v01.network.Link;
 import org.matsim.api.core.v01.network.Network;
+import org.matsim.api.core.v01.network.Node;
 import org.matsim.application.MATSimAppCommand;
+import org.matsim.application.options.ShpOptions;
 import org.matsim.contrib.emissions.HbefaRoadTypeMapping;
 import org.matsim.contrib.emissions.OsmHbefaMapping;
 import org.matsim.core.network.NetworkUtils;
+import org.matsim.core.utils.geometry.geotools.MGC;
 import picocli.CommandLine;
 
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.Set;
 
 import static org.matsim.utils.DresdenUtils.getFreightModes;
@@ -41,6 +48,7 @@ public class PrepareNetwork implements MATSimAppCommand {
 
 		prepareFreightNetwork(network);
 		prepareEmissionsAttributes(network);
+		prepareBikeNetwork(network);
 
 		NetworkUtils.writeNetwork(network, outputPath);
 
@@ -77,4 +85,38 @@ public class PrepareNetwork implements MATSimAppCommand {
 		HbefaRoadTypeMapping roadTypeMapping = OsmHbefaMapping.build();
 		roadTypeMapping.addHbefaMappings(network);
 	}
+
+	/**
+	 * Create a dedicated network for bikes within the Dresden city, so that bike does not involve in car congestion.
+	 * This also enables further detailed processing of bike network (e.g., impact of traffic light, more realistic impact of car congestion on bike)
+	 *
+	 * @param network
+	 */
+	public static void prepareBikeNetwork(Network network) {
+		ShpOptions shpOptions = new ShpOptions("input/v1.0/vvo_tarifzone_10_dresden/v1.0_vvo_tarifzone_10_dresden_utm32n.shp", "EPSG:25832", null);
+		Geometry studyArea = shpOptions.getGeometry();
+		for (Link link : network.getLinks().values()) {
+			if (link.getAllowedModes().contains(TransportMode.bike)) {
+				if (link.getAllowedModes().size() == 1) {
+					// this link is bike only link, no need to duplicate
+					continue;
+				}
+				// duplicate the link and add it to the network
+				Node fromNode = link.getFromNode();
+				Node toNode = link.getToNode();
+				if (MGC.coord2Point(fromNode.getCoord()).within(studyArea) && MGC.coord2Point(toNode.getCoord()).within(studyArea)) {
+					String id = link.getId().toString() + "_bike";
+					Link bikeLink = NetworkUtils.createAndAddLink(network, Id.createLinkId(id), fromNode, toNode, link.getLength(), link.getFreespeed(), link.getCapacity(), 1);
+					bikeLink.setAllowedModes(Set.of(TransportMode.bike));
+
+					// remove bike mode from the original link
+					Set<String> allowedModes = new HashSet<>(link.getAllowedModes());
+					allowedModes.remove(TransportMode.bike);
+					link.setAllowedModes(allowedModes);
+				}
+			}
+		}
+		NetworkUtils.cleanNetwork(network, Set.of(TransportMode.bike));
+	}
+
 }

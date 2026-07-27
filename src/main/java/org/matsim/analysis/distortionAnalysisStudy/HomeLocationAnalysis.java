@@ -20,11 +20,11 @@ import java.util.Map;
 
 public class HomeLocationAnalysis {
 	public static void main(String[] args) throws IOException {
-		String output = args.length == 1 ? args[0] : "/Users/luchengqi/Documents/MATSimScenarios/Dresden/distortion-study-analysis/analysis/home-locations-from-attribute.tsv";
+		String output = args.length == 1 ? args[0] : "/Users/luchengqi/Documents/MATSimScenarios/Dresden/distortion-study-analysis/analysis/home-locations-new.tsv";
 
 		ShpOptions shp = new ShpOptions("input/v1.0/vvo_tarifzone_10_dresden/v1.0_vvo_tarifzone_10_dresden_utm32n.shp", "EPSG:25832", null);
 		Geometry studyArea = shp.getGeometry("EPSG:25832");
-		Population population = PopulationUtils.readPopulation("https://svn.vsp.tu-berlin.de/repos/public-svn/matsim/scenarios/countries/de/dresden/dresden-v1.0/input/dresden-v1.0-10pct.plans.xml.gz");
+		Population population = PopulationUtils.readPopulation("https://svn.vsp.tu-berlin.de/repos/public-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/calibrated-10pct/output/012.output_plans.xml.gz");
 		Map<Id<Person>, Coord> personsLivingInDresden = new HashMap<>();
 
 		for (Person person : population.getPersons().values()) {

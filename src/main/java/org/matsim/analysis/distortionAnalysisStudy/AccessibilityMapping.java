@@ -26,7 +26,7 @@ public class AccessibilityMapping {
 		// Accessibility file for any activity (we just need to read the measurement points id and coords)
 		log.info("Reading data...");
 		String accessibilityData = args.length == 3 ? args[0] : "/Users/luchengqi/Documents/MATSimScenarios/Dresden/distortion-study-analysis/output/1pct/analysis/accessibility/shop/accessibilities.csv";
-		String homeLocationData = args.length == 3 ? args[1] : "/Users/luchengqi/Documents/MATSimScenarios/Dresden/distortion-study-analysis/analysis/home-locations.tsv";
+		String homeLocationData = args.length == 3 ? args[1] : "/Users/luchengqi/Documents/MATSimScenarios/Dresden/distortion-study-analysis/analysis/home-locations-new.tsv";
 
 		Map<String, Coord> measurementPointsCoords = new HashMap<>();
 		try (BufferedReader reader = Files.newBufferedReader(Path.of(accessibilityData), StandardCharsets.UTF_8);
