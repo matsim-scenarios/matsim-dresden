@@ -7,7 +7,11 @@ import org.matsim.core.config.groups.ScenarioConfigGroup;
 import org.matsim.core.config.groups.ScoringConfigGroup;
 import org.matsim.core.replanning.PlanStrategy;
 import org.matsim.core.replanning.PlanStrategyImpl;
+import org.matsim.core.replanning.modules.ReRoute;
 import org.matsim.core.replanning.selectors.RandomPlanSelector;
+import org.matsim.core.router.TripRouter;
+import org.matsim.core.utils.timing.TimeInterpretation;
+import org.matsim.facilities.ActivityFacilities;
 
 /**
  * A schedule-sampling replanning {@link PlanStrategy} that <em>replaces</em> {@code TimeAllocationMutator}: instead of
@@ -28,6 +32,9 @@ public final class DirichletSamplingStrategy implements Provider<PlanStrategy> {
 	@Inject private ScoringConfigGroup scoringConfigGroup;
 	@Inject private ScenarioConfigGroup scenarioConfigGroup;
 	@Inject private DirichletSamplingConfigGroup dirichletSamplingConfigGroup;
+	@Inject private ActivityFacilities facilities;
+	@Inject private Provider<TripRouter> tripRouterProvider;
+	@Inject private TimeInterpretation timeInterpretation;
 
 	@Override
 	public PlanStrategy get() {
@@ -35,6 +42,7 @@ public final class DirichletSamplingStrategy implements Provider<PlanStrategy> {
 		double dayEnd = scenarioConfigGroup.getSimulationPeriodInDays() * 24. * 3600.;
 		strategy.addStrategyModule( new DirichletSamplingModule(
 			globalConfigGroup, scoringConfigGroup, dirichletSamplingConfigGroup.getInverseTemperature(), dayEnd ) );
+		strategy.addStrategyModule( new ReRoute( facilities, tripRouterProvider, globalConfigGroup, timeInterpretation ) );
 		return strategy;
 	}
 }
