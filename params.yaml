@@ -35,9 +35,20 @@
 #   experiment rather than of whichever machine it lands on. Deliberately NOT applied to
 #   eventsManager.numberOfThreads, which is unset (i.e. sequential event handling): switching that on
 #   would change how events are handled, not just how fast, and is a separate decision.
+# use_transit_in_mobsim: whether the mobsim actually simulates the transit vehicles from the schedule
+#   (config transit.usingTransitInMobsim), rather than teleporting pt passengers. On is both MATSim's
+#   default and the scenario baseline (prepareConfig does not touch it), so true is a no-op; set false to
+#   teleport pt for an experiment. Passed as a --config: override, applied after prepareConfig.
+# matsim_config: arbitrary MATSim config overrides for the run, as a single whitespace-separated string
+#   of --config:<group>.<param>=<value> tokens (empty by default). An escape hatch for varying a config
+#   parameter that has no dedicated knob above, without editing the Makefile; the tokens are appended
+#   verbatim to the run command. Tracked here so changing them re-runs the stage. Example:
+#   matsim_config: "--config:qsim.endTime=30:00:00"
 sim_period_days: 1.125
 last_iteration: 2000
 best_response_scheduling: false
 dirichlet_sampling: true
-dirichlet_inverse_temperature: 0.0
+dirichlet_inverse_temperature: 1.0
 threads: 12
+use_transit_in_mobsim: true
+matsim_config: ""

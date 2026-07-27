@@ -55,6 +55,21 @@ DIRICHLET_INV_TEMP ?= 0
 # BEST_RESPONSE, only wired into run-1pct-notimes, the target the dvc run stage drives.
 THREADS ?= 12
 
+# Whether the mobsim actually simulates the transit vehicles from the schedule, rather than teleporting pt
+# passengers (config transit.usingTransitInMobsim; see the use_transit_in_mobsim dvc parameter). MATSim's
+# default -- and the scenario baseline, which prepareConfig no longer touches -- is on; this knob, like
+# BEST_RESPONSE only wired into run-1pct-notimes (the target the dvc run stage drives), lets an experiment
+# turn it off. Passed as a --config: override, applied after prepareConfig.
+USE_TRANSIT_IN_MOBSIM ?= true
+
+# Arbitrary MATSim config overrides passed straight through to the run (see the matsim_config dvc parameter):
+# an escape hatch for varying a config parameter that has no dedicated knob of its own. Whitespace-separated
+# --config:<group>.<param>=<value> tokens, appended verbatim, e.g.
+#   make run-1pct-notimes CONFIG='--config:transit.usingTransitInMobsim=true --config:qsim.endTime=30:00:00'
+# Same effect as passing them through ARGS, but backed by a tracked dvc parameter so the run stage re-runs when
+# it changes. Only wired into run-1pct-notimes, the target the dvc run stage drives.
+CONFIG ?=
+
 .PHONY: prepare run run-1pct run-0pct
 
 # DVC owns cross-stage invalidation (see dvc.yaml); make only has to build what is genuinely absent.
@@ -439,6 +454,8 @@ run-1pct-notimes: input/prepare-config.xml | $(CLASSPATH)
 	 --config:global.numberOfThreads=$(THREADS)\
 	 --config:qsim.numberOfThreads=$(THREADS)\
 	 --config:dsim.threads=$(THREADS)\
+	 --config:transit.usingTransitInMobsim=$(USE_TRANSIT_IN_MOBSIM)\
+	 $(CONFIG)\
 	 $(ARGS)
 
 # Like run-1pct-notimes, but with the schedule-delay corridor armed in the scoring: per-activity soft anchors at the

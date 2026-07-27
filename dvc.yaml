@@ -74,7 +74,7 @@ stages:
       - input/before-calibration/output/dresden-v1.1-activity-facilities.xml.gz
   run:
     # run-1pct-notimes (no made-up opening times) is the structural candidate we vary parameters on.
-    cmd: make run-1pct-notimes SIM_PERIOD_DAYS=${sim_period_days} LAST_IT=${last_iteration} BEST_RESPONSE=${best_response_scheduling} DIRICHLET=${dirichlet_sampling} DIRICHLET_INV_TEMP=${dirichlet_inverse_temperature} THREADS=${threads}
+    cmd: make run-1pct-notimes SIM_PERIOD_DAYS=${sim_period_days} LAST_IT=${last_iteration} BEST_RESPONSE=${best_response_scheduling} DIRICHLET=${dirichlet_sampling} DIRICHLET_INV_TEMP=${dirichlet_inverse_temperature} THREADS=${threads} USE_TRANSIT_IN_MOBSIM=${use_transit_in_mobsim} CONFIG='${matsim_config}'
     params:
       - sim_period_days
       - last_iteration
@@ -82,6 +82,8 @@ stages:
       - dirichlet_sampling
       - dirichlet_inverse_temperature
       - threads
+      - use_transit_in_mobsim
+      - matsim_config
     deps:
       - Makefile
       - pom.xml
