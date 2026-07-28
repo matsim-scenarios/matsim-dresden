@@ -1,5 +1,5 @@
 metrics:
-  - output/dresden-v1.1-1pct-notimes/metrics.json
+  - output/dresden-v1.1-${sample}/metrics.json
 stages:
   network:
     cmd: make input/before-calibration/output/dresden-v1.1-network-with-pt.xml.gz
@@ -73,12 +73,19 @@ stages:
       - input/before-calibration/output/dresden-v1.1-1pct.plans-initial.xml.gz
       - input/before-calibration/output/dresden-v1.1-activity-facilities.xml.gz
   run:
-    # run-1pct-notimes (no made-up opening times) is the structural candidate we vary parameters on.
-    cmd: make run-1pct-notimes SIM_PERIOD_DAYS=${sim_period_days} LAST_IT=${last_iteration} BEST_RESPONSE=${best_response_scheduling} DIRICHLET=${dirichlet_sampling} DIRICHLET_INV_TEMP=${dirichlet_inverse_temperature} THREADS=${threads} USE_TRANSIT_IN_MOBSIM=${use_transit_in_mobsim} CONFIG='${matsim_config}'
+    # The one run target, at the sample the `sample` parameter selects. Its defaults are the structural
+    # candidate we vary parameters on: no made-up opening times (what used to be the separate "notimes"
+    # variant). The variants that used to be Makefile targets of their own are reachable from here by setting
+    # the parameter that distinguishes them, e.g. --set-param with_opening_times=true.
+    cmd: make run SAMPLE=${sample} SIM_PERIOD_DAYS=${sim_period_days} LAST_IT=${last_iteration} WITH_OPENING_TIMES=${with_opening_times} BEST_RESPONSE=${best_response_scheduling} BR_SIGMA=${best_response_sigma} SCHEDULE_DELAY_SCORING=${schedule_delay_scoring} DIRICHLET=${dirichlet_sampling} DIRICHLET_INV_TEMP=${dirichlet_inverse_temperature} THREADS=${threads} USE_TRANSIT_IN_MOBSIM=${use_transit_in_mobsim} CONFIG='${matsim_config}'
     params:
+      - sample
       - sim_period_days
       - last_iteration
+      - with_opening_times
       - best_response_scheduling
+      - best_response_sigma
+      - schedule_delay_scoring
       - dirichlet_sampling
       - dirichlet_inverse_temperature
       - threads
@@ -89,10 +96,10 @@ stages:
       - pom.xml
       - src/main/java
       - input/prepare-config.xml
-      - input/before-calibration/output/dresden-v1.1-1pct.plans-initial.xml.gz
+      - input/before-calibration/output/dresden-v1.1-${sample}.plans-initial.xml.gz
       - input/before-calibration/output/dresden-v1.1-activity-facilities.xml.gz
       - input/before-calibration/output/dresden-v1.1-network-with-pt.xml.gz
       - input/before-calibration/output/dresden-v1.1-transitSchedule.xml.gz
       - input/before-calibration/output/dresden-v1.1-transitVehicles.xml.gz
     outs:
-      - output/dresden-v1.1-1pct-notimes
+      - output/dresden-v1.1-${sample}

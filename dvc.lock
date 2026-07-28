@@ -54,8 +54,8 @@ stages:
     deps:
     - path: Makefile
       hash: md5
-      md5: a87709f675c160e068702bbcfdfc9d1c
-      size: 31307
+      md5: 6df79eb027070bd09b9c2beafd9f2269
+      size: 29149
     - path: input/gtfs
       hash: md5
       md5: 31f000198d1738d565b89e73733bd9ed.dir
@@ -94,8 +94,8 @@ stages:
     deps:
     - path: Makefile
       hash: md5
-      md5: a87709f675c160e068702bbcfdfc9d1c
-      size: 31307
+      md5: 6df79eb027070bd09b9c2beafd9f2269
+      size: 29149
     - path: input/20250123_Teilmodell_Hoyerswerda
       hash: md5
       md5: 3272a2301c12051831ba875bcb5641e3.dir
@@ -174,8 +174,8 @@ stages:
     deps:
     - path: Makefile
       hash: md5
-      md5: a87709f675c160e068702bbcfdfc9d1c
-      size: 31307
+      md5: 6df79eb027070bd09b9c2beafd9f2269
+      size: 29149
     - path: input/before-calibration/output/prepare-100pct-short-trips.plans.xml.gz
       hash: md5
       md5: 153fd388f346ac4cc658485b98455a82
@@ -248,8 +248,8 @@ stages:
     deps:
     - path: Makefile
       hash: md5
-      md5: a87709f675c160e068702bbcfdfc9d1c
-      size: 31307
+      md5: 6df79eb027070bd09b9c2beafd9f2269
+      size: 29149
     - path: input/20250123_Teilmodell_Hoyerswerda
       hash: md5
       md5: 3272a2301c12051831ba875bcb5641e3.dir
@@ -291,8 +291,8 @@ stages:
     deps:
     - path: Makefile
       hash: md5
-      md5: a87709f675c160e068702bbcfdfc9d1c
-      size: 31307
+      md5: 6df79eb027070bd09b9c2beafd9f2269
+      size: 29149
     - path: input/osm
       hash: md5
       md5: a9feb92fc645e4a87ddaa273e13e6425.dir

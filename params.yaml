@@ -2,17 +2,41 @@
 # Makefile. Override per experiment instead of editing here, e.g.
 #   dvc exp run --set-param sim_period_days=1.5
 #
+# sample: which population sample the run simulates -- one of the samples the downsample-population step at
+#   the end of the prepare pipeline writes: 1pct, 10pct or 100pct (25pct is written too, but is not a tracked
+#   pipeline output, so dvc cannot supply it on a machine that only pulled the data). The name, not the
+#   fraction: it is what the plans file, the run id and the output directory are named after, and the Makefile
+#   looks up the scale factor for the flow/storage capacities, the counts and simwrapper from it. Changing it
+#   changes the run's output path, so samples do not overwrite each other, e.g.
+#     dvc exp run --set-param sample=10pct
+#   Only the run stage depends on it; the prepare pipeline builds all samples in one go regardless.
 # sim_period_days: length of the simulation period, as a multiple of 24h (1.125 = 27:00). Consumed by
 #   the prepare steps (reschedule-late-plans, encode-typical-duration) as well as the run, so changing
 #   it invalidates the plans and re-runs the whole pipeline, not just the simulation.
 # last_iteration: last iteration of the run. Lower it for smoke runs, e.g.
 #   dvc exp run --set-param last_iteration=1
+# with_opening_times: whether activity types get the made-up opening times. False is the variant this
+#   scenario now runs -- what used to be the separate "notimes" run: no invented opening hours, so an
+#   activity's position in the day comes from the plan and from the scoring rather than from a fabricated
+#   window. Set true to reproduce the old (MATSim-default) behaviour.
 # best_response_scheduling: keep the best-response scheduling strategy (re-plan the whole day at once,
 #   then re-route), which input/prepare-config.xml declares alongside the other "person" strategies;
 #   false drops it. Meant to supply the coordinated multi-activity retiming that TimeAllocationMutator
 #   cannot reach in one step, which is what leaves agents parked on zero-duration activities. Its weight
 #   is in prepare-config.xml with the other strategies; the fraction of the run after which it switches
 #   off is DresdenModel.BEST_RESPONSE_DISABLE_FRACTION.
+# best_response_sigma: standard deviation (seconds) of the random perturbation added to that strategy's
+#   target end times, i.e. how stochastic the best response is. 0 (the default) is the deterministic
+#   optimizer. 1040 matches the spread of the TimeAllocationMutator this scenario configures (uniform on
+#   +-mutationRange = 1800s has standard deviation 1800/sqrt(3)), so the best response explores as widely as
+#   the mutator it stands in for. Exploration happens around the stable stamped initialEndTime anchors, so
+#   the perturbation does not accumulate into a random walk across replannings. Only used when
+#   best_response_scheduling is true.
+# schedule_delay_scoring: arm the schedule-delay corridor in the scoring: per-activity soft anchors at the
+#   stamped initial (surveyed) start/end times -- starting later is penalized at the lateArrival rate, ending
+#   earlier at the performing rate (via earlyDeparture) -- as the positional anchor that made-up opening
+#   times used to be. False (the default) leaves those terms dead, since the type-level trigger times are
+#   undefined without opening times.
 # dirichlet_sampling: REPLACE the TimeAllocationMutator with the Dirichlet schedule sampler: each
 #   replanning draws a whole new feasible day at once (durations ~ T * Dirichlet(alpha) over the day's
 #   time budget T = day minus travel) instead of perturbing one end time. Bound under the mutator's
@@ -44,9 +68,13 @@
 #   parameter that has no dedicated knob above, without editing the Makefile; the tokens are appended
 #   verbatim to the run command. Tracked here so changing them re-runs the stage. Example:
 #   matsim_config: "--config:qsim.endTime=30:00:00"
+sample: 1pct
 sim_period_days: 1.125
 last_iteration: 2000
+with_opening_times: false
 best_response_scheduling: false
+best_response_sigma: 0
+schedule_delay_scoring: false
 dirichlet_sampling: true
 dirichlet_inverse_temperature: 1.0
 threads: 12

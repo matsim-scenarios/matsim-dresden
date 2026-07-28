@@ -25,7 +25,24 @@ MEMORY ?= 50G
 CLASSPATH := target/dresden.classpath
 sc := java -Xms$(MEMORY) -Xmx$(MEMORY) @$(CLASSPATH) org.matsim.run.DresdenModelWrapper
 
-# Last iteration for the run-* targets. Override on the command line, e.g. `make run-1pct LAST_IT=1`.
+# Population sample the run reads (see the sample dvc parameter): one of the samples the downsample-population
+# step at the end of the prepare pipeline writes. Both the file names and the run id carry this name, so it is
+# the name -- not the fraction -- that is the knob; the fraction is looked up below.
+SAMPLE ?= 1pct
+
+# The scale factor belonging to SAMPLE, for the flow/storage capacities, the counts and simwrapper. A lookup
+# rather than a computation, because make has no arithmetic. 1pct, 10pct and 100pct are what dvc tracks;
+# 25pct is written by the prepare pipeline as well and works here, it is just not a pipeline output.
+SAMPLE_SIZE_1pct := 0.01
+SAMPLE_SIZE_10pct := 0.1
+SAMPLE_SIZE_25pct := 0.25
+SAMPLE_SIZE_100pct := 1.0
+SAMPLE_SIZE := $(SAMPLE_SIZE_$(SAMPLE))
+ifeq ($(SAMPLE_SIZE),)
+$(error SAMPLE must be one of 1pct 10pct 25pct 100pct, got '$(SAMPLE)')
+endif
+
+# Last iteration for the run target. Override on the command line, e.g. `make run LAST_IT=1`.
 LAST_IT ?= 500
 
 # Length of the simulation period, as a multiple of 24h: the effective end of day for the non-wrap-around
@@ -34,43 +51,54 @@ LAST_IT ?= 500
 # Changing it invalidates the prepared plans: re-run the prepare pipeline.
 SIM_PERIOD_DAYS ?= 1.125
 
+# Whether activity types get the made-up opening times (see --with-opening-times and the with_opening_times
+# dvc parameter). Off is the variant this scenario now runs -- what used to be the separate "notimes" target:
+# no invented opening hours, so an activity's position in the day comes from the plan and the scoring rather
+# than from a fabricated window. Set true to get the old (MATSim-default) behaviour back.
+WITH_OPENING_TIMES ?= false
+
 # Add the best-response scheduling strategy to the run's replanning (see --best-response-scheduling and the
-# best_response_scheduling dvc parameter). Only wired into run-1pct-notimes, the target the dvc run stage drives;
-# pass it to the other run targets via ARGS if needed.
+# best_response_scheduling dvc parameter). BR_SIGMA is the standard deviation (seconds) of the perturbation
+# added to its target end times, making the best response stochastic; 0 (the default) is the deterministic one.
+# BR_SIGMA is only used when BEST_RESPONSE is on.
 BEST_RESPONSE ?= false
+BR_SIGMA ?= 0
 
 # Replace the TimeAllocationMutator with the Dirichlet schedule sampler (see --dirichlet-sampling and the
 # dirichlet_sampling / dirichlet_inverse_temperature dvc parameters). DIRICHLET_INV_TEMP is the inverse
 # temperature (1/utils) of the sampled Boltzmann distribution of the performing utility: 0 samples uniformly
 # among the feasible schedules, 1 matches the ChangeExpBeta selection temperature, larger values approach the
-# proportional fit of the typicals. As with BEST_RESPONSE, only wired into run-1pct-notimes, the target the
-# dvc run stage drives.
+# proportional fit of the typicals.
 DIRICHLET ?= false
 DIRICHLET_INV_TEMP ?= 0
+
+# Arm the schedule-delay corridor in the scoring (see --schedule-delay-scoring and the schedule_delay_scoring
+# dvc parameter): per-activity soft anchors at the stamped initial (surveyed) start/end times -- late start at
+# the lateArrival rate, early end at the performing rate -- as the positional anchor that made-up opening times
+# used to be. Off by default, which leaves those terms dead.
+SCHEDULE_DELAY_SCORING ?= false
 
 # Parallelism of the run (see the threads dvc parameter): one knob for global.numberOfThreads (replanning,
 # routing), qsim.numberOfThreads and dsim.threads. The default matches what input/prepare-config.xml sets for
 # the first two. dsim's own default is 0, i.e. "use every available processor", so it is pinned here as well --
-# a run's parallelism should come from the experiment, not from whichever machine it lands on. As with
-# BEST_RESPONSE, only wired into run-1pct-notimes, the target the dvc run stage drives.
+# a run's parallelism should come from the experiment, not from whichever machine it lands on.
 THREADS ?= 12
 
 # Whether the mobsim actually simulates the transit vehicles from the schedule, rather than teleporting pt
 # passengers (config transit.usingTransitInMobsim; see the use_transit_in_mobsim dvc parameter). MATSim's
-# default -- and the scenario baseline, which prepareConfig no longer touches -- is on; this knob, like
-# BEST_RESPONSE only wired into run-1pct-notimes (the target the dvc run stage drives), lets an experiment
-# turn it off. Passed as a --config: override, applied after prepareConfig.
+# default -- and the scenario baseline, which prepareConfig no longer touches -- is on; this knob lets an
+# experiment turn it off. Passed as a --config: override, applied after prepareConfig.
 USE_TRANSIT_IN_MOBSIM ?= true
 
 # Arbitrary MATSim config overrides passed straight through to the run (see the matsim_config dvc parameter):
 # an escape hatch for varying a config parameter that has no dedicated knob of its own. Whitespace-separated
 # --config:<group>.<param>=<value> tokens, appended verbatim, e.g.
-#   make run-1pct-notimes CONFIG='--config:transit.usingTransitInMobsim=true --config:qsim.endTime=30:00:00'
+#   make run CONFIG='--config:transit.usingTransitInMobsim=true --config:qsim.endTime=30:00:00'
 # Same effect as passing them through ARGS, but backed by a tracked dvc parameter so the run stage re-runs when
-# it changes. Only wired into run-1pct-notimes, the target the dvc run stage drives.
+# it changes.
 CONFIG ?=
 
-.PHONY: prepare run run-1pct run-0pct
+.PHONY: prepare check run run-continue sc vtts best-response-report
 
 # DVC owns cross-stage invalidation (see dvc.yaml); make only has to build what is genuinely absent.
 # None of the files below are DVC outputs, so a machine that only pulled the pipeline data (the cluster)
@@ -385,70 +413,32 @@ sc: | $(CLASSPATH)
 	 $(ARGS)
 
 # Run the before-calibration scenario with the initial (uncalibrated) config. Assumes the prepare pipeline has
-# produced the inputs referenced by input/prepare-config.xml (run `make prepare` first). The config is set up for
-# the 10pct sample; the run-1pct / run-0pct targets below override the sample-dependent parameters.
-# Pass extra args to the run command verbatim via ARGS, e.g. `make run ARGS='--with-opening-times=false'`.
+# produced the inputs referenced by input/prepare-config.xml (run `make prepare` first). This is the single run
+# target, and the one the dvc run stage drives; the variants that used to have a target of their own are now
+# reachable through the knobs at the top of this file (and through the dvc parameters that feed them), e.g.
+#   make run SAMPLE=10pct                     the former run-10pct
+#   make run WITH_OPENING_TIMES=true          the former run-1pct-yestimes
+#   make run SCHEDULE_DELAY_SCORING=true      the former run-1pct-notimes-penalties
+#   make run BEST_RESPONSE=true DIRICHLET=false                 the former run-1pct-bestresponse
+#   make run BEST_RESPONSE=true BR_SIGMA=1040 DIRICHLET=false   the former run-1pct-bestresponse-sigma
+# 1040 is the standard deviation of the classic TimeAllocationMutator this scenario configures (uniform on
+# +-mutationRange = 1800s has sd 1800/sqrt(3)), i.e. a stochastic best response that explores as widely as the
+# mutator it replaces. Extra args not covered by a knob go through verbatim via ARGS.
 run: input/prepare-config.xml | $(CLASSPATH)
 	$(sc) run --config $<\
+	 --config:plans.inputPlansFile=before-calibration/output/$N-$V-$(SAMPLE).plans-initial.xml.gz\
+	 --config:qsim.flowCapacityFactor=$(SAMPLE_SIZE)\
+	 --config:qsim.storageCapacityFactor=$(SAMPLE_SIZE)\
+	 --config:counts.countsScaleFactor=$(SAMPLE_SIZE)\
+	 --config:simwrapper.sampleSize=$(SAMPLE_SIZE)\
+	 --runId $N-$V-$(SAMPLE)\
+	 --output output/$N-$V-$(SAMPLE)\
 	 --config:controller.lastIteration=$(LAST_IT)\
 	 --simulation-period-in-days=$(SIM_PERIOD_DAYS)\
-	 $(ARGS)
-
-# Run at 10pct sample.
-run-10pct: input/prepare-config.xml | $(CLASSPATH)
-	$(sc) run --config $<\
-	 --config:plans.inputPlansFile=before-calibration/output/$N-$V-10pct.plans-initial.xml.gz\
-	 --config:qsim.flowCapacityFactor=0.1\
-	 --config:qsim.storageCapacityFactor=0.1\
-	 --config:counts.countsScaleFactor=0.1\
-	 --config:simwrapper.sampleSize=0.1\
-	 --runId $N-$V-10pct\
-	 --output output/$N-$V-10pct\
-	 --config:controller.lastIteration=$(LAST_IT)\
-	 --simulation-period-in-days=$(SIM_PERIOD_DAYS)\
-	 $(ARGS)
-
-# Run at 1pct sample.
-run-1pct: input/prepare-config.xml | $(CLASSPATH)
-	$(sc) run --config $<\
-	 --config:plans.inputPlansFile=before-calibration/output/$N-$V-1pct.plans-initial.xml.gz\
-	 --config:qsim.flowCapacityFactor=0.01\
-	 --config:qsim.storageCapacityFactor=0.01\
-	 --config:counts.countsScaleFactor=0.01\
-	 --config:simwrapper.sampleSize=0.01\
-	 --runId $N-$V-1pct\
-	 --output output/$N-$V-1pct\
-	 --config:controller.lastIteration=$(LAST_IT)\
-	 --simulation-period-in-days=$(SIM_PERIOD_DAYS)\
-	 $(ARGS)
-
-run-1pct-yestimes: input/prepare-config.xml | $(CLASSPATH)
-	$(sc) run --config $<\
-	 --config:plans.inputPlansFile=before-calibration/output/$N-$V-1pct.plans-initial.xml.gz\
-	 --config:qsim.flowCapacityFactor=0.01\
-	 --config:qsim.storageCapacityFactor=0.01\
-	 --config:counts.countsScaleFactor=0.01\
-	 --config:simwrapper.sampleSize=0.01\
-	 --runId $N-$V-1pct-yestimes\
-	 --output output/$N-$V-1pct-yestimes\
-	 --with-opening-times=true\
-	 --config:controller.lastIteration=$(LAST_IT)\
-	 --simulation-period-in-days=$(SIM_PERIOD_DAYS)\
-	 $(ARGS)
-
-run-1pct-notimes: input/prepare-config.xml | $(CLASSPATH)
-	$(sc) run --config $<\
-	 --config:plans.inputPlansFile=before-calibration/output/$N-$V-1pct.plans-initial.xml.gz\
-	 --config:qsim.flowCapacityFactor=0.01\
-	 --config:qsim.storageCapacityFactor=0.01\
-	 --config:counts.countsScaleFactor=0.01\
-	 --config:simwrapper.sampleSize=0.01\
-	 --runId $N-$V-1pct-notimes\
-	 --output output/$N-$V-1pct-notimes\
-	 --with-opening-times=false\
-	 --config:controller.lastIteration=$(LAST_IT)\
-	 --simulation-period-in-days=$(SIM_PERIOD_DAYS)\
+	 --with-opening-times=$(WITH_OPENING_TIMES)\
+	 --schedule-delay-scoring=$(SCHEDULE_DELAY_SCORING)\
 	 --best-response-scheduling=$(BEST_RESPONSE)\
+	 --best-response-sigma=$(BR_SIGMA)\
 	 --dirichlet-sampling=$(DIRICHLET)\
 	 --dirichlet-inverse-temperature=$(DIRICHLET_INV_TEMP)\
 	 --config:global.numberOfThreads=$(THREADS)\
@@ -458,86 +448,27 @@ run-1pct-notimes: input/prepare-config.xml | $(CLASSPATH)
 	 $(CONFIG)\
 	 $(ARGS)
 
-# Like run-1pct-notimes, but with the schedule-delay corridor armed in the scoring: per-activity soft anchors at the
-# stamped initial (surveyed) start/end times (late start at the lateArrival rate, early end at the performing rate),
-# replacing made-up opening times as the positional anchor. Replanning is the plain random mutator, as in notimes.
-run-1pct-notimes-penalties: input/prepare-config.xml | $(CLASSPATH)
+# Re-score the output plans of a finished run without simulating any replanning (0 iterations), into a separate
+# output directory. A diagnostic, not part of the pipeline: it reads whatever `make run` last wrote for SAMPLE.
+run-continue: input/prepare-config.xml | $(CLASSPATH)
 	$(sc) run --config $<\
-	 --config:plans.inputPlansFile=before-calibration/output/$N-$V-1pct.plans-initial.xml.gz\
-	 --config:qsim.flowCapacityFactor=0.01\
-	 --config:qsim.storageCapacityFactor=0.01\
-	 --config:counts.countsScaleFactor=0.01\
-	 --config:simwrapper.sampleSize=0.01\
-	 --runId $N-$V-1pct-notimes-penalties\
-	 --output output/$N-$V-1pct-notimes-penalties\
-	 --with-opening-times=false\
-	 --schedule-delay-scoring\
-	 --config:controller.lastIteration=$(LAST_IT)\
-	 --simulation-period-in-days=$(SIM_PERIOD_DAYS)\
-	 $(ARGS)
-
-run-1pct-bestresponse: input/prepare-config.xml | $(CLASSPATH)
-	$(sc) run --config $<\
-	 --config:plans.inputPlansFile=before-calibration/output/$N-$V-1pct.plans-initial.xml.gz\
-	 --config:qsim.flowCapacityFactor=0.01\
-	 --config:qsim.storageCapacityFactor=0.01\
-	 --config:counts.countsScaleFactor=0.01\
-	 --config:simwrapper.sampleSize=0.01\
-	 --runId $N-$V-1pct-bestresponse\
-	 --output output/$N-$V-1pct-bestresponse\
-	 --with-opening-times=false\
-	 --best-response-scheduling\
-	 --config:controller.lastIteration=$(LAST_IT)\
-	 --simulation-period-in-days=$(SIM_PERIOD_DAYS)\
-	 $(ARGS)
-
- run-continue: input/prepare-config.xml | $(CLASSPATH)
-	$(sc) run --config $<\
-	 --config:plans.inputPlansFile=../output/dresden-v1.1-1pct-notimes/$N-$V-1pct-notimes.output_plans.xml.zst\
-	 --config:qsim.flowCapacityFactor=0.01\
-	 --config:qsim.storageCapacityFactor=0.01\
-	 --config:counts.countsScaleFactor=0.01\
-	 --config:simwrapper.sampleSize=0.01\
-	 --runId $N-$V-1pct-continued\
-	 --output output/$N-$V-1pct-continued\
-	 --with-opening-times=false\
+	 --config:plans.inputPlansFile=../output/$N-$V-$(SAMPLE)/$N-$V-$(SAMPLE).output_plans.xml.zst\
+	 --config:qsim.flowCapacityFactor=$(SAMPLE_SIZE)\
+	 --config:qsim.storageCapacityFactor=$(SAMPLE_SIZE)\
+	 --config:counts.countsScaleFactor=$(SAMPLE_SIZE)\
+	 --config:simwrapper.sampleSize=$(SAMPLE_SIZE)\
+	 --runId $N-$V-$(SAMPLE)-continued\
+	 --output output/$N-$V-$(SAMPLE)-continued\
+	 --with-opening-times=$(WITH_OPENING_TIMES)\
 	 --config:controller.lastIteration=0\
 	 --simulation-period-in-days=$(SIM_PERIOD_DAYS)\
 	 $(ARGS)
 
-
-# Stochastic best response (random-utility sampling): like run-1pct-bestresponse, but each target end time is
-# perturbed per replanning with N(0, sigma). Sigma mimics the spread of the classic TimeAllocationMutator this
-# scenario configures: uniform on +-mutationRange (1800s) has standard deviation 1800/sqrt(3) ~ 1040s. Exploration
-# happens around the stable stamped initialEndTime anchors, so the perturbation does not accumulate into a random
-# walk across replannings.
-BR_SIGMA ?= 1040
-run-1pct-bestresponse-sigma: input/prepare-config.xml | $(CLASSPATH)
-	$(sc) run --config $<\
-	 --config:plans.inputPlansFile=before-calibration/output/$N-$V-1pct.plans-initial.xml.gz\
-	 --config:qsim.flowCapacityFactor=0.01\
-	 --config:qsim.storageCapacityFactor=0.01\
-	 --config:counts.countsScaleFactor=0.01\
-	 --config:simwrapper.sampleSize=0.01\
-	 --runId $N-$V-1pct-bestresponse-sigma\
-	 --output output/$N-$V-1pct-bestresponse-sigma\
-	 --with-opening-times=false\
-	 --best-response-scheduling\
-	 --best-response-sigma=$(BR_SIGMA)\
-	 --config:controller.lastIteration=$(LAST_IT)\
-	 --simulation-period-in-days=$(SIM_PERIOD_DAYS)\
-	 $(ARGS)
-
-# Backport: the VTTS analysis now runs automatically as a post-processing step of every DresdenModel run (see
-# DresdenModel.preparePostProcessing), so current runs need no separate target. This one stays to analyse the old
-# dresden-v1.1-1pct run, which predates that wiring (and predates SIM_PERIOD_DAYS: it was simulated with the 24:00
-# default, so it keeps its own literal 1.0 rather than following the constant).
-vtts-v1.1: | $(CLASSPATH)
-	$(sc) analysis run-vtts-analysis --path output/dresden-v1.1-1pct --runId dresden-v1.1-1pct --simulation-period-in-days 1.0
-
+# The VTTS analysis runs automatically as a post-processing step of every DresdenModel run (see
+# DresdenModel.preparePostProcessing), so this only exists to re-run it over an existing output directory.
 vtts: | $(CLASSPATH)
-	$(sc) analysis run-vtts-analysis --path output/dresden-v1.1-1pct-notimes --runId dresden-v1.1-1pct-notimes --simulation-period-in-days $(SIM_PERIOD_DAYS)
+	$(sc) analysis run-vtts-analysis --path output/$N-$V-$(SAMPLE) --runId $N-$V-$(SAMPLE) --simulation-period-in-days $(SIM_PERIOD_DAYS)
 
-# Run the best-response optimizer standalone over the initial 1pct plans and report what it changes.
+# Run the best-response optimizer standalone over the initial plans and report what it changes.
 best-response-report: | $(CLASSPATH)
-	$(sc) analysis best-response-report input/before-calibration/output/$N-$V-1pct.plans-initial.xml.gz --simulation-period-in-days $(SIM_PERIOD_DAYS)
+	$(sc) analysis best-response-report input/before-calibration/output/$N-$V-$(SAMPLE).plans-initial.xml.gz --simulation-period-in-days $(SIM_PERIOD_DAYS)
