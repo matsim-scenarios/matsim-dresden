@@ -271,9 +271,9 @@ public class DresdenModel extends MATSimApplication {
 //		anchor times (initialStartTime/initialEndTime, stamped in prepareScenario) act as latestStartTime /
 //		earliestEndTime -- the late side keeps the configured lateArrival (-18/h), the early side gets the performing
 //		rate as its opportunity cost (ending earlier than the anchored schedule means waiting/untyped time instead of
-//		performing). The on/off gate lives inside DresdenActivityScoring (via DresdenScoringConfigGroup), NOT in the
-//		slopes: zeroing lateArrival would also soften the stuck-agent penalty (abortedPlanScore derives from it) and
-//		the best-response scheduler's slopes.
+//		performing). The on/off gate is whether DresdenScoringFunctionFactory adds the DresdenActivityScoring corridor
+//		terms at all (via DresdenScoringConfigGroup), NOT in the slopes: zeroing lateArrival would also soften the
+//		stuck-agent penalty (abortedPlanScore derives from it) and the best-response scheduler's slopes.
 		DresdenScoringConfigGroup dresdenScoring = ConfigUtils.addOrGetModule(config, DresdenScoringConfigGroup.class);
 		dresdenScoring.setScheduleDelayScoring(scheduleDelayScoring);
 		dresdenScoring.setAllowConfigTypicalDurations(allowConfigTypicalDurations);

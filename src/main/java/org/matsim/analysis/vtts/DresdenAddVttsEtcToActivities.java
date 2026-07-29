@@ -61,9 +61,10 @@ import static tech.tablesaw.aggregate.AggregateFunctions.*;
 
 /**
  * Dresden-local copy of {@code org.matsim.application.analysis.population.AddVttsEtcToActivities} that drives the
- * local {@link VTTSHandler}, which in turn scores activities with {@link org.matsim.scoring.DresdenActivityScoring}
- * (per-activity typical duration) instead of the stock Charypar-Nagel scoring. Behaviour is otherwise identical to
- * the library command, including the compression-agnostic input file resolution.
+ * local {@link VTTSHandler}, which in turn scores activities against their per-activity typical duration (core
+ * Charypar-Nagel scoring with an {@code ActivityAttributeTypicalDurationCalculator}, plus the
+ * {@link org.matsim.scoring.DresdenActivityScoring} corridor terms when the analyzed run had them armed). Behaviour
+ * is otherwise identical to the library command, including the compression-agnostic input file resolution.
  */
 @CommandLine.Command(name = "run-vtts-analysis", description = "")
 public class DresdenAddVttsEtcToActivities implements MATSimAppCommand {

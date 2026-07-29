@@ -23,39 +23,47 @@ import org.apache.logging.log4j.Logger;
 import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.population.Activity;
 import org.matsim.api.core.v01.population.Person;
-import org.matsim.core.config.groups.ScoringConfigGroup;
 import org.matsim.core.gbl.Gbl;
 import org.matsim.core.population.PopulationUtils;
 import org.matsim.core.scoring.SumScoringFunction;
+import org.matsim.core.scoring.functions.ActivityAttributeTypicalDurationCalculator;
 import org.matsim.core.scoring.functions.ActivityUtilityParameters;
+import org.matsim.core.scoring.functions.CharyparNagelActivityScoring;
 import org.matsim.core.scoring.functions.ScoringParameters;
 import org.matsim.scoring.DresdenActivityScoring;
 
 /**
  * Local copy of {@code org.matsim.application.analysis.population.MarginalSumScoringFunction} (author: ikaddoura),
- * adapted for the Dresden scenario: the activity term uses {@link DresdenActivityScoring} instead of the stock
- * {@code CharyparNagelActivityScoring}, so the marginal utility of activity time is computed from the per-activity
- * typical duration (attribute {@code typicalDuration}) exactly as the run's scoring does. When an activity carries
- * no such attribute, {@link DresdenActivityScoring} falls back to the activity type's config typical duration, so
- * this behaves like the original in that case.
+ * adapted for the Dresden scenario: the activity term is the stock {@link CharyparNagelActivityScoring} with an
+ * {@link ActivityAttributeTypicalDurationCalculator}, so the marginal utility of activity time is computed from the
+ * per-activity typical duration (attribute {@code typicalDuration}) exactly as the run's scoring does; when the
+ * schedule-delay corridor was armed in the analyzed run, {@link DresdenActivityScoring} adds the corridor terms the
+ * agents experienced. When an activity carries no typicalDuration attribute, the scoring falls back to the activity
+ * type's config typical duration, so this behaves like the original in that case.
  *
  * @author ikaddoura (original); adapted for per-activity typical duration
  */
 public final class MarginalSumScoringFunction {
 	private final static Logger log = LogManager.getLogger(MarginalSumScoringFunction.class);
 	private final ScoringParameters params;
+	private final boolean scheduleDelayScoring;
 
-	SumScoringFunction.ActivityScoring activityScoringA;
-	SumScoringFunction.ActivityScoring activityScoringB;
-
-	public MarginalSumScoringFunction(ScoringParameters params, ScoringConfigGroup.ScoringParameterSet scoringParameterSet,
-									  boolean scheduleDelayScoring) {
+	public MarginalSumScoringFunction(ScoringParameters params, boolean scheduleDelayScoring) {
 		this.params = params;
-		// no plan cursor: the caller hands in activities that carry their attributes directly; the schedule-delay
-		// corridor is armed iff the analyzed run scored with it armed, so the marginals include the same
-		// schedule-delay components the agents experienced.
-		activityScoringA = new DresdenActivityScoring(params, scoringParameterSet, null, scheduleDelayScoring);
-		activityScoringB = new DresdenActivityScoring(params, scoringParameterSet, null, scheduleDelayScoring);
+		this.scheduleDelayScoring = scheduleDelayScoring;
+	}
+
+	/**
+	 * The activity scoring the marginals are computed with, freshly per computation: no plan cursor (person null) --
+	 * the caller hands in activities that carry their attributes directly.
+	 */
+	private SumScoringFunction activityScoring() {
+		SumScoringFunction sumScoringFunction = new SumScoringFunction();
+		sumScoringFunction.addScoringFunction(new CharyparNagelActivityScoring(params, new ActivityAttributeTypicalDurationCalculator(), null));
+		if (scheduleDelayScoring) {
+			sumScoringFunction.addScoringFunction(new DresdenActivityScoring(params, null));
+		}
+		return sumScoringFunction;
 	}
 
 	private static int deltaScoreZeroWrnCnt = 0;
@@ -84,12 +92,9 @@ public final class MarginalSumScoringFunction {
 	 */
 	public final Scores getNormalActivityDelayDisutility( Id<Person> personId, Activity activity, double earlier ) {
 
-		SumScoringFunction sumScoringNormal = new SumScoringFunction() ;
-		sumScoringNormal.addScoringFunction(activityScoringA);
-		// yyyyyy it is not clear to me why this does not add the same scoring fct contribution multiple times.  kai, dec'25
+		SumScoringFunction sumScoringNormal = activityScoring();
 
-		SumScoringFunction sumScoringEarly = new SumScoringFunction() ;
-		sumScoringEarly.addScoringFunction(activityScoringB);
+		SumScoringFunction sumScoringEarly = activityScoring();
 
 		if (activity.getStartTime().seconds() != Double.NEGATIVE_INFINITY && activity.getEndTime().seconds() != Double.NEGATIVE_INFINITY) {
         	// activity is not the first and not the last activity
@@ -146,11 +151,9 @@ public final class MarginalSumScoringFunction {
 
 	public final Scores getOvernightActivityDelayDisutility(Activity activityMorning, Activity activityEveningNormal, double earlier) {
 
-		SumScoringFunction normalScoring = new SumScoringFunction() ;
-		normalScoring.addScoringFunction(activityScoringA);
+		SumScoringFunction normalScoring = activityScoring();
 
-		SumScoringFunction earlyScoring = new SumScoringFunction() ;
-		earlyScoring.addScoringFunction(activityScoringB);
+		SumScoringFunction earlyScoring = activityScoring();
 
 	//	log.info("activityMorning: " + activityMorning.toString());
 	//	log.info("activityEveningNormal: " + activityEveningNormal.toString());

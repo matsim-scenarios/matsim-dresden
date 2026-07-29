@@ -62,14 +62,15 @@ import java.util.*;
  * <p>
  * Two Dresden adaptations:
  * <ul>
- *   <li>the {@link MarginalSumScoringFunction} used here scores activities with
- *   {@link org.matsim.scoring.DresdenActivityScoring};</li>
+ *   <li>the {@link MarginalSumScoringFunction} used here scores activities per-activity-parameterized (core
+ *   {@code CharyparNagelActivityScoring} with an {@code ActivityAttributeTypicalDurationCalculator}, plus
+ *   {@link org.matsim.scoring.DresdenActivityScoring}'s corridor terms when the analyzed run had them armed);</li>
  *   <li>each synthetic activity built from the events is stamped with the planned per-activity typical duration the
  *   run used ({@link EncodeTypicalDuration} inserts it into the initial population and it is threaded, never updated,
  *   through the iterations into the output population). We read it back from the output population, matched by
- *   selected-plan activity order, so {@code DresdenActivityScoring} scores against the same typical duration the run
- *   used. When it is absent (e.g. freight/commercial activities), the activity is not stamped and
- *   {@code DresdenActivityScoring} falls back to the activity type's config value.</li>
+ *   selected-plan activity order, so the scoring here uses the same typical duration the run used. When it is absent
+ *   (e.g. freight/commercial activities), the activity is not stamped and the scoring falls back to the activity
+ *   type's config value.</li>
  * </ul>
  *
  * @author ikaddoura (original); adapted for per-activity typical duration
@@ -372,7 +373,7 @@ public final class VTTSHandler implements ActivityStartEventHandler, ActivityEnd
 			final ScoringConfigGroup.ScoringParameterSet scoringParameterSet = scoringConfigGroup.getScoringParameters( subpop );
 			final MarginalSumScoringFunction marginalSumScoringFunction = new MarginalSumScoringFunction(
 							new ScoringParameters.Builder( scoringConfigGroup, scoringParameterSet, scenario.getConfig().scenario() ).build(),
-							scoringParameterSet, scheduleDelayScoring );
+							scheduleDelayScoring );
 			// yyyy it would (presumably) be much better to pull the scoring function from injection.  Rather than self-constructing the
 			// scoring function here, where we need to rely on having the same ("default") scoring function in the model implementation.
 			// Which we almost surely do not have (e.g. bicycle scoring addition, bus penalty addition, ...).  kai, gr, jul'25
@@ -382,10 +383,10 @@ public final class VTTSHandler implements ActivityStartEventHandler, ActivityEnd
 			// The interval the performing utility is integrated over, i.e. the duration in the scoring's own terms:
 			// arrival to departure for a middle activity, arrival to the day end for the last one. Drives both the
 			// reported actDur_h and the scoring-input classification, so those cannot disagree about which interval
-			// they describe. Caveat for both consumers: DresdenActivityScoring additionally clips this interval to the
-			// activity type's opening hours (and collapses it when the type is closed throughout), which is not
-			// reproduced here -- exact as long as no opening/closing times are configured, as in this scenario, and
-			// the place to extend if they ever are.
+			// they describe. Caveat for both consumers: the Charypar-Nagel activity scoring additionally clips this
+			// interval to the activity type's opening hours (and collapses it when the type is closed throughout),
+			// which is not reproduced here -- exact as long as no opening/closing times are configured, as in this
+			// scenario, and the place to extend if they ever are.
 			double scoringWindow_s;
 			MarginalSumScoringFunction.Scores scores = null;
 			simData.trips.getLast().afterDayEnd = false;
@@ -402,7 +403,7 @@ public final class VTTSHandler implements ActivityStartEventHandler, ActivityEnd
 
 				// Dresden: both activities are matched to the plan by position -- the morning one is activity index 0,
 				// the evening one the index the realized sequence has reached, exactly like the middle-activity branch
-				// below and exactly like the plan cursor the run's own DresdenActivityScoring walks. Do NOT reach for
+				// below and exactly like the plan alignment the run's own activity scoring walks. Do NOT reach for
 				// the plan's terminal slot instead: an agent is scored here whenever the simulation ended while it was
 				// at an activity, which is not the same as it being at its last activity. One that stalled mid-plan
 				// would otherwise be scored against the typical duration of an activity it never reached (silently,
@@ -531,7 +532,7 @@ public final class VTTSHandler implements ActivityStartEventHandler, ActivityEnd
 
 		simData.trips.getLast().actType = simData.currentActivityType;
 		// Report the per-activity typical duration actually used in the scoring; fall back to the activity type's
-		// config typical duration when the activity carried none (so DresdenActivityScoring used the config value too).
+		// config typical duration when the activity carried none (so the scoring used the config value too).
 		double configTypicalDuration_s = scoringConfigGroup.getActivityParams( simData.currentActivityType ).getTypicalDuration().seconds();
 		simData.trips.getLast().actTypDur_h = ( typicalDurationUsed_s > 0 ? typicalDurationUsed_s : configTypicalDuration_s ) / 3600. ;
 
@@ -539,8 +540,8 @@ public final class VTTSHandler implements ActivityStartEventHandler, ActivityEnd
 
 	/**
 	 * Put the typical duration (seconds) onto the activity, unless it is not a positive number (NaN when the run did
-	 * not assign one), in which case the activity is left unstamped and DresdenActivityScoring falls back to the
-	 * activity type's config typical duration.
+	 * not assign one), in which case the activity is left unstamped and the scoring falls back to the activity
+	 * type's config typical duration.
 	 */
 	private static void stampTypicalDuration( Activity activity, double typicalDuration_s ) {
 		if ( typicalDuration_s > 0 ) {
@@ -567,10 +568,11 @@ public final class VTTSHandler implements ActivityStartEventHandler, ActivityEnd
 
 	/**
 	 * Whether a planned typical duration makes the scoring input non-computable for the given activity type: the
-	 * Charypar-Nagel zero-utility duration -- computed exactly as {@link org.matsim.scoring.DresdenActivityScoring}
-	 * does -- underflows to zero for a pathologically small typical duration, after which the logarithmic performing
-	 * utility is undefined ({@code log(duration/0)}). A non-positive/NaN value means no per-activity typical duration
-	 * was stamped, so the activity is scored with its (normal-sized) config typical duration and does not underflow.
+	 * Charypar-Nagel zero-utility duration -- computed exactly as
+	 * {@link org.matsim.core.scoring.functions.ActivityUtilityParameters} does -- underflows to zero for a
+	 * pathologically small typical duration, after which the logarithmic performing utility is undefined
+	 * ({@code log(duration/0)}). A non-positive/NaN value means no per-activity typical duration was stamped, so the
+	 * activity is scored with its (normal-sized) config typical duration and does not underflow.
 	 */
 	private static boolean isUnderflowingTypicalDuration( ScoringConfigGroup.ScoringParameterSet scoringParameterSet, String activityType, double typicalDuration_s ) {
 		if ( !(typicalDuration_s > 0) ) {
@@ -579,7 +581,7 @@ public final class VTTSHandler implements ActivityStartEventHandler, ActivityEnd
 		return !(zeroUtilityDuration_h( scoringParameterSet, activityType, typicalDuration_s ) > 0);
 	}
 
-	/** The Charypar-Nagel zero-utility duration (hours), computed exactly as {@link org.matsim.scoring.DresdenActivityScoring} does. */
+	/** The Charypar-Nagel zero-utility duration (hours), computed exactly as {@link org.matsim.core.scoring.functions.ActivityUtilityParameters} does. */
 	private static double zeroUtilityDuration_h( ScoringConfigGroup.ScoringParameterSet scoringParameterSet, String activityType, double typicalDuration_s ) {
 		ScoringConfigGroup.ActivityParams activityParams = scoringParameterSet.getActivityParams( activityType );
 		ActivityUtilityParameters.ZeroUtilityComputation computation = switch ( activityParams.getTypicalDurationScoreComputation() ) {

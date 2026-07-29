@@ -3,9 +3,10 @@ package org.matsim.scoring;
 import org.matsim.core.config.ReflectiveConfigGroup;
 
 /**
- * Config for the Dresden scoring extensions in {@link DresdenActivityScoring}, so the switch state is recorded in the
- * output config. Currently only the schedule-delay corridor switch; see {@code DresdenModel}'s
- * {@code --schedule-delay-scoring}.
+ * Config for the Dresden scoring extensions (see {@link DresdenScoringFunctionFactory}), so the switch state is
+ * recorded in the output config: whether the schedule-delay corridor ({@link DresdenActivityScoring}) is added, and
+ * whether activities without a typicalDuration attribute are tolerated; see {@code DresdenModel}'s
+ * {@code --schedule-delay-scoring} and {@code --allow-config-typical-durations}.
  */
 public final class DresdenScoringConfigGroup extends ReflectiveConfigGroup {
 

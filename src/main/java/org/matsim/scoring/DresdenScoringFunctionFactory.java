@@ -10,25 +10,29 @@ import org.matsim.core.population.PopulationUtils;
 import org.matsim.core.scoring.ScoringFunction;
 import org.matsim.core.scoring.ScoringFunctionFactory;
 import org.matsim.core.scoring.SumScoringFunction;
+import org.matsim.core.scoring.functions.ActivityAttributeTypicalDurationCalculator;
+import org.matsim.core.scoring.functions.CharyparNagelActivityScoring;
 import org.matsim.core.scoring.functions.CharyparNagelAgentStuckScoring;
 import org.matsim.core.scoring.functions.CharyparNagelLegScoring;
 import org.matsim.core.scoring.functions.CharyparNagelMoneyScoring;
 import org.matsim.core.scoring.functions.ScoringParameters;
 import org.matsim.core.scoring.functions.ScoringParametersForPerson;
 import org.matsim.core.scoring.functions.SubpopulationScoringParameters;
+import org.matsim.core.scoring.functions.TypicalDurationCalculator;
 
 /**
- * A copy of {@link org.matsim.core.scoring.functions.CharyparNagelScoringFunctionFactory} that swaps the
- * activity term for {@link DresdenActivityScoring}, which reads the per-activity typical duration from the
- * {@value org.matsim.prepare.EncodeTypicalDuration#TYPICAL_DURATION} attribute when present. The leg, money and
- * agent-stuck terms are the unchanged Charypar-Nagel ones.
+ * A copy of {@link org.matsim.core.scoring.functions.CharyparNagelScoringFunctionFactory} (which is {@code final})
+ * that enables the per-activity typical duration: the activity term is the stock
+ * {@link CharyparNagelActivityScoring}, constructed with an {@link ActivityAttributeTypicalDurationCalculator} (each
+ * activity is scored against its {@value org.matsim.prepare.EncodeTypicalDuration#TYPICAL_DURATION} attribute, see
+ * {@link org.matsim.prepare.EncodeTypicalDuration}) and with the person, so the attributes are read from the selected
+ * plan's main activities -- the activities handed to the scoring by the events machinery carry none, and the plan is
+ * resolved lazily because scoring functions are created BEFORE replanning.
  * <p>
- * {@link DresdenActivityScoring} falls back to the classic type-based typical duration when an activity has no
- * such attribute, so it is used for every subpopulation: activities carrying the attribute (the "person"
- * population) are scored against their plan-derived typical duration, everything else (freight/commercial) is
- * scored exactly as before.
- * <p>
- * The base factory is {@code final}, so this is a copy rather than a subclass.
+ * Person-subpopulation activities MUST carry survey-derived typical durations (the experiment's premise), enforced by
+ * {@link RequiredTypicalDurationCalculator}; everything else (freight/commercial) falls back to the config typical
+ * durations by design. When the schedule-delay corridor is armed, {@link DresdenActivityScoring} adds the corridor
+ * terms on top. The leg, money and agent-stuck terms are the unchanged Charypar-Nagel ones.
  */
 public final class DresdenScoringFunctionFactory implements ScoringFunctionFactory {
 
@@ -52,20 +56,19 @@ public final class DresdenScoringFunctionFactory implements ScoringFunctionFacto
 	public ScoringFunction createNewScoringFunction(Person person) {
 
 		final ScoringParameters parameters = params.getScoringParameters(person);
-
-		SumScoringFunction sumScoringFunction = new SumScoringFunction();
-		// The person's executed plan is the attribute source: the activities the events machinery hands to the scoring
-		// carry no attributes. The person (not the plan) is passed because scoring functions are created BEFORE
-		// replanning; DresdenActivityScoring resolves the selected plan lazily at the first scoring callback.
-		// Person-subpopulation activities MUST carry survey-derived typical durations (the experiment's premise);
-		// freight/commercial score by config typicals by design.
 		DresdenScoringConfigGroup dresdenScoring = ConfigUtils.addOrGetModule(config, DresdenScoringConfigGroup.class);
 		String subpopulation = PopulationUtils.getSubpopulation(person);
-		sumScoringFunction.addScoringFunction(new DresdenActivityScoring(parameters,
-			config.scoring().getScoringParameters(subpopulation),
-			person,
-			dresdenScoring.isScheduleDelayScoring(),
-			"person".equals(subpopulation) && !dresdenScoring.isAllowConfigTypicalDurations()));
+
+		TypicalDurationCalculator typicalDurationCalculator =
+			"person".equals(subpopulation) && !dresdenScoring.isAllowConfigTypicalDurations()
+				? new RequiredTypicalDurationCalculator(person)
+				: new ActivityAttributeTypicalDurationCalculator();
+
+		SumScoringFunction sumScoringFunction = new SumScoringFunction();
+		sumScoringFunction.addScoringFunction(new CharyparNagelActivityScoring(parameters, typicalDurationCalculator, person));
+		if (dresdenScoring.isScheduleDelayScoring()) {
+			sumScoringFunction.addScoringFunction(new DresdenActivityScoring(parameters, person));
+		}
 		sumScoringFunction.addScoringFunction(new CharyparNagelLegScoring(parameters, config.transit().getTransitModes()));
 		sumScoringFunction.addScoringFunction(new CharyparNagelMoneyScoring(parameters));
 		sumScoringFunction.addScoringFunction(new CharyparNagelAgentStuckScoring(parameters));
