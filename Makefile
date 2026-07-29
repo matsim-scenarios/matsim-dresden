@@ -42,6 +42,14 @@ ifeq ($(SAMPLE_SIZE),)
 $(error SAMPLE must be one of 1pct 10pct 25pct 100pct, got '$(SAMPLE)')
 endif
 
+# The counts scale factor is the INVERSE of the sample size (sim counts are multiplied UP to reality);
+# MATSim aborts at startup if it does not match 1/flowCapacityFactor. Again a lookup, since make has no arithmetic.
+COUNTS_SCALE_1pct := 100
+COUNTS_SCALE_10pct := 10
+COUNTS_SCALE_25pct := 4
+COUNTS_SCALE_100pct := 1.0
+COUNTS_SCALE := $(COUNTS_SCALE_$(SAMPLE))
+
 # Last iteration for the run target. Override on the command line, e.g. `make run LAST_IT=1`.
 LAST_IT ?= 500
 
@@ -429,7 +437,7 @@ run: input/prepare-config.xml | $(CLASSPATH)
 	 --config:plans.inputPlansFile=before-calibration/output/$N-$V-$(SAMPLE).plans-initial.xml.gz\
 	 --config:qsim.flowCapacityFactor=$(SAMPLE_SIZE)\
 	 --config:qsim.storageCapacityFactor=$(SAMPLE_SIZE)\
-	 --config:counts.countsScaleFactor=$(SAMPLE_SIZE)\
+	 --config:counts.countsScaleFactor=$(COUNTS_SCALE)\
 	 --config:simwrapper.sampleSize=$(SAMPLE_SIZE)\
 	 --runId $N-$V-$(SAMPLE)\
 	 --output output/$N-$V-$(SAMPLE)\
@@ -455,7 +463,7 @@ run-continue: input/prepare-config.xml | $(CLASSPATH)
 	 --config:plans.inputPlansFile=../output/$N-$V-$(SAMPLE)/$N-$V-$(SAMPLE).output_plans.xml.zst\
 	 --config:qsim.flowCapacityFactor=$(SAMPLE_SIZE)\
 	 --config:qsim.storageCapacityFactor=$(SAMPLE_SIZE)\
-	 --config:counts.countsScaleFactor=$(SAMPLE_SIZE)\
+	 --config:counts.countsScaleFactor=$(COUNTS_SCALE)\
 	 --config:simwrapper.sampleSize=$(SAMPLE_SIZE)\
 	 --runId $N-$V-$(SAMPLE)-continued\
 	 --output output/$N-$V-$(SAMPLE)-continued\

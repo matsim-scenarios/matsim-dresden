@@ -39,6 +39,10 @@ class RunIntegrationTest {
 	void runScenario() {
 		Config config = ConfigUtils.loadConfig(String.format("input/%s/dresden-%s-IT.config.xml", DresdenModel.VERSION, DresdenModel.VERSION));
 
+		// the v1.0 IT fixture uses duration-binned activity types (home_39000, ...); register their params (see
+		// ReplanningAttributeInvariantsTest, which does the same) -- DresdenModel itself only registers the untagged types
+		org.matsim.contrib.vsp.scenario.SnzActivities.addScoringParams(config);
+
 //		config.controller().setWritePlansInterval( 0 );
 //		config.controller().setWritePlansUntilIteration( -1 );
 
