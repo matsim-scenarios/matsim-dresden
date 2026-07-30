@@ -95,17 +95,6 @@ public final class DresdenUtils {
 
 		for (VehicleType type : scenario.getVehicles().getVehicleTypes().values()) {
 			EngineInformation engineInformation = type.getEngineInformation();
-			if (VehicleUtils.getHbefaTechnology(engineInformation).equals("petrol")) {
-//				some veh types use technology "petrol" which does not exist. it either is petrol (4S) or petrol (2S). going for 4S here
-				VehicleUtils.setHbefaTechnology(engineInformation, HbefaTechnology.PETROL_4S.id);
-				log.warn("For vehicle type {} HbefaTechnology was set to 'petrol'. This is not a possible value. It was changed to {}." +
-					"Please check class HbefaTechnology for possibles values.", type.getId(), HbefaTechnology.PETROL_4S.id);
-			}
-		}
-
-
-		for (VehicleType type : scenario.getVehicles().getVehicleTypes().values()) {
-			EngineInformation engineInformation = type.getEngineInformation();
 
 //				only set engine information if none are present
 			if (engineInformation.getAttributes().isEmpty()) {
@@ -150,6 +139,8 @@ public final class DresdenUtils {
 			if (VehicleUtils.getHbefaTechnology(engineInformation).equals("petrol")) {
 //				some veh types use technology "petrol" which does not exist. it either is petrol (4S) or petrol (2S). going for 4S here
 				VehicleUtils.setHbefaTechnology(engineInformation, HbefaTechnology.PETROL_4S.id);
+				log.warn("For vehicle type {} HbefaTechnology was set to 'petrol'. This is not a possible value. It was changed to {}." +
+					"Please check class HbefaTechnology for possibles values.", type.getId(), HbefaTechnology.PETROL_4S.id);
 			}
 		}
 
