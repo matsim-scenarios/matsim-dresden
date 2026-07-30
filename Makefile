@@ -156,6 +156,8 @@ NETWORK := $(shared)/before-calibration/output/network.osm.pbf
 	 --subpopulation "longDistanceFreight"\
 	 --output $@
 
+#TODO: create veh types xml file in code; incl. commercial types from RE and longDistanceFreight types from CL
+
 # create facilities for commercial traffic
 # the following 2 steps are typically run on the math cluster by Ricardo Ewert. the steps are here for documentation.
 # the necessary small scale commercial traffic plans file is copied from the cluster into the local directory for further use.
