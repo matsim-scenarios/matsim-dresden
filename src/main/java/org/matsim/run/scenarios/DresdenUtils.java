@@ -1,9 +1,10 @@
 package org.matsim.run.scenarios;
 
 import ch.sbb.matsim.config.SwissRailRaptorConfigGroup;
-import ch.sbb.matsim.config.SwissRailRaptorConfigGroup.IntermodalAccessEgressModeSelection;
 import ch.sbb.matsim.config.SwissRailRaptorConfigGroup.IntermodalAccessEgressParameterSet;
 import com.google.common.collect.Sets;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.matsim.api.core.v01.Scenario;
 import org.matsim.api.core.v01.TransportMode;
 import org.matsim.contrib.emissions.HbefaTechnology;
@@ -11,6 +12,7 @@ import org.matsim.contrib.emissions.HbefaVehicleCategory;
 import org.matsim.contrib.emissions.utils.EmissionsConfigGroup;
 import org.matsim.contrib.emissions.utils.EmissionsConfigGroup.DetailedVsAverageLookupBehavior;
 import org.matsim.contrib.emissions.utils.EmissionsConfigGroup.HbefaTableConsistencyCheckingLevel;
+import org.matsim.contrib.emissions.utils.HbefaUtils;
 import org.matsim.core.config.Config;
 import org.matsim.core.config.ConfigUtils;
 import org.matsim.core.config.groups.ReplanningConfigGroup;
@@ -24,8 +26,8 @@ import java.util.HashSet;
 import java.util.Set;
 
 import static ch.sbb.matsim.config.SwissRailRaptorConfigGroup.IntermodalAccessEgressModeSelection.*;
+import static org.matsim.contrib.common.conventions.vsp.SubpopulationDefaultNames.*;
 import static org.matsim.contrib.vsp.scenario.HbefaDefaultStrings.*;
-import static org.matsim.contrib.vsp.scenario.SubpopulationDefaultNames.*;
 import static org.matsim.run.scenarios.DresdenUtils.SNZPersonAttributeNames.*;
 
 /**
@@ -39,6 +41,7 @@ public final class DresdenUtils {
 	public static final String LONG_DIST_FREIGHT_SUBPOP = "longDistanceFreight";
 
 	private static final String AVERAGE = "average";
+	private static final Logger log = LogManager.getLogger(DresdenUtils.class);
 
 	private DresdenUtils() {
 
@@ -79,12 +82,17 @@ public final class DresdenUtils {
 		eConfig.setAverageWarmEmissionFactorsFile(HBEFA_FILE_WARM_AVERAGE);
 		eConfig.setHbefaTableConsistencyCheckingLevel( HbefaTableConsistencyCheckingLevel.consistent );
 		eConfig.setDetailedVsAverageLookupBehavior( DetailedVsAverageLookupBehavior.tryDetailedThenTechnologyAverageThenAverageTable );
+		eConfig.setEmissionsComputationMethod(EmissionsConfigGroup.EmissionsComputationMethod.StopAndGoFraction);
 	}
 
 	/**
 	 * Prepare vehicle types with necessary HBEFA information for emission analysis.
 	 */
 	public static void prepareVehicleTypesForEmissionAnalysis(Scenario scenario) {
+//		for some of the input vehicle types hbefa emissionConcept and technology are swapped. We have to swap them back.
+//		hbefa4.1 relies on HbefaTechnology for correct emission calculation, not on HbefaEmissionConcept
+		HbefaUtils.checkAndCorrectHbefaTechnologyAndEmissionConcept(scenario);
+
 		for (VehicleType type : scenario.getVehicles().getVehicleTypes().values()) {
 			EngineInformation engineInformation = type.getEngineInformation();
 
@@ -94,7 +102,7 @@ public final class DresdenUtils {
 					case TransportMode.car -> {
 						VehicleUtils.setHbefaVehicleCategory(engineInformation, HbefaVehicleCategory.PASSENGER_CAR.toString());
 //						based on car registrations in germany 2023: 30% petrol, 17% diesel, 30% Hybrid, 18% battery. Thus, average is the choice here.
-						VehicleUtils.setHbefaTechnology(engineInformation, AVERAGE);
+						VehicleUtils.setHbefaTechnology(engineInformation, HbefaTechnology.PETROL_4S.id);
 						VehicleUtils.setHbefaSizeClass(engineInformation, AVERAGE);
 						VehicleUtils.setHbefaEmissionsConcept(engineInformation, AVERAGE);
 					}
@@ -114,13 +122,13 @@ public final class DresdenUtils {
 					}
 					case LIGHT_MODE -> {
 						VehicleUtils.setHbefaVehicleCategory(engineInformation, HbefaVehicleCategory.LIGHT_COMMERCIAL_VEHICLE.toString());
-						VehicleUtils.setHbefaTechnology(engineInformation, "diesel");
+						VehicleUtils.setHbefaTechnology(engineInformation, HbefaTechnology.DIESEL.id);
 						VehicleUtils.setHbefaSizeClass(engineInformation, AVERAGE);
 						VehicleUtils.setHbefaEmissionsConcept(engineInformation, AVERAGE);
 					}
 					case MEDIUM_MODE, HEAVY_MODE -> {
 						VehicleUtils.setHbefaVehicleCategory(engineInformation, HbefaVehicleCategory.HEAVY_GOODS_VEHICLE.toString());
-						VehicleUtils.setHbefaTechnology(engineInformation, "diesel");
+						VehicleUtils.setHbefaTechnology(engineInformation, HbefaTechnology.DIESEL.id);
 						VehicleUtils.setHbefaSizeClass(engineInformation, AVERAGE);
 						VehicleUtils.setHbefaEmissionsConcept(engineInformation, AVERAGE);
 					}
@@ -131,6 +139,8 @@ public final class DresdenUtils {
 			if (VehicleUtils.getHbefaTechnology(engineInformation).equals("petrol")) {
 //				some veh types use technology "petrol" which does not exist. it either is petrol (4S) or petrol (2S). going for 4S here
 				VehicleUtils.setHbefaTechnology(engineInformation, HbefaTechnology.PETROL_4S.id);
+				log.warn("For vehicle type {} HbefaTechnology was set to 'petrol'. This is not a possible value. It was changed to {}." +
+					"Please check class HbefaTechnology for possibles values.", type.getId(), HbefaTechnology.PETROL_4S.id);
 			}
 		}
 
