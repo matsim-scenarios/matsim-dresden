@@ -30,6 +30,7 @@ import org.matsim.contrib.vsp.scenario.Activities;
 import org.matsim.contrib.vsp.scoring.RideScoringParamsFromCarParams;
 import org.matsim.core.config.Config;
 import org.matsim.core.config.ConfigUtils;
+import org.matsim.core.config.groups.PlanInheritanceConfigGroup;
 import org.matsim.core.config.groups.RoutingConfigGroup.AccessEgressType;
 import org.matsim.core.config.groups.ScoringConfigGroup;
 import org.matsim.core.controler.AbstractModule;
@@ -122,6 +123,12 @@ public class DresdenModel extends MATSimApplication {
 		scoringConfig.setPerforming_utils_hr( 6.0 );
 		scoringConfig.setWriteExperiencedPlans(true);
 		scoringConfig.setPathSizeLogitBeta(0.);
+//		write score explanations into person attrs for each person
+		config.scoring().setExplainScores(true);
+
+//		also enable plan inheritance analysis
+		PlanInheritanceConfigGroup planInheritanceConfigGroup = ConfigUtils.addOrGetModule(config, PlanInheritanceConfigGroup.class);
+		planInheritanceConfigGroup.setEnabled(true);
 
 		prepareCommercialTrafficConfig(config);
 
