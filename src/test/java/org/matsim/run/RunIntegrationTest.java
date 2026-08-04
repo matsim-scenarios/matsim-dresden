@@ -8,14 +8,12 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.population.Person;
 import org.matsim.api.core.v01.population.Population;
-import org.matsim.application.ApplicationUtils;
 import org.matsim.application.MATSimApplication;
+import org.matsim.contrib.common.conventions.vsp.SnzActivities;
 import org.matsim.core.config.Config;
 import org.matsim.core.config.ConfigUtils;
 import org.matsim.core.config.groups.FacilitiesConfigGroup;
-import org.matsim.core.config.groups.VspExperimentalConfigGroup;
 import org.matsim.core.config.groups.VspExperimentalConfigGroup.VspDefaultsCheckingLevel;
-import org.matsim.core.controler.Controler;
 import org.matsim.core.events.EventsUtils;
 import org.matsim.core.population.PopulationUtils;
 import org.matsim.run.scenarios.DresdenModel;
@@ -38,6 +36,10 @@ class RunIntegrationTest {
 	@Test
 	void runScenario() {
 		Config config = ConfigUtils.loadConfig(String.format("input/%s/dresden-%s-IT.config.xml", DresdenModel.VERSION, DresdenModel.VERSION));
+
+		// the v1.0 IT fixture uses duration-binned activity types (home_39000, ...); register their params (see
+		// ReplanningAttributeInvariantsTest, which does the same) -- DresdenModel itself only registers the untagged types
+		SnzActivities.addScoringParams(config);
 
 //		config.controller().setWritePlansInterval( 0 );
 //		config.controller().setWritePlansUntilIteration( -1 );
@@ -65,6 +67,7 @@ class RunIntegrationTest {
 //			"--config:controller.overwriteFiles=deleteDirectoryIfExists",
 			"--config:global.numberOfThreads", "2",
 			"--config:qsim.numberOfThreads", "2",
+			"--allow-config-typical-durations", // legacy v1.0 fixture: typicals are type-encoded, not attributes
 			"--emissions", DresdenUtils.EmissionsAnalysisHandling.NO_EMISSIONS_ANALYSIS.name() );
 		Assertions.assertEquals(0, code, "Must return non error code");
 

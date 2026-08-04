@@ -17,6 +17,11 @@ sharedOberlausitzDresden := $(CURDIR)/../../shared-svn/projects/matsim-oberlausi
 dresdenRaw := $(CURDIR)/../../shared-svn/raw/europe/de/dresden
 
 MEMORY ?= 50G
+
+# Length of the simulation period as a multiple of 24h; must match DresdenModel.DEFAULT_SIMULATION_PERIOD_IN_DAYS
+# (1.125 = 27:00), since preprocessing and the scoring have to agree on where the day ends.
+SIM_PERIOD_DAYS ?= 1.125
+
 #JAR := matsim-$(N)-*.jar
 JAR := matsim-dresden-1.1-v1.0.2-68.jar
 
@@ -289,16 +294,20 @@ NETWORK := $(shared)/before-calibration/output/network.osm.pbf
   	 --range 700\
     --num-trips 43524\
     --output $@
-#   this step *has to* be done after the generation of short distance trips.
-#	split activity types to type_duration for the scoring to take into account the typical duration
-#some plans apparently have a sum of act_duration >> 86400. This is some issue in the input data, we decided to ignore that for dresden v1.1.
-#To fix the above issue, we set --overlong-plans-factor 1.5
-#	TODO: usage of --end-time-to-duration does not remove all end times of activities below 1800s (default value)
-	$(sc) prepare split-activity-types-duration\
-		--input $@\
-		--overlong-plans-factor 1.5\
-		--exclude commercial_start,commercial_end,freight_start,freight_end,service\
-		--output $@
+#   these steps *have to* be done after the generation of short distance trips.
+#	They replace split-activity-types-duration: instead of encoding the typical duration in the activity type,
+#	each activity carries its own "typicalDuration" attribute, which the scoring reads (see
+#	DresdenScoringFunctionFactory).
+# clean redundant max-duration attributes and reschedule plans whose activities run past the simulation day,
+# order-preserving, so the last activity keeps a positive window.
+	$(sc) prepare reschedule-late-plans $@ --output $@ --simulation-period-in-days $(SIM_PERIOD_DAYS)
+# switch off wrap-around scoring: split first and last act of the day into separate _morning and _evening act types.
+	$(sc) prepare split-wrap-around-activities $@ --output $@
+# encode each activity's typical duration as a "typicalDuration" attribute on the activity. Must run after the
+# wrap-around split, so the (now differing) morning/evening types take the non-wrap-around branch.
+	$(sc) prepare encode-typical-duration $@ --output $@ --simulation-period-in-days $(SIM_PERIOD_DAYS) --min-typical-duration 300
+# for short activities, remove the end time and encode the span as a maximum duration instead.
+	$(sc) prepare end-time-to-duration $@ --output $@ --end-time-to-duration 1800
 #	merge person and freight pops
 	$(sc) prepare merge-populations $@ $< $(word 3,$^) --output $@
 
