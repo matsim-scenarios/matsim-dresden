@@ -21,4 +21,13 @@ jobs:
           name: Package
           path: staging
     env:
-      MAVEN_OPTS: -Xmx512m
+      # Bound how long a single unresponsive repository can hold up resolution. jogamp.org (inherited from
+      # matsim-all, serves nothing we use) answers each request only after ~45s, which on a cold cache cost
+      # roughly an hour per job before central was moved to the front of the repository list in pom.xml.
+      # Set for both the default resolver transport and wagon, whichever ends up being used.
+      MAVEN_OPTS: >-
+        -Xmx512m
+        -Daether.connector.connectTimeout=5000
+        -Daether.connector.requestTimeout=30000
+        -Dmaven.wagon.http.connectionTimeout=5000
+        -Dmaven.wagon.http.readTimeout=30000

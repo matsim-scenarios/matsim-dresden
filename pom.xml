@@ -273,6 +273,18 @@
 	<repositories>
 		<!--Note that in general repositories are not transitive, so they need to be repeated at every level where needed.-->
 		<repository>
+			<!--
+				Maven consults repositories in declaration order, and the super-POM puts central LAST, i.e. after
+				everything below plus the jogl repo we inherit from matsim-all. jogamp.org answers, but takes ~45s
+				per request, and it serves nothing we use, so every one of the ~150 artifacts that does live on
+				central had to wait out that tarpit before being found. Redeclaring central here overrides the
+				super-POM's definition and moves it to the front; the repos below are still consulted, just only
+				for the artifacts central does not have.
+			-->
+			<id>central</id>
+			<url>https://repo.maven.apache.org/maven2</url>
+		</repository>
+		<repository>
 			<!-- Geotools is not on Maven central -->
 			<id>osgeo</id>
 			<name>Geotools repository</name>
