@@ -161,7 +161,11 @@ public class DresdenModel extends MATSimApplication {
 		vvo10.setFareZoneShp( "https://svn.vsp.tu-berlin.de/repos/public-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/shp/v1.1_vvo_tarifzone_10_dresden_utm32n.shp" );
 		ptFareConfigGroup.addParameterSet( vvo10 );
 
-		DistanceBasedPtFareParams germany = DistanceBasedPtFareParams.GERMAN_WIDE_FARE_2024;
+//		GERMAN_WIDE_FARE_2024 is a shared static singleton. Deflating it in place would compound the factor
+//		once per model setup in the same JVM (the test suite sets up several), so copy it and deflate the copy.
+		DistanceBasedPtFareParams germanWide2024 = DistanceBasedPtFareParams.GERMAN_WIDE_FARE_2024;
+		DistanceBasedPtFareParams germany = new DistanceBasedPtFareParams();
+		germany.setMinFare( germanWide2024.getMinFare() );
 		germany.setTransactionPartner( "Deutschlandtarif" );
 		germany.setDescription( "Deutschlandtarif" );
 		germany.setOrder( 2 );
@@ -174,13 +178,12 @@ public class DresdenModel extends MATSimApplication {
 //		pt distance cost 2021: cost = (m*distance + b) / inflationFactor = m * inflationFactor * distance + b * inflationFactor
 //		ergo: slope2021 = slope2024/inflationFactor and intercept2021 = intercept2024/inflationFactor
 		double inflationFactor = 1.16;
-		DistanceBasedPtFareParams.DistanceClassLinearFareFunctionParams below100km = germany.getOrCreateDistanceClassFareParams( 100_000. );
-		below100km.setFareSlope( below100km.getFareSlope() / inflationFactor );
-		below100km.setFareIntercept( below100km.getFareIntercept() / inflationFactor );
-
-		DistanceBasedPtFareParams.DistanceClassLinearFareFunctionParams greaterThan100km = germany.getOrCreateDistanceClassFareParams( POSITIVE_INFINITY );
-		greaterThan100km.setFareSlope( greaterThan100km.getFareSlope() / inflationFactor );
-		greaterThan100km.setFareIntercept( greaterThan100km.getFareIntercept() / inflationFactor );
+		for ( double maxDistance : new double[] { 100_000., POSITIVE_INFINITY } ) {
+			DistanceBasedPtFareParams.DistanceClassLinearFareFunctionParams fare2024 = germanWide2024.getOrCreateDistanceClassFareParams( maxDistance );
+			DistanceBasedPtFareParams.DistanceClassLinearFareFunctionParams fare2021 = germany.getOrCreateDistanceClassFareParams( maxDistance );
+			fare2021.setFareSlope( fare2024.getFareSlope() / inflationFactor );
+			fare2021.setFareIntercept( fare2024.getFareIntercept() / inflationFactor );
+		}
 
 		setExplicitIntermodalityParamsForWalkToPt(ConfigUtils.addOrGetModule(config, SwissRailRaptorConfigGroup.class));
 
