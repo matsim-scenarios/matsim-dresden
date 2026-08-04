@@ -283,15 +283,19 @@
 			-->
 			<id>central</id>
 			<url>https://repo.maven.apache.org/maven2</url>
+			<!-- the super-POM disables snapshots on central; redeclaring it here would silently re-enable them. -->
+			<snapshots><enabled>false</enabled></snapshots>
 		</repository>
 		<repository>
 			<!-- Geotools is not on Maven central -->
 			<id>osgeo</id>
 			<name>Geotools repository</name>
 			<url>https://repo.osgeo.org/repository/release/</url>
+			<snapshots><enabled>false</enabled></snapshots>
 		</repository>
 		<repository>
 			<!-- Repository for MATSim (MATSim is not on Maven central, releases and snapshots) -->
+			<!-- the only repository here that serves snapshots, so the only one worth asking for them. -->
 			<id>matsim</id>
 			<url>https://repo.matsim.org/repository/matsim</url>
 		</repository>
@@ -299,11 +303,29 @@
 		<repository>
 			<id>topobyte</id>
 			<url>https://mvn.topobyte.de</url>
+			<snapshots><enabled>false</enabled></snapshots>
 		</repository>
 		<!-- for dependencies of osm-network-reader -->
 		<repository>
 			<id>slimjars</id>
 			<url>https://mvn.slimjars.com</url>
+			<snapshots><enabled>false</enabled></snapshots>
+		</repository>
+		<repository>
+			<!--
+				matsim-all inherits a "jogl" repository pointing at jogamp.org (for the JOGL artifacts otfvis
+				needs). A POM cannot drop an inherited repository, only redefine it by id, so point it at central:
+				jogamp.org answers each request only after ~45s, and over a full cold resolve it served 0 of 1684
+				artifacts while still being asked 22 times, which is ~16 minutes of waiting for nothing. Those 22
+				are BOM and parent POMs that central has anyway.
+
+				Consequence: nothing here can resolve from jogamp any more. If this scenario ever pulls in otfvis
+				or another genuinely JOGL-dependent artifact, restore the URL below to
+				https://jogamp.org/deployment/maven/ (and expect the wait back).
+			-->
+			<id>jogl</id>
+			<url>https://repo.maven.apache.org/maven2</url>
+			<snapshots><enabled>false</enabled></snapshots>
 		</repository>
 
 <!--		<repository>-->

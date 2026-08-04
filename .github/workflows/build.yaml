@@ -14,7 +14,10 @@ jobs:
           architecture: x64
           distribution: adopt
           cache: maven
-      - run: mvn --batch-mode --update-snapshots package checkstyle:checkstyle enforcer:enforce -Dmatsim.preferLocalDtds=true -Dmaven.javadoc.skip -e
+      # No --update-snapshots: nothing in the effective POM is a SNAPSHOT (the matsim parent is a pinned release),
+      # so it has nothing to update, and it forces every repository to be re-asked for metadata and for artifacts
+      # whose absence is already cached -- including the slow ones. Add it back when pinning a SNAPSHOT parent.
+      - run: mvn --batch-mode package checkstyle:checkstyle enforcer:enforce -Dmatsim.preferLocalDtds=true -Dmaven.javadoc.skip -e
       - run: mkdir staging && cp *.jar staging
       - uses: actions/upload-artifact@v4
         with:
