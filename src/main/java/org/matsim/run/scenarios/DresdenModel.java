@@ -42,11 +42,15 @@ import org.matsim.core.replanning.annealing.ReplanningAnnealerConfigGroup.Anneal
 import org.matsim.core.scoring.functions.ScoringParametersForPerson;
 import org.matsim.dashboards.DresdenDashboardProvider;
 import org.matsim.prepare.*;
+import org.matsim.scoring.DresdenScoringConfigGroup;
+import org.matsim.scoring.DresdenScoringFunctionFactory;
 import org.matsim.simwrapper.DashboardProvider;
 import org.matsim.simwrapper.SimWrapperConfigGroup;
 import org.matsim.simwrapper.SimWrapperModule;
 import org.matsim.smallScaleCommercialTrafficGeneration.GenerateSmallScaleCommercialTrafficDemand;
 import org.matsim.smallScaleCommercialTrafficGeneration.prepare.CreateDataDistributionOfStructureData;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 import playground.vsp.scoring.IncomeDependentUtilityOfMoneyPersonScoringParameters;
 
@@ -60,7 +64,7 @@ import static org.matsim.run.scenarios.DresdenUtils.*;
 		CreateLandUseShp.class, ResolveGridCoordinates.class, FixSubtourModes.class, AdjustActivityToLinkDistances.class, XYToLinks.class,
 		CleanNetwork.class, PrepareNetwork.class, SplitActivityTypesDuration.class, CreateCountsFromBAStData.class,
 		CutOutDresdenPopulation.class, CreateDataDistributionOfStructureData.class, GenerateSmallScaleCommercialTrafficDemand.class,
-		PreparePopulation.class, CreateFacilitiesFromPopulation.class, CreateSingleTransportModePopulation.class, RemoveVehicleInformationFromPopulation.class,
+		PreparePopulation.class, RescheduleLatePlans.class, SplitWrapAroundActivities.class, EndTimeToDuration.class, EncodeTypicalDuration.class, CreateFacilitiesFromPopulation.class, CreateSingleTransportModePopulation.class, RemoveVehicleInformationFromPopulation.class,
 		CreateScenarioCutOut.class
 })
 @MATSimApplication.Analysis({
@@ -70,12 +74,46 @@ public class DresdenModel extends MATSimApplication {
 
 	public static final String VERSION = "v1.1";
 
+	/**
+	 * Default length of the simulation period, as a multiple of 24h; overridable with --simulation-period-in-days.
+	 * 1.125 (= 27:00) makes the non-wrap-around overnight scoring clamp the last activity at 27:00 instead of 24:00
+	 * (see {@link org.matsim.prepare.EncodeTypicalDuration}).
+	 */
+	public static final double DEFAULT_SIMULATION_PERIOD_IN_DAYS = 1.125;
+
+	/**
+	 * Fallback typical duration (seconds) for the untagged person activity types. Normally overridden per
+	 * activity by the "typicalDuration" attribute (see EncodeTypicalDuration / DresdenScoringFunctionFactory); only
+	 * used for activities that carry no such attribute.
+	 */
+	private static final double FALLBACK_TYPICAL_DURATION = 2 * 3600;
+	private static final Logger log = LoggerFactory.getLogger(DresdenModel.class);
+
 	@CommandLine.Option(names = "--emissions",
 		description = "Define if emission analysis should be performed or not" )
 	private EmissionsAnalysisHandling emissions = EmissionsAnalysisHandling.RUN_EMISSIONS_ANALYSIS;
 
 	@CommandLine.Option(names="--emissions-from-iteration")
 	private long emissionsFromIteration = 10;
+
+	@CommandLine.Option(names="--with-opening-times",
+		description = "Give the activity types the made-up opening times of the Snz conventions. Default false: the " +
+			"per-activity typical durations carry the schedule, so the opening times only distort it.")
+	private boolean withOpeningTimes = false;
+
+	@CommandLine.Option(names="--simulation-period-in-days",
+		description = "Length of the simulation period, as a multiple of 24h. Moves the else-branch overnight " +
+			"scoring clamp: handleOvernightActivity scores the (non-wrap-around) last activity from its start to " +
+			"simulationPeriodInDays * 24h. Preprocessing (reschedule-late-plans, encode-typical-duration) must use " +
+			"the same value.")
+	private double simulationPeriodInDays = DEFAULT_SIMULATION_PERIOD_IN_DAYS;
+
+	@CommandLine.Option(names="--allow-config-typical-durations",
+		description = "Allow person-subpopulation activities without a typicalDuration attribute to score against the " +
+			"config typical duration. By default such an activity ABORTS the run: every person activity is to be " +
+			"scored against its survey-derived typical duration. Pass this only for legacy type-encoded populations " +
+			"(v1.1 and earlier), whose typicals live in the activity type names. Default false.")
+	private boolean allowConfigTypicalDurations = false;
 
 //	TODO: remove before release
 //	@CommandLine.Option(names="--ride-alpha", description = "alpha value for ride. For calibration only! To be removed before release.")
@@ -96,9 +134,24 @@ public class DresdenModel extends MATSimApplication {
 
 	protected void addScoringParams( Config config ) {
 		// yyyy need to find a way to remove the existing scoring params; then this can be programmed without inheritance
-		SnzActivities.addScoringParams(config);
-//		add scoring params for split act types for _morning and _evening. See method prepareScenario.
-		SnzActivities.addMorningEveningScoringParams(config);
+
+//		Register the original, untagged Snz activity types plus the _morning and _evening variants that switch off
+//		wrap-around scoring. Upstream SnzActivities only offers the duration-tagged variants (one type per duration
+//		bin), so we register the untagged types ourselves. The per-activity typical duration is supplied at scoring
+//		time by the "typicalDuration" attribute (see EncodeTypicalDuration / DresdenScoringFunctionFactory); the
+//		typical duration set here is only a fallback for activities that lack the attribute.
+		for (SnzActivities value : SnzActivities.values()) {
+			if (withOpeningTimes) {
+				log.info("with opening times");
+				config.scoring().addActivityParams(value.apply(new ScoringConfigGroup.ActivityParams(value.name()).setTypicalDuration(FALLBACK_TYPICAL_DURATION)));
+			} else {
+				log.info("without opening times");
+				config.scoring().addActivityParams(new ScoringConfigGroup.ActivityParams(value.name()).setTypicalDuration(FALLBACK_TYPICAL_DURATION));
+			}
+//			morning/evening variants deliberately without opening times, matching SnzActivities.addMorningEveningScoringParams.
+			config.scoring().addActivityParams(new ScoringConfigGroup.ActivityParams(SnzActivities.createMorningActivityType(value.name())).setTypicalDuration(FALLBACK_TYPICAL_DURATION));
+			config.scoring().addActivityParams(new ScoringConfigGroup.ActivityParams(SnzActivities.createEveningActivityType(value.name())).setTypicalDuration(FALLBACK_TYPICAL_DURATION));
+		}
 	}
 
 	@Nullable
@@ -129,6 +182,16 @@ public class DresdenModel extends MATSimApplication {
 //		also enable plan inheritance analysis
 		PlanInheritanceConfigGroup planInheritanceConfigGroup = ConfigUtils.addOrGetModule(config, PlanInheritanceConfigGroup.class);
 		planInheritanceConfigGroup.setEnabled(true);
+
+//		Record in the output config whether activities without a typicalDuration attribute are tolerated; see
+//		--allow-config-typical-durations and DresdenScoringFunctionFactory.
+		ConfigUtils.addOrGetModule(config, DresdenScoringConfigGroup.class)
+			.setAllowConfigTypicalDurations(allowConfigTypicalDurations);
+
+//		Move the else-branch overnight scoring clamp away from 24:00. handleOvernightActivity
+//		scores the (non-wrap-around) last activity from its start to simulationPeriodInDays * 24h;
+//		the default 1.125 * 24h = 27:00. See --simulation-period-in-days.
+		config.scenario().setSimulationPeriodInDays( simulationPeriodInDays );
 
 		prepareCommercialTrafficConfig(config);
 
@@ -161,7 +224,11 @@ public class DresdenModel extends MATSimApplication {
 		vvo10.setFareZoneShp( "https://svn.vsp.tu-berlin.de/repos/public-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/shp/v1.1_vvo_tarifzone_10_dresden_utm32n.shp" );
 		ptFareConfigGroup.addParameterSet( vvo10 );
 
-		DistanceBasedPtFareParams germany = DistanceBasedPtFareParams.GERMAN_WIDE_FARE_2024;
+//		GERMAN_WIDE_FARE_2024 is a shared static singleton. Deflating it in place would compound the factor
+//		once per model setup in the same JVM (the test suite sets up several), so copy it and deflate the copy.
+		DistanceBasedPtFareParams germanWide2024 = DistanceBasedPtFareParams.GERMAN_WIDE_FARE_2024;
+		DistanceBasedPtFareParams germany = new DistanceBasedPtFareParams();
+		germany.setMinFare( germanWide2024.getMinFare() );
 		germany.setTransactionPartner( "Deutschlandtarif" );
 		germany.setDescription( "Deutschlandtarif" );
 		germany.setOrder( 2 );
@@ -174,13 +241,12 @@ public class DresdenModel extends MATSimApplication {
 //		pt distance cost 2021: cost = (m*distance + b) / inflationFactor = m * inflationFactor * distance + b * inflationFactor
 //		ergo: slope2021 = slope2024/inflationFactor and intercept2021 = intercept2024/inflationFactor
 		double inflationFactor = 1.16;
-		DistanceBasedPtFareParams.DistanceClassLinearFareFunctionParams below100km = germany.getOrCreateDistanceClassFareParams( 100_000. );
-		below100km.setFareSlope( below100km.getFareSlope() / inflationFactor );
-		below100km.setFareIntercept( below100km.getFareIntercept() / inflationFactor );
-
-		DistanceBasedPtFareParams.DistanceClassLinearFareFunctionParams greaterThan100km = germany.getOrCreateDistanceClassFareParams( POSITIVE_INFINITY );
-		greaterThan100km.setFareSlope( greaterThan100km.getFareSlope() / inflationFactor );
-		greaterThan100km.setFareIntercept( greaterThan100km.getFareIntercept() / inflationFactor );
+		for ( double maxDistance : new double[] { 100_000., POSITIVE_INFINITY } ) {
+			DistanceBasedPtFareParams.DistanceClassLinearFareFunctionParams fare2024 = germanWide2024.getOrCreateDistanceClassFareParams( maxDistance );
+			DistanceBasedPtFareParams.DistanceClassLinearFareFunctionParams fare2021 = germany.getOrCreateDistanceClassFareParams( maxDistance );
+			fare2021.setFareSlope( fare2024.getFareSlope() / inflationFactor );
+			fare2021.setFareIntercept( fare2024.getFareIntercept() / inflationFactor );
+		}
 
 		setExplicitIntermodalityParamsForWalkToPt(ConfigUtils.addOrGetModule(config, SwissRailRaptorConfigGroup.class));
 
@@ -196,9 +262,8 @@ public class DresdenModel extends MATSimApplication {
 //		this happens in the makefile pipeline already, but we do it here anyways, in case somebody uses a preliminary network.
 		PrepareNetwork.prepareFreightNetwork(scenario.getNetwork());
 
-//		switch off wrap around scoring if not done already. The method creates separate _morning and _evening act types for the first and last act if they have the same act type, e.g. home.
-//		Thus, no wrap-around scoring will be performed.
-		Activities.changeWrapAroundActsIntoMorningAndEveningActs(scenario);
+//		Splitting the first and last act of the day into separate _morning and _evening act types (to switch off
+//		wrap-around scoring) is now done during population preparation, see the split-wrap-around-activities step.
 
 //		remove disallowed links. The disallowed links cause many problems and (usually) are not useful in our rather macroscopic view on transport systems.
 		// yyyy I have no idea what this means; could someone please explain?  kai, dec'25
@@ -236,6 +301,10 @@ public class DresdenModel extends MATSimApplication {
 			public void install() {
 				install(new PtFareModule());
 				bind(ScoringParametersForPerson.class).to(IncomeDependentUtilityOfMoneyPersonScoringParameters.class).in( Singleton.class );
+
+//				score activities against the plan-derived typical duration stored on each activity (see
+//				EncodeTypicalDuration), instead of encoding the typical duration in the activity type.
+				bindScoringFunctionFactory().to(DresdenScoringFunctionFactory.class);
 
 				addTravelTimeBinding(TransportMode.ride).to(carTravelTime());
 				addTravelDisutilityFactoryBinding(TransportMode.ride).to(carTravelDisutilityFactoryKey());
