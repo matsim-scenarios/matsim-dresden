@@ -23,8 +23,8 @@ import java.util.HashSet;
 import java.util.Set;
 
 import static ch.sbb.matsim.config.SwissRailRaptorConfigGroup.IntermodalAccessEgressModeSelection.*;
+import static org.matsim.contrib.common.conventions.vsp.SubpopulationDefaultNames.*;
 import static org.matsim.contrib.vsp.scenario.HbefaDefaultStrings.*;
-import static org.matsim.contrib.vsp.scenario.SubpopulationDefaultNames.*;
 import static org.matsim.run.scenarios.DresdenUtils.SNZPersonAttributeNames.*;
 
 /**

@@ -16,11 +16,11 @@ jobs:
         with:
           java-version: 25
           architecture: x64
-          distribution: adopt
+          distribution: temurin
           cache: maven
 
       - name: Checkstyle
-        run: mvn --batch-mode --update-snapshots checkstyle:checkstyle
+        run: ./mvnw --batch-mode checkstyle:checkstyle
 
   enforce:
     #run if push or pull_requests from fork
@@ -34,11 +34,11 @@ jobs:
         with:
           java-version: 25
           architecture: x64
-          distribution: adopt
+          distribution: temurin
           cache: maven
 
       - name: Package
-        run: mvn --batch-mode --update-snapshots  enforcer:enforce
+        run: ./mvnw --batch-mode enforcer:enforce
 
   test:
     #run if push or pull_requests from fork
@@ -59,11 +59,11 @@ jobs:
         with:
           java-version: ${{ matrix.java }}
           architecture: x64
-          distribution: adopt
+          distribution: temurin
           cache: maven
 
       - name: Test
-        run: mvn --batch-mode --update-snapshots test -Dmatsim.preferLocalDtds=true -Dmaven.javadoc.skip -e
+        run: ./mvnw --batch-mode test -Dmatsim.preferLocalDtds=true -Dmaven.javadoc.skip -e
       - uses: actions/upload-artifact@v4
         with:
           name: test-coverage
@@ -82,11 +82,11 @@ jobs:
         with:
           java-version: 25
           architecture: x64
-          distribution: adopt
+          distribution: temurin
           cache: maven
 
       - name: Package
-        run: mvn --batch-mode --update-snapshots package -DskipTests -Dmatsim.preferLocalDtds=true -Dmaven.javadoc.skip -e
+        run: ./mvnw --batch-mode package -DskipTests -Dmatsim.preferLocalDtds=true -Dmaven.javadoc.skip -e
       - run: mkdir staging && cp *.jar staging
       - uses: actions/upload-artifact@v4
         with:

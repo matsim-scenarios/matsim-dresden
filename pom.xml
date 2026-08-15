@@ -12,8 +12,8 @@
 		<!-- weekly release -->
 <!--		<version>2026.0-2026w03</version>-->
 
-		<!-- PR-labelled release -->
-		<version>2027.0-PR4883</version>
+		<!-- Pinned weekly release -->
+		<version>2027.0-2026w32</version>
 
 		<!-- snapshot; ONLY use for "sharing in the IDE" -->
 <!--		<version>2026.0-SNAPSHOT</version>-->
@@ -35,7 +35,7 @@
 
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-		<maven.compiler.release>21</maven.compiler.release>
+		<maven.compiler.release>25</maven.compiler.release>
 	</properties>
 
 	<distributionManagement>
@@ -122,6 +122,8 @@
 				<version>3.0.0-M9</version>
 				<configuration>
 					<forkCount>1</forkCount>
+					<!-- MATSim applications keep process-global state; isolate scenario test classes. -->
+					<reuseForks>false</reuseForks>
 					<!-- avoid out of memory errors: -->
 					<argLine>@{argLine} -Xmx6500m -Djava.awt.headless=true -Dmatsim.preferLocalDtds=true</argLine>
 					<!--necessary in tu berlin gitlab. BUT not good in other places, so solve by command line switch only where needed.  kai, nov'18-->

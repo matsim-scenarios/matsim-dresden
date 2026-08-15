@@ -54,7 +54,7 @@
 
 	<module name="counts">
 		<param name="inputCountsFile" value="https://svn.vsp.tu-berlin.de/repos/public-svn/matsim/scenarios/countries/de/dresden/dresden-v1.1/calibrated-1pct/output/009.output_counts.xml.gz"/>
-		<param name="countsScaleFactor" value="0.01"/>
+		<param name="countsScaleFactor" value="100"/>
 	</module>
 
 	<module name="routing">

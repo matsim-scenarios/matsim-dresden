@@ -7,7 +7,7 @@ import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.core.config.Configurator;
 import org.matsim.api.core.v01.Scenario;
 import org.matsim.application.MATSimApplication;
-import org.matsim.contrib.vsp.scenario.SnzActivities;
+import org.matsim.contrib.common.conventions.vsp.SnzActivities;
 import org.matsim.core.config.Config;
 import org.matsim.core.controler.Controler;
 import org.matsim.core.controler.ControllerUtils;
