@@ -118,7 +118,7 @@ public class PrepareNetwork implements MATSimAppCommand {
 	 * Create a dedicated network for bikes within the Dresden city, so that bike does not involve in car congestion.
 	 * This also enables further detailed processing of bike network (e.g., impact of traffic light, more realistic impact of car congestion on bike)
 	 *
-	 * @param network
+	 * @param network the input network
 	 */
 	public static void prepareBikeNetwork(Network network) {
 		ShpOptions shpOptions = new ShpOptions("input/v1.0/vvo_tarifzone_10_dresden/v1.0_vvo_tarifzone_10_dresden_utm32n.shp", "EPSG:25832", null);
@@ -136,7 +136,11 @@ public class PrepareNetwork implements MATSimAppCommand {
 					String id = link.getId().toString() + "_bike";
 					Link bikeLink = NetworkUtils.createAndAddLink(network, Id.createLinkId(id), fromNode, toNode, link.getLength(), link.getFreespeed(), link.getCapacity(), 1);
 					bikeLink.setAllowedModes(Set.of(TransportMode.bike));
-
+					// put the same road name of the original link
+					Object roadName = link.getAttributes().getAsMap().get("name");
+					if (roadName != null) {
+						bikeLink.getAttributes().putAttribute("name", roadName.toString());
+					}
 					// remove bike mode from the original link
 					Set<String> allowedModes = new HashSet<>(link.getAllowedModes());
 					allowedModes.remove(TransportMode.bike);
